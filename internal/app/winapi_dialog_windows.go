@@ -80,11 +80,11 @@ func chooseConfigPath(hwnd uintptr, title string, initialPath string, save bool)
 
 func fileDialogInitialNameAndDir(initialPath string) (string, string) {
 	if initialPath == "" {
-		return "settings.toml", ""
+		return defaultConfigFileName, ""
 	}
 	name := filepath.Base(initialPath)
 	if name == "." || name == string(filepath.Separator) {
-		name = "settings.toml"
+		name = defaultConfigFileName
 	}
 	dir := filepath.Dir(initialPath)
 	if dir == "." || dir == name {

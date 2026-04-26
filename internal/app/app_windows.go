@@ -47,6 +47,8 @@ var (
 	mouseHookProc    = syscall.NewCallback(lowLevelMouseProc)
 )
 
+const defaultConfigFileName = "default.toml"
+
 func Run() error {
 	runtime.LockOSThread()
 
@@ -78,7 +80,7 @@ func (a *application) run() error {
 	if loaded, err := config.LoadFile(a.configPath); err == nil {
 		a.cfg = loaded
 	} else if !errors.Is(err, os.ErrNotExist) {
-		messageBox(0, "diablo-helper", "Failed to load settings.toml. Defaults will be used.\n\n"+err.Error(), mbOK|mbIconError)
+		messageBox(0, "diablo-helper", "Failed to load "+defaultConfigFileName+". Defaults will be used.\n\n"+err.Error(), mbOK|mbIconError)
 	}
 	a.cfg.Normalize()
 
@@ -168,7 +170,7 @@ func (a *application) registerWindowClass() error {
 func defaultConfigPath() string {
 	executable, err := os.Executable()
 	if err != nil {
-		return "settings.toml"
+		return defaultConfigFileName
 	}
-	return filepath.Join(filepath.Dir(executable), "settings.toml")
+	return filepath.Join(filepath.Dir(executable), defaultConfigFileName)
 }

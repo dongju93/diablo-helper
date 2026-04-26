@@ -5,7 +5,7 @@ var (
 	Commit    = "none"
 	BuildDate = "unknown"
 	Author    = "dongju93"
-	Repo      = "github.com/dongju93/diablo-helper"
+	Repo      = "https://github.com/dongju93/diablo-helper"
 	GoVersion = "unknown"
 )
 

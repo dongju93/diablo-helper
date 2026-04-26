@@ -167,7 +167,7 @@ func TestSaveFileAndLoadFileRoundTrip(t *testing.T) {
 		Enabled:    true,
 	}
 
-	path := filepath.Join(t.TempDir(), "settings.toml")
+	path := filepath.Join(t.TempDir(), "default.toml")
 	if err := SaveFile(path, cfg); err != nil {
 		t.Fatalf("SaveFile() error = %v", err)
 	}

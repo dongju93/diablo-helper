@@ -59,8 +59,8 @@ func TestFileDialogInitialNameAndDir(t *testing.T) {
 		wantName string
 		wantDir  string
 	}{
-		{name: "empty", wantName: "settings.toml"},
-		{name: "relative file", path: "settings.toml", wantName: "settings.toml"},
+		{name: "empty", wantName: "default.toml"},
+		{name: "relative file", path: "default.toml", wantName: "default.toml"},
 		{name: "absolute file", path: `C:\profiles\season.toml`, wantName: "season.toml", wantDir: `C:\profiles`},
 	}
 
