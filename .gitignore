@@ -87,3 +87,4 @@ $RECYCLE.BIN/
 
 .build-cache/
 dist/
+*.syso

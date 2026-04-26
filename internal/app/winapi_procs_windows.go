@@ -30,6 +30,7 @@ var (
 	procGetWindowTextLenW = user32.NewProc("GetWindowTextLengthW")
 	procInvalidateRect    = user32.NewProc("InvalidateRect")
 	procLoadCursorW       = user32.NewProc("LoadCursorW")
+	procLoadIconW         = user32.NewProc("LoadIconW")
 	procMessageBoxW       = user32.NewProc("MessageBoxW")
 	procPostQuitMessage   = user32.NewProc("PostQuitMessage")
 	procRegisterClassExW  = user32.NewProc("RegisterClassExW")

@@ -12,6 +12,7 @@ import (
 	"unsafe"
 
 	"github.com/dongju93/diablo-helper/internal/config"
+	"github.com/dongju93/diablo-helper/internal/meta"
 )
 
 type application struct {
@@ -93,7 +94,7 @@ func (a *application) run() error {
 	hwnd, _, err := procCreateWindowExW.Call(
 		0,
 		uintptr(unsafe.Pointer(utf16Ptr("DiabloHelperWindow"))),
-		uintptr(unsafe.Pointer(utf16Ptr("Diablo Helper"))),
+		uintptr(unsafe.Pointer(utf16Ptr(meta.Title()))),
 		wsOverlappedWindow,
 		cwUseDefault,
 		cwUseDefault,
@@ -143,11 +144,14 @@ func (a *application) run() error {
 
 func (a *application) registerWindowClass() error {
 	cursor, _, _ := procLoadCursorW.Call(0, idcArrow)
+	icon, _, _ := procLoadIconW.Call(a.instance, uintptr(1))
 	className := utf16Ptr("DiabloHelperWindow")
 	wc := windowClassEx{
 		Size:       uint32(unsafe.Sizeof(windowClassEx{})),
 		WndProc:    windowProc,
 		Instance:   a.instance,
+		Icon:       icon,
+		IconSm:     icon,
 		Cursor:     cursor,
 		Background: colorWindow + 1,
 		ClassName:  className,
