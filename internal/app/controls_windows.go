@@ -185,7 +185,7 @@ func (a *application) createControls(hwnd uintptr) {
 
 	// Right column – skill rows
 	y := 204
-	for i := 0; i < config.MaxSkills; i++ {
+	for i := range config.MaxSkills {
 		a.controls.skillEnabled[i] = a.createCheckbox(hwnd, idSkillEnabledBase+i, "", lo.skillChkX, lo.y(y+6), lo.w(22), lo.h(22))
 		a.controls.skillNums[i] = a.createStatic(hwnd, strconv.Itoa(i+1), lo.skillNumX, lo.y(y+7), lo.w(skillNumW), lo.h(22))
 		a.controls.skillButtons[i] = a.createButton(hwnd, idSkillKeyBase+i, "", lo.skillBtnX, lo.y(y), lo.skillBtnW, lo.h(34))
@@ -235,7 +235,7 @@ func (a *application) repositionControls() {
 	moveControl(a.controls.skillIntHdr, lo.skillIntHdrX, lo.y(174), lo.w(80), lo.h(24))
 
 	y := 204
-	for i := 0; i < config.MaxSkills; i++ {
+	for i := range config.MaxSkills {
 		moveControl(a.controls.skillEnabled[i], lo.skillChkX, lo.y(y+6), lo.w(22), lo.h(22))
 		moveControl(a.controls.skillNums[i], lo.skillNumX, lo.y(y+7), lo.w(skillNumW), lo.h(22))
 		moveControl(a.controls.skillButtons[i], lo.skillBtnX, lo.y(y), lo.skillBtnW, lo.h(34))
@@ -336,7 +336,7 @@ func (a *application) updateControlsFromConfig() {
 			setWindowText(hwnd, bindingText(menu.Binding))
 		}
 	}
-	for i := 0; i < config.MaxSkills; i++ {
+	for i := range config.MaxSkills {
 		setChecked(a.controls.skillEnabled[i], a.cfg.Skills[i].Enabled)
 		setWindowText(a.controls.skillButtons[i], bindingText(a.cfg.Skills[i].Key))
 		setWindowText(a.controls.skillInterval[i], strconv.Itoa(a.cfg.Skills[i].IntervalMS))
@@ -350,7 +350,7 @@ func (a *application) applyBulkInterval() {
 		messageBox(a.hwnd, "잘못된 간격", err.Error(), mbOK|mbIconError)
 		return
 	}
-	for i := 0; i < config.MaxSkills; i++ {
+	for i := range config.MaxSkills {
 		setWindowText(a.controls.skillInterval[i], strconv.Itoa(interval))
 	}
 	a.setStatus("일괄 간격을 적용했습니다.")
@@ -433,7 +433,7 @@ func (a *application) stopRunner(status string) {
 
 func (a *application) syncConfigFromControls() error {
 	a.cfg.Normalize()
-	for i := 0; i < config.MaxSkills; i++ {
+	for i := range config.MaxSkills {
 		interval, err := parseInterval(getWindowText(a.controls.skillInterval[i]))
 		if err != nil {
 			return fmt.Errorf("기술 %d: %w", i+1, err)

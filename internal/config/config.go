@@ -69,6 +69,41 @@ func Default() Config {
 	return cfg
 }
 
+func (m *MenuKeys) SetKeyByID(id string, binding KeyBinding) bool {
+	switch id {
+	case "inventory":
+		m.Inventory = binding
+	case "skills":
+		m.Skills = binding
+	case "follower":
+		m.Follower = binding
+	case "map":
+		m.Map = binding
+	case "world_map":
+		m.WorldMap = binding
+	case "town_portal":
+		m.TownPortal = binding
+	case "chat":
+		m.Chat = binding
+	case "whisper":
+		m.Whisper = binding
+	default:
+		return false
+	}
+	return true
+}
+
+func (m *MenuKeys) forEachKey(fn func(*KeyBinding)) {
+	fn(&m.Inventory)
+	fn(&m.Skills)
+	fn(&m.Follower)
+	fn(&m.Map)
+	fn(&m.WorldMap)
+	fn(&m.TownPortal)
+	fn(&m.Chat)
+	fn(&m.Whisper)
+}
+
 func (c *Config) Normalize() {
 	if len(c.Skills) > MaxSkills {
 		c.Skills = c.Skills[:MaxSkills]
@@ -93,14 +128,7 @@ func (c *Config) Normalize() {
 	normalizeKey(&c.Start)
 	normalizeKey(&c.Stop)
 	normalizeKey(&c.Pause)
-	normalizeKey(&c.Menu.Inventory)
-	normalizeKey(&c.Menu.Skills)
-	normalizeKey(&c.Menu.Follower)
-	normalizeKey(&c.Menu.Map)
-	normalizeKey(&c.Menu.WorldMap)
-	normalizeKey(&c.Menu.TownPortal)
-	normalizeKey(&c.Menu.Chat)
-	normalizeKey(&c.Menu.Whisper)
+	c.Menu.forEachKey(normalizeKey)
 }
 
 func (c Config) MenuBindings() []MenuBinding {

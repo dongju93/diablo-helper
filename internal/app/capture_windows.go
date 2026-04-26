@@ -76,8 +76,6 @@ func (a *application) handleKeyEvent(vk uint16, down bool) bool {
 		a.stopRunner("종료 키 입력으로 정지했습니다.")
 	case sameKey(vk, a.cfg.Start):
 		a.startRunnerFromHotkey()
-	case sameKey(vk, a.cfg.Stop):
-		a.stopRunner("종료 키 입력으로 정지했습니다.")
 	case a.menuKeyMatches(vk):
 		a.stopRunner("게임 메뉴 키 입력으로 정지했습니다.")
 	case sameKey(vk, a.cfg.Pause):
@@ -102,7 +100,7 @@ func (a *application) assignCapturedKey(vk uint16) {
 			a.cfg.Skills[target.index].Key = binding
 		}
 	case captureMenu:
-		a.setMenuBinding(target.menuID, binding)
+		a.cfg.Menu.SetKeyByID(target.menuID, binding)
 	}
 	a.capture = captureTarget{}
 	a.updateBindingControl(target)
@@ -123,7 +121,7 @@ func (a *application) clearCapturedKey() {
 			a.cfg.Skills[a.capture.index].Key = config.KeyBinding{}
 		}
 	case captureMenu:
-		a.setMenuBinding(a.capture.menuID, config.KeyBinding{})
+		a.cfg.Menu.SetKeyByID(a.capture.menuID, config.KeyBinding{})
 	}
 }
 
@@ -158,27 +156,6 @@ func (a *application) menuKeyMatches(vk uint16) bool {
 		}
 	}
 	return false
-}
-
-func (a *application) setMenuBinding(id string, binding config.KeyBinding) {
-	switch id {
-	case "inventory":
-		a.cfg.Menu.Inventory = binding
-	case "skills":
-		a.cfg.Menu.Skills = binding
-	case "follower":
-		a.cfg.Menu.Follower = binding
-	case "map":
-		a.cfg.Menu.Map = binding
-	case "world_map":
-		a.cfg.Menu.WorldMap = binding
-	case "town_portal":
-		a.cfg.Menu.TownPortal = binding
-	case "chat":
-		a.cfg.Menu.Chat = binding
-	case "whisper":
-		a.cfg.Menu.Whisper = binding
-	}
 }
 
 func sameKey(vk uint16, binding config.KeyBinding) bool {

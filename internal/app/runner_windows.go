@@ -41,7 +41,6 @@ func (r *skillRunner) Start(cfg config.Config) bool {
 	r.paused.Store(false)
 
 	for _, skill := range skills {
-		skill := skill
 		go r.runSkill(ctx, skill)
 	}
 	return true

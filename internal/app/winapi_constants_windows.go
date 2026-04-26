@@ -7,16 +7,12 @@ const (
 
 	cwUseDefault = 0x80000000
 
-	wsExClientEdge     = 0x00000200
 	wsOverlappedWindow = 0x00CF0000
 	wsChild            = 0x40000000
 	wsVisible          = 0x10000000
 	wsTabStop          = 0x00010000
-	wsBorder           = 0x00800000
 
-	bsPushButton          = 0x00000000
 	bsAutoCheckbox        = 0x00000003
-	bsGroupBox            = 0x00000007
 	bsOwnerDraw           = 0x0000000B
 	bstChecked            = 1
 	cleartypeQuality      = 5
@@ -26,7 +22,7 @@ const (
 	esAutoHScroll         = 0x00000080
 	transparent           = 1
 	ssLeft                = 0x00000000
-	defaultGUIFont        = 17
+
 	dwmwaWindowCornerPref = 33
 	dwmwaSystemBackdrop   = 38
 	dwmwcpRound           = 2
@@ -49,7 +45,6 @@ const (
 	mbOK                  = 0x00000000
 	mbIconError           = 0x00000010
 	mbIconWarning         = 0x00000030
-	mbIconInfo            = 0x00000040
 	mouseEventLeftDown    = 0x0002
 	mouseEventLeftUp      = 0x0004
 	mouseEventRightDown   = 0x0008

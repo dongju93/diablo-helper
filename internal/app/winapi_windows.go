@@ -32,8 +32,8 @@ func makeLong(low int, high int) uintptr {
 	return uintptr(uint32(uint16(low)) | uint32(uint16(high))<<16)
 }
 
-func defWindowProc(hwnd uintptr, msg uint32, wParam uintptr, lParam uintptr) uintptr {
-	ret, _, _ := procDefWindowProcW.Call(hwnd, uintptr(msg), wParam, lParam)
+func defWindowProc(hwnd uintptr, msg uint32, wParam uintptr, lParam unsafe.Pointer) uintptr {
+	ret, _, _ := procDefWindowProcW.Call(hwnd, uintptr(msg), wParam, uintptr(lParam))
 	return ret
 }
 
@@ -121,7 +121,7 @@ func moveControl(hwnd uintptr, x, y, width, height int) {
 	procMoveWindow.Call(hwnd, uintptr(x), uintptr(y), uintptr(width), uintptr(height), 1)
 }
 
-func callNextHookEx(code int, wParam uintptr, lParam uintptr) uintptr {
-	ret, _, _ := procCallNextHookEx.Call(0, uintptr(code), wParam, lParam)
+func callNextHookEx(code int, wParam uintptr, lParam unsafe.Pointer) uintptr {
+	ret, _, _ := procCallNextHookEx.Call(0, uintptr(code), wParam, uintptr(lParam))
 	return ret
 }

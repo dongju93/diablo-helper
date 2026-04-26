@@ -72,7 +72,7 @@ func TestNormalizeRepairsConfigShapeAndValues(t *testing.T) {
 			Inventory: KeyBinding{Name: "Bad Menu", VK: 999},
 		},
 	}
-	for i := 0; i < MaxSkills+2; i++ {
+	for range MaxSkills + 2 {
 		cfg.Skills = append(cfg.Skills, Skill{
 			Name:       "",
 			Key:        KeyBinding{Name: "Bad Skill", VK: -10},

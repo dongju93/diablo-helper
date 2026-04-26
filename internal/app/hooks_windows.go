@@ -2,11 +2,9 @@
 
 package app
 
-import (
-	"unsafe"
-)
+import "unsafe"
 
-func wndProc(hwnd uintptr, msg uint32, wParam uintptr, lParam uintptr) uintptr {
+func wndProc(hwnd uintptr, msg uint32, wParam uintptr, lParam unsafe.Pointer) uintptr {
 	if appInstance == nil {
 		return defWindowProc(hwnd, msg, wParam, lParam)
 	}
@@ -22,8 +20,8 @@ func wndProc(hwnd uintptr, msg uint32, wParam uintptr, lParam uintptr) uintptr {
 		}
 		return 0
 	case wmGetMinMaxInfo:
-		if lParam != 0 {
-			info := (*minMaxInfo)(unsafe.Pointer(lParam))
+		if lParam != nil {
+			info := (*minMaxInfo)(lParam)
 			info.MinTrackSize.X = windowMinW
 			info.MinTrackSize.Y = windowMinH
 			info.MaxSize.X = windowMaxW
@@ -44,7 +42,7 @@ func wndProc(hwnd uintptr, msg uint32, wParam uintptr, lParam uintptr) uintptr {
 	case wmCtlColorEdit:
 		return appInstance.colorEdit(wParam)
 	case wmDrawItem:
-		appInstance.drawButton((*drawItemStruct)(unsafe.Pointer(lParam)))
+		appInstance.drawButton((*drawItemStruct)(lParam))
 		return 1
 	case wmCommand:
 		if appInstance.handleCommand(wParam) {
@@ -70,11 +68,11 @@ func wndProc(hwnd uintptr, msg uint32, wParam uintptr, lParam uintptr) uintptr {
 	return defWindowProc(hwnd, msg, wParam, lParam)
 }
 
-func lowLevelKeyboardProc(code int, wParam uintptr, lParam uintptr) uintptr {
+func lowLevelKeyboardProc(code int, wParam uintptr, lParam unsafe.Pointer) uintptr {
 	if code < 0 || appInstance == nil {
 		return callNextHookEx(code, wParam, lParam)
 	}
-	event := (*keyboardHookStruct)(unsafe.Pointer(lParam))
+	event := (*keyboardHookStruct)(lParam)
 	if event.Flags&llkhfInjected != 0 {
 		return callNextHookEx(code, wParam, lParam)
 	}
@@ -92,11 +90,11 @@ func lowLevelKeyboardProc(code int, wParam uintptr, lParam uintptr) uintptr {
 	return callNextHookEx(code, wParam, lParam)
 }
 
-func lowLevelMouseProc(code int, wParam uintptr, lParam uintptr) uintptr {
+func lowLevelMouseProc(code int, wParam uintptr, lParam unsafe.Pointer) uintptr {
 	if code < 0 || appInstance == nil {
 		return callNextHookEx(code, wParam, lParam)
 	}
-	event := (*mouseHookStruct)(unsafe.Pointer(lParam))
+	event := (*mouseHookStruct)(lParam)
 	if event.Flags&llmhfInjected != 0 {
 		return callNextHookEx(code, wParam, lParam)
 	}

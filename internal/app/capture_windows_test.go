@@ -104,7 +104,7 @@ func TestSetMenuBindingAndMenuKeyMatches(t *testing.T) {
 	a := newApplication()
 	a.cfg = config.Default()
 
-	a.setMenuBinding("world_map", config.KeyBinding{Name: "F7", VK: vkF1 + 6})
+	a.cfg.Menu.SetKeyByID("world_map", config.KeyBinding{Name: "F7", VK: vkF1 + 6})
 	if a.cfg.Menu.WorldMap != (config.KeyBinding{Name: "F7", VK: vkF1 + 6}) {
 		t.Fatalf("world map = %+v, want F7", a.cfg.Menu.WorldMap)
 	}
@@ -115,7 +115,7 @@ func TestSetMenuBindingAndMenuKeyMatches(t *testing.T) {
 		t.Fatal("menuKeyMatches(F8) = true, want false")
 	}
 
-	a.setMenuBinding("missing", config.KeyBinding{Name: "F8", VK: vkF1 + 7})
+	a.cfg.Menu.SetKeyByID("missing", config.KeyBinding{Name: "F8", VK: vkF1 + 7})
 	if a.menuKeyMatches(vkF1 + 7) {
 		t.Fatal("unknown menu id changed a binding")
 	}
