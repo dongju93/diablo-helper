@@ -36,18 +36,44 @@ const (
 )
 
 type controlRefs struct {
+	// Left column key bindings
+	startLabel  uintptr
 	startButton uintptr
+	stopLabel   uintptr
 	stopButton  uintptr
 	pauseButton uintptr
-
+	menuLabels  map[string]uintptr
 	menuButtons map[string]uintptr
 
+	// Right column – header buttons
+	loadButton uintptr
+	saveButton uintptr
+
+	// Right column – bulk interval section
+	bulkLabel    uintptr
+	bulkInterval uintptr
+	bulkMsLabel  uintptr
+	applyBulk    uintptr
+
+	// Right column – skill grid headers
+	skillUseHdr uintptr
+	skillNumHdr uintptr
+	skillKeyHdr uintptr
+	skillIntHdr uintptr
+
+	// Right column – skill rows
 	skillEnabled  [config.MaxSkills]uintptr
+	skillNums     [config.MaxSkills]uintptr
 	skillButtons  [config.MaxSkills]uintptr
 	skillInterval [config.MaxSkills]uintptr
+	skillMsLbls   [config.MaxSkills]uintptr
 
-	bulkInterval uintptr
-	status       uintptr
+	// Right column – pause section
+	pauseLabel uintptr
+
+	// Status bar
+	statusLabel uintptr
+	status      uintptr
 }
 
 type menuControl struct {
@@ -125,46 +151,106 @@ func (a *application) invalidateCaptureControls(targets ...captureTarget) {
 func (a *application) createControls(hwnd uintptr) {
 	a.initUIResources()
 
-	a.createButton(hwnd, idLoad, "불러오기", 680, 26, 120, 34)
-	a.createButton(hwnd, idSave, "저장하기", 812, 26, 120, 34)
+	cw, ch := getClientSize(hwnd)
+	lo := computeLayout(cw, ch)
 
-	a.createStatic(hwnd, "시작 키", 48, 139, 95, 24)
-	a.controls.startButton = a.createButton(hwnd, idStartKey, "", 154, 134, 190, 34)
-	a.createStatic(hwnd, "종료 키", 48, 181, 95, 24)
-	a.controls.stopButton = a.createButton(hwnd, idStopKey, "", 154, 176, 190, 34)
+	// Header buttons (right-anchored)
+	a.controls.loadButton = a.createButton(hwnd, idLoad, "불러오기", lo.loadX, lo.y(26), lo.w(headerBtnW), lo.h(34))
+	a.controls.saveButton = a.createButton(hwnd, idSave, "저장하기", lo.saveX, lo.y(26), lo.w(headerBtnW), lo.h(34))
+
+	// Left column – key bindings
+	a.controls.startLabel = a.createStatic(hwnd, "시작 키", lo.x(layoutLX+24), lo.y(139), lo.w(95), lo.h(24))
+	a.controls.startButton = a.createButton(hwnd, idStartKey, "", lo.x(layoutLX+130), lo.y(134), lo.w(190), lo.h(34))
+	a.controls.stopLabel = a.createStatic(hwnd, "종료 키", lo.x(layoutLX+24), lo.y(181), lo.w(95), lo.h(24))
+	a.controls.stopButton = a.createButton(hwnd, idStopKey, "", lo.x(layoutLX+130), lo.y(176), lo.w(190), lo.h(34))
 
 	menuY := 282
 	for _, menu := range menuControls {
-		a.createStatic(hwnd, menu.label, 48, menuY+5, 120, 24)
-		a.controls.menuButtons[menu.id] = a.createButton(hwnd, menu.control, "", 174, menuY, 170, 34)
+		a.controls.menuLabels[menu.id] = a.createStatic(hwnd, menu.label, lo.x(layoutLX+24), lo.y(menuY+5), lo.w(120), lo.h(24))
+		a.controls.menuButtons[menu.id] = a.createButton(hwnd, menu.control, "", lo.x(layoutLX+150), lo.y(menuY), lo.w(170), lo.h(34))
 		menuY += 40
 	}
 
-	a.createStatic(hwnd, "일괄 간격", 598, 129, 78, 24)
-	a.controls.bulkInterval = a.createEdit(hwnd, idBulkInterval, strconv.Itoa(config.DefaultIntervalMS), 686, 130, 62, 22)
-	a.createStatic(hwnd, "ms", 766, 129, 30, 24)
-	a.createButton(hwnd, idApplyBulk, "적용", 812, 124, 92, 32)
+	// Right column – bulk interval section
+	a.controls.bulkLabel = a.createStatic(hwnd, "일괄 간격", lo.bulkLabelX, lo.y(129), lo.w(78), lo.h(24))
+	a.controls.bulkInterval = a.createEdit(hwnd, idBulkInterval, strconv.Itoa(config.DefaultIntervalMS), lo.bulkEditX, lo.y(130), lo.w(bulkEditW), lo.h(22))
+	a.controls.bulkMsLabel = a.createStatic(hwnd, "ms", lo.bulkMsX, lo.y(129), lo.w(bulkMsW), lo.h(24))
+	a.controls.applyBulk = a.createButton(hwnd, idApplyBulk, "적용", lo.bulkApplyX, lo.y(124), lo.w(bulkApplyW), lo.h(32))
 
-	a.createStatic(hwnd, "사용", 430, 174, 45, 24)
-	a.createStatic(hwnd, "기술", 492, 174, 55, 24)
-	a.createStatic(hwnd, "키", 592, 174, 35, 24)
-	a.createStatic(hwnd, "실행 간격", 730, 174, 80, 24)
+	// Right column – skill grid headers
+	a.controls.skillUseHdr = a.createStatic(hwnd, "사용", lo.skillUseHdrX, lo.y(174), lo.w(45), lo.h(24))
+	a.controls.skillNumHdr = a.createStatic(hwnd, "기술", lo.skillNumHdrX, lo.y(174), lo.w(55), lo.h(24))
+	a.controls.skillKeyHdr = a.createStatic(hwnd, "키", lo.skillKeyHdrX, lo.y(174), lo.w(35), lo.h(24))
+	a.controls.skillIntHdr = a.createStatic(hwnd, "실행 간격", lo.skillIntHdrX, lo.y(174), lo.w(80), lo.h(24))
+
+	// Right column – skill rows
 	y := 204
 	for i := 0; i < config.MaxSkills; i++ {
-		a.controls.skillEnabled[i] = a.createCheckbox(hwnd, idSkillEnabledBase+i, "", 438, y+6, 22, 22)
-		a.createStatic(hwnd, strconv.Itoa(i+1), 501, y+7, 30, 22)
-		a.controls.skillButtons[i] = a.createButton(hwnd, idSkillKeyBase+i, "", 548, y, 160, 34)
-		a.controls.skillInterval[i] = a.createEdit(hwnd, idSkillIntervalBase+i, "", 740, y+7, 56, 22)
-		a.createStatic(hwnd, "ms", 822, y+6, 32, 22)
+		a.controls.skillEnabled[i] = a.createCheckbox(hwnd, idSkillEnabledBase+i, "", lo.skillChkX, lo.y(y+6), lo.w(22), lo.h(22))
+		a.controls.skillNums[i] = a.createStatic(hwnd, strconv.Itoa(i+1), lo.skillNumX, lo.y(y+7), lo.w(skillNumW), lo.h(22))
+		a.controls.skillButtons[i] = a.createButton(hwnd, idSkillKeyBase+i, "", lo.skillBtnX, lo.y(y), lo.skillBtnW, lo.h(34))
+		a.controls.skillInterval[i] = a.createEdit(hwnd, idSkillIntervalBase+i, "", lo.skillIntervalX, lo.y(y+7), lo.w(skillEditW), lo.h(22))
+		a.controls.skillMsLbls[i] = a.createStatic(hwnd, "ms", lo.skillMsX, lo.y(y+6), lo.w(skillMsW), lo.h(22))
 		y += 39
 	}
 
-	a.createStatic(hwnd, "키", 426, 648, 45, 24)
-	a.controls.pauseButton = a.createButton(hwnd, idPauseKey, "", 548, 642, 258, 34)
+	// Right column – pause section
+	a.controls.pauseLabel = a.createStatic(hwnd, "키", lo.pauseLabelX, lo.y(648), lo.w(45), lo.h(24))
+	a.controls.pauseButton = a.createButton(hwnd, idPauseKey, "", lo.pauseBtnX, lo.y(642), lo.pauseBtnW, lo.h(34))
 
-	a.createStatic(hwnd, "상태", 48, 711, 55, 24)
-	a.controls.status = a.createStatic(hwnd, "정지.", 112, 711, 780, 24)
+	// Status bar
+	a.controls.statusLabel = a.createStatic(hwnd, "상태", lo.x(layoutLX+24), lo.y(711), lo.w(55), lo.h(24))
+	a.controls.status = a.createStatic(hwnd, "정지.", lo.statusTextX, lo.y(711), lo.statusTextW, lo.h(24))
+
 	a.updateControlsFromConfig()
+}
+
+func (a *application) repositionControls() {
+	cw, ch := getClientSize(a.hwnd)
+	lo := computeLayout(cw, ch)
+
+	moveControl(a.controls.loadButton, lo.loadX, lo.y(26), lo.w(headerBtnW), lo.h(34))
+	moveControl(a.controls.saveButton, lo.saveX, lo.y(26), lo.w(headerBtnW), lo.h(34))
+
+	moveControl(a.controls.startLabel, lo.x(layoutLX+24), lo.y(139), lo.w(95), lo.h(24))
+	moveControl(a.controls.startButton, lo.x(layoutLX+130), lo.y(134), lo.w(190), lo.h(34))
+	moveControl(a.controls.stopLabel, lo.x(layoutLX+24), lo.y(181), lo.w(95), lo.h(24))
+	moveControl(a.controls.stopButton, lo.x(layoutLX+130), lo.y(176), lo.w(190), lo.h(34))
+
+	menuY := 282
+	for _, menu := range menuControls {
+		moveControl(a.controls.menuLabels[menu.id], lo.x(layoutLX+24), lo.y(menuY+5), lo.w(120), lo.h(24))
+		moveControl(a.controls.menuButtons[menu.id], lo.x(layoutLX+150), lo.y(menuY), lo.w(170), lo.h(34))
+		menuY += 40
+	}
+
+	moveControl(a.controls.bulkLabel, lo.bulkLabelX, lo.y(129), lo.w(78), lo.h(24))
+	moveControl(a.controls.bulkInterval, lo.bulkEditX, lo.y(130), lo.w(bulkEditW), lo.h(22))
+	moveControl(a.controls.bulkMsLabel, lo.bulkMsX, lo.y(129), lo.w(bulkMsW), lo.h(24))
+	moveControl(a.controls.applyBulk, lo.bulkApplyX, lo.y(124), lo.w(bulkApplyW), lo.h(32))
+
+	moveControl(a.controls.skillUseHdr, lo.skillUseHdrX, lo.y(174), lo.w(45), lo.h(24))
+	moveControl(a.controls.skillNumHdr, lo.skillNumHdrX, lo.y(174), lo.w(55), lo.h(24))
+	moveControl(a.controls.skillKeyHdr, lo.skillKeyHdrX, lo.y(174), lo.w(35), lo.h(24))
+	moveControl(a.controls.skillIntHdr, lo.skillIntHdrX, lo.y(174), lo.w(80), lo.h(24))
+
+	y := 204
+	for i := 0; i < config.MaxSkills; i++ {
+		moveControl(a.controls.skillEnabled[i], lo.skillChkX, lo.y(y+6), lo.w(22), lo.h(22))
+		moveControl(a.controls.skillNums[i], lo.skillNumX, lo.y(y+7), lo.w(skillNumW), lo.h(22))
+		moveControl(a.controls.skillButtons[i], lo.skillBtnX, lo.y(y), lo.skillBtnW, lo.h(34))
+		moveControl(a.controls.skillInterval[i], lo.skillIntervalX, lo.y(y+7), lo.w(skillEditW), lo.h(22))
+		moveControl(a.controls.skillMsLbls[i], lo.skillMsX, lo.y(y+6), lo.w(skillMsW), lo.h(22))
+		y += 39
+	}
+
+	moveControl(a.controls.pauseLabel, lo.pauseLabelX, lo.y(648), lo.w(45), lo.h(24))
+	moveControl(a.controls.pauseButton, lo.pauseBtnX, lo.y(642), lo.pauseBtnW, lo.h(34))
+
+	moveControl(a.controls.statusLabel, lo.x(layoutLX+24), lo.y(711), lo.w(55), lo.h(24))
+	moveControl(a.controls.status, lo.statusTextX, lo.y(711), lo.statusTextW, lo.h(24))
+
+	invalidateRect(a.hwnd, true)
 }
 
 func (a *application) createStatic(parent uintptr, text string, x int, y int, width int, height int) uintptr {

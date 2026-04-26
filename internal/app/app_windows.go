@@ -60,10 +60,13 @@ func ShowFatalError(err error) {
 
 func newApplication() *application {
 	return &application{
-		cfg:      config.Default(),
-		pressed:  make(map[uint16]bool),
-		runner:   newSkillRunner(sendVirtualKey),
-		controls: controlRefs{menuButtons: make(map[string]uintptr)},
+		cfg:     config.Default(),
+		pressed: make(map[uint16]bool),
+		runner:  newSkillRunner(sendVirtualKey),
+		controls: controlRefs{
+			menuLabels:  make(map[string]uintptr),
+			menuButtons: make(map[string]uintptr),
+		},
 	}
 }
 
@@ -94,8 +97,8 @@ func (a *application) run() error {
 		wsOverlappedWindow,
 		cwUseDefault,
 		cwUseDefault,
-		980,
-		780,
+		windowMaxW,
+		windowMaxH,
 		0,
 		0,
 		a.instance,

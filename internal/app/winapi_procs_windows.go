@@ -37,6 +37,7 @@ var (
 	procSendMessageW      = user32.NewProc("SendMessageW")
 	procSetWindowsHookExW = user32.NewProc("SetWindowsHookExW")
 	procSetWindowTextW    = user32.NewProc("SetWindowTextW")
+	procMoveWindow        = user32.NewProc("MoveWindow")
 	procShowWindow        = user32.NewProc("ShowWindow")
 	procTranslateMessage  = user32.NewProc("TranslateMessage")
 	procUnhookWindowsHook = user32.NewProc("UnhookWindowsHookEx")

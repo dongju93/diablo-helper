@@ -111,6 +111,16 @@ func setChecked(hwnd uintptr, value bool) {
 	sendMessage(hwnd, bmSetCheck, check, 0)
 }
 
+func getClientSize(hwnd uintptr) (int, int) {
+	var cr rect
+	procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&cr)))
+	return int(cr.Right), int(cr.Bottom)
+}
+
+func moveControl(hwnd uintptr, x, y, width, height int) {
+	procMoveWindow.Call(hwnd, uintptr(x), uintptr(y), uintptr(width), uintptr(height), 1)
+}
+
 func callNextHookEx(code int, wParam uintptr, lParam uintptr) uintptr {
 	ret, _, _ := procCallNextHookEx.Call(0, uintptr(code), wParam, lParam)
 	return ret

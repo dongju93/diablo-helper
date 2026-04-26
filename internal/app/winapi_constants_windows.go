@@ -64,6 +64,8 @@ const (
 	wmCreate              = 0x0001
 	wmDestroy             = 0x0002
 	wmPaint               = 0x000F
+	wmSize                = 0x0005
+	wmGetMinMaxInfo       = 0x0024
 	wmClose               = 0x0010
 	wmEraseBkgnd          = 0x0014
 	wmDrawItem            = 0x002B

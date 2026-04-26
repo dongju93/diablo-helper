@@ -143,36 +143,47 @@ func (a *application) paint(hwnd uintptr) {
 	procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&client)))
 	procFillRect.Call(hdc, uintptr(unsafe.Pointer(&client)), a.bgBrush)
 
-	a.drawPanel(hdc, 24, 92, 348, 126)
-	a.drawPanel(hdc, 24, 234, 348, 386)
-	a.drawPanel(hdc, 396, 92, 540, 498)
-	a.drawPanel(hdc, 396, 606, 540, 84)
-	a.drawPanel(hdc, 24, 700, 912, 40)
-	a.drawAccentMark(hdc, 28, 26, 4, 24)
+	lo := computeLayout(int(client.Right), int(client.Bottom))
 
-	a.drawDivider(hdc, 44, 174, 308)
+	// Panels
+	a.drawPanel(hdc, lo.leftX, lo.y(92), lo.leftW, lo.h(126))
+	a.drawPanel(hdc, lo.leftX, lo.y(234), lo.leftW, lo.h(386))
+	a.drawPanel(hdc, lo.rx, lo.y(92), lo.rw, lo.h(498))
+	a.drawPanel(hdc, lo.rx, lo.y(606), lo.rw, lo.h(84))
+	a.drawPanel(hdc, lo.leftX, lo.y(700), lo.statusBarW, lo.h(40))
+	a.drawAccentMark(hdc, lo.x(28), lo.y(26), lo.w(4), lo.h(24))
+
+	// Dividers – left column
+	a.drawDivider(hdc, lo.x(layoutLX+20), lo.y(174), lo.w(layoutLW-40))
 	for y := 320; y <= 560; y += 40 {
-		a.drawDivider(hdc, 44, y, 308)
+		a.drawDivider(hdc, lo.x(layoutLX+20), lo.y(y), lo.w(layoutLW-40))
 	}
-	a.drawDivider(hdc, 416, 198, 500)
+
+	// Dividers – right column (scales with rw)
+	a.drawDivider(hdc, lo.rx+lo.w(20), lo.y(198), lo.rw-lo.w(40))
 	for y := 242; y <= 515; y += 39 {
-		a.drawDivider(hdc, 416, y, 500)
+		a.drawDivider(hdc, lo.rx+lo.w(20), lo.y(y), lo.rw-lo.w(40))
 	}
 
-	a.drawInputFrame(hdc, 678, 124, 86, 32)
+	// Input frames
+	a.drawInputFrame(hdc, lo.bulkEditX-lo.w(8), lo.y(124), lo.w(86), lo.h(32))
 	for y := 204; y < 204+config.MaxSkills*39; y += 39 {
-		a.drawInputFrame(hdc, 732, y+1, 82, 32)
+		a.drawInputFrame(hdc, lo.skillIntervalX-lo.w(8), lo.y(y+1), lo.w(82), lo.h(32))
 	}
-	a.drawStatusDot(hdc, 92, 719)
 
-	drawText(hdc, "Diablo Helper", a.titleFont, uiText, 40, 18, 300, 40, dtSingleLine|dtNoPrefix)
-	drawText(hdc, "시작/종료 키", a.sectionFont, uiText, 44, 108, 210, 28, dtSingleLine|dtNoPrefix)
-	drawText(hdc, "게임 메뉴 키", a.sectionFont, uiText, 44, 250, 210, 28, dtSingleLine|dtNoPrefix)
-	drawText(hdc, "기술 키", a.sectionFont, uiText, 416, 108, 160, 28, dtSingleLine|dtNoPrefix)
-	drawText(hdc, "일시정지 키", a.sectionFont, uiText, 416, 622, 180, 28, dtSingleLine|dtNoPrefix)
+	a.drawStatusDot(hdc, lo.statusDotX, lo.y(719), lo.s(10))
+
+	drawText(hdc, "Diablo Helper", a.titleFont, uiText, lo.x(40), lo.y(18), lo.w(300), lo.h(40), dtSingleLine|dtNoPrefix)
+	drawText(hdc, "시작/종료 키", a.sectionFont, uiText, lo.x(layoutLX+20), lo.y(108), lo.w(210), lo.h(28), dtSingleLine|dtNoPrefix)
+	drawText(hdc, "게임 메뉴 키", a.sectionFont, uiText, lo.x(layoutLX+20), lo.y(250), lo.w(210), lo.h(28), dtSingleLine|dtNoPrefix)
+	drawText(hdc, "기술 키", a.sectionFont, uiText, lo.rx+lo.w(20), lo.y(108), lo.w(160), lo.h(28), dtSingleLine|dtNoPrefix)
+	drawText(hdc, "일시정지 키", a.sectionFont, uiText, lo.rx+lo.w(20), lo.y(622), lo.w(180), lo.h(28), dtSingleLine|dtNoPrefix)
 }
 
 func (a *application) drawPanel(hdc uintptr, x int, y int, width int, height int) {
+	if width <= 0 || height <= 0 {
+		return
+	}
 	oldBrush, _, _ := procSelectObject.Call(hdc, a.panelBrush)
 	oldPen, _, _ := procSelectObject.Call(hdc, a.borderPen)
 	procRoundRect.Call(hdc, uintptr(x), uintptr(y), uintptr(x+width), uintptr(y+height), 16, 16)
@@ -181,6 +192,9 @@ func (a *application) drawPanel(hdc uintptr, x int, y int, width int, height int
 }
 
 func (a *application) drawInputFrame(hdc uintptr, x int, y int, width int, height int) {
+	if width <= 0 || height <= 0 {
+		return
+	}
 	oldBrush, _, _ := procSelectObject.Call(hdc, a.panelBrush)
 	oldPen, _, _ := procSelectObject.Call(hdc, a.borderStrongPen)
 	procRoundRect.Call(hdc, uintptr(x), uintptr(y), uintptr(x+width), uintptr(y+height), 8, 8)
@@ -189,11 +203,17 @@ func (a *application) drawInputFrame(hdc uintptr, x int, y int, width int, heigh
 }
 
 func (a *application) drawDivider(hdc uintptr, x int, y int, width int) {
+	if width <= 0 {
+		return
+	}
 	rc := rect{Left: int32(x), Top: int32(y), Right: int32(x + width), Bottom: int32(y + 1)}
 	procFillRect.Call(hdc, uintptr(unsafe.Pointer(&rc)), a.borderBrush)
 }
 
 func (a *application) drawAccentMark(hdc uintptr, x int, y int, width int, height int) {
+	if width <= 0 || height <= 0 {
+		return
+	}
 	oldBrush, _, _ := procSelectObject.Call(hdc, a.accentBrush)
 	oldPen, _, _ := procSelectObject.Call(hdc, a.accentPen)
 	procRoundRect.Call(hdc, uintptr(x), uintptr(y), uintptr(x+width), uintptr(y+height), 4, 4)
@@ -201,7 +221,10 @@ func (a *application) drawAccentMark(hdc uintptr, x int, y int, width int, heigh
 	procSelectObject.Call(hdc, oldBrush)
 }
 
-func (a *application) drawStatusDot(hdc uintptr, x int, y int) {
+func (a *application) drawStatusDot(hdc uintptr, x int, y int, size int) {
+	if size <= 0 {
+		return
+	}
 	color := uiTextSubtle
 	switch {
 	case a.capture.valid():
@@ -215,7 +238,7 @@ func (a *application) drawStatusDot(hdc uintptr, x int, y int) {
 	pen := createPen(color, 1)
 	oldBrush, _, _ := procSelectObject.Call(hdc, brush)
 	oldPen, _, _ := procSelectObject.Call(hdc, pen)
-	procEllipse.Call(hdc, uintptr(x), uintptr(y), uintptr(x+10), uintptr(y+10))
+	procEllipse.Call(hdc, uintptr(x), uintptr(y), uintptr(x+size), uintptr(y+size))
 	procSelectObject.Call(hdc, oldPen)
 	procSelectObject.Call(hdc, oldBrush)
 	deleteGDIObject(pen)

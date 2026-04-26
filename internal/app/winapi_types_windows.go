@@ -122,3 +122,11 @@ type input struct {
 	Type uint32
 	MI   mouseInput
 }
+
+type minMaxInfo struct {
+	Reserved     point
+	MaxSize      point
+	MaxPosition  point
+	MinTrackSize point
+	MaxTrackSize point
+}

@@ -16,6 +16,22 @@ func wndProc(hwnd uintptr, msg uint32, wParam uintptr, lParam uintptr) uintptr {
 		appInstance.hwnd = hwnd
 		appInstance.createControls(hwnd)
 		return 0
+	case wmSize:
+		if appInstance.controls.status != 0 {
+			appInstance.repositionControls()
+		}
+		return 0
+	case wmGetMinMaxInfo:
+		if lParam != 0 {
+			info := (*minMaxInfo)(unsafe.Pointer(lParam))
+			info.MinTrackSize.X = windowMinW
+			info.MinTrackSize.Y = windowMinH
+			info.MaxSize.X = windowMaxW
+			info.MaxSize.Y = windowMaxH
+			info.MaxTrackSize.X = windowMaxW
+			info.MaxTrackSize.Y = windowMaxH
+		}
+		return 0
 	case wmPaint:
 		appInstance.paint(hwnd)
 		return 0
