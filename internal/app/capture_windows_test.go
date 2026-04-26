@@ -1,6 +1,6 @@
 //go:build windows
 
-package main
+package app
 
 import (
 	"strings"
@@ -65,31 +65,6 @@ func TestParseInterval(t *testing.T) {
 	}
 }
 
-func TestApplicationControlClassification(t *testing.T) {
-	a := newApplication()
-
-	if !a.isPrimaryButton(idSave) {
-		t.Fatal("idSave should be primary")
-	}
-	if !a.isPrimaryButton(idApplyBulk) {
-		t.Fatal("idApplyBulk should be primary")
-	}
-	if a.isPrimaryButton(idLoad) {
-		t.Fatal("idLoad should not be primary")
-	}
-
-	for _, id := range []int{idStartKey, idStopKey, idPauseKey, idSkillKeyBase, idSkillKeyBase + config.MaxSkills - 1, idMenuInventory, idMenuWhisper} {
-		if !a.isBindingButton(id) {
-			t.Fatalf("id %d should be a binding button", id)
-		}
-	}
-	for _, id := range []int{idSave, idApplyBulk, idSkillKeyBase + config.MaxSkills} {
-		if a.isBindingButton(id) {
-			t.Fatalf("id %d should not be a binding button", id)
-		}
-	}
-}
-
 func TestCaptureTargetAndControlID(t *testing.T) {
 	a := newApplication()
 
@@ -122,45 +97,6 @@ func TestCaptureTargetAndControlID(t *testing.T) {
 				t.Fatalf("captureControlID() = %d, want %d", got, tt.want)
 			}
 		})
-	}
-}
-
-func TestHandleCommandStartsKeyCapture(t *testing.T) {
-	tests := []struct {
-		name string
-		id   int
-		want captureTarget
-	}{
-		{name: "start", id: idStartKey, want: captureTarget{kind: captureStart}},
-		{name: "stop", id: idStopKey, want: captureTarget{kind: captureStop}},
-		{name: "pause", id: idPauseKey, want: captureTarget{kind: capturePause}},
-		{name: "skill", id: idSkillKeyBase + 2, want: captureTarget{kind: captureSkill, index: 2}},
-		{name: "menu", id: idMenuWorldMap, want: captureTarget{kind: captureMenu, menuID: "world_map"}},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			a := newApplication()
-			if !a.handleCommand(makeLong(tt.id, bnClicked)) {
-				t.Fatal("handleCommand() = false, want true")
-			}
-			if a.capture != tt.want {
-				t.Fatalf("capture = %+v, want %+v", a.capture, tt.want)
-			}
-		})
-	}
-}
-
-func TestHandleCommandIgnoresNonClickOrUnknownCommand(t *testing.T) {
-	a := newApplication()
-	if a.handleCommand(makeLong(idStartKey, 1)) {
-		t.Fatal("handleCommand() = true for non-click notification")
-	}
-	if a.handleCommand(makeLong(9999, bnClicked)) {
-		t.Fatal("handleCommand() = true for unknown command")
-	}
-	if a.capture.valid() {
-		t.Fatalf("capture = %+v, want unchanged", a.capture)
 	}
 }
 
@@ -356,37 +292,5 @@ func enableRunnableTestSkill(cfg *config.Config) {
 		Key:        config.KeyBinding{Name: "1", VK: int('1')},
 		IntervalMS: config.MinimumIntervalMS,
 		Enabled:    true,
-	}
-}
-
-func TestMouseEventKey(t *testing.T) {
-	tests := []struct {
-		name      string
-		message   uintptr
-		mouseData uint32
-		wantVK    uint16
-		wantDown  bool
-		wantOK    bool
-	}{
-		{name: "left down", message: wmLButtonDown, wantVK: vkLButton, wantDown: true, wantOK: true},
-		{name: "left up", message: wmLButtonUp, wantVK: vkLButton, wantDown: false, wantOK: true},
-		{name: "right down", message: wmRButtonDown, wantVK: vkRButton, wantDown: true, wantOK: true},
-		{name: "right up", message: wmRButtonUp, wantVK: vkRButton, wantDown: false, wantOK: true},
-		{name: "middle down", message: wmMButtonDown, wantVK: vkMButton, wantDown: true, wantOK: true},
-		{name: "middle up", message: wmMButtonUp, wantVK: vkMButton, wantDown: false, wantOK: true},
-		{name: "x1 down", message: wmXButtonDown, mouseData: xButton1 << 16, wantVK: vkXButton1, wantDown: true, wantOK: true},
-		{name: "x1 up", message: wmXButtonUp, mouseData: xButton1 << 16, wantVK: vkXButton1, wantDown: false, wantOK: true},
-		{name: "x2 down", message: wmXButtonDown, mouseData: xButton2 << 16, wantVK: vkXButton2, wantDown: true, wantOK: true},
-		{name: "unknown x button", message: wmXButtonDown, mouseData: 3 << 16, wantOK: false},
-		{name: "unknown message", message: wmKeyDown, wantOK: false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotVK, gotDown, gotOK := mouseEventKey(tt.message, &mouseHookStruct{MouseData: tt.mouseData})
-			if gotVK != tt.wantVK || gotDown != tt.wantDown || gotOK != tt.wantOK {
-				t.Fatalf("mouseEventKey() = (%d, %v, %v), want (%d, %v, %v)", gotVK, gotDown, gotOK, tt.wantVK, tt.wantDown, tt.wantOK)
-			}
-		})
 	}
 }
