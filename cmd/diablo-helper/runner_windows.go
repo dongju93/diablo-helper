@@ -24,6 +24,11 @@ func newSkillRunner(sendKey func(vk uint16)) *skillRunner {
 }
 
 func (r *skillRunner) Start(cfg config.Config) bool {
+	skills := runnableSkills(cfg)
+	if len(skills) == 0 {
+		return false
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.cancel != nil {
@@ -35,10 +40,7 @@ func (r *skillRunner) Start(cfg config.Config) bool {
 	r.running.Store(true)
 	r.paused.Store(false)
 
-	for _, skill := range cfg.Skills {
-		if !skill.Enabled || !skill.Key.Assigned() {
-			continue
-		}
+	for _, skill := range skills {
 		skill := skill
 		go r.runSkill(ctx, skill)
 	}
@@ -90,4 +92,14 @@ func (r *skillRunner) runSkill(ctx context.Context, skill config.Skill) {
 			timer.Reset(interval)
 		}
 	}
+}
+
+func runnableSkills(cfg config.Config) []config.Skill {
+	skills := make([]config.Skill, 0, len(cfg.Skills))
+	for _, skill := range cfg.Skills {
+		if skill.Enabled && skill.Key.Assigned() {
+			skills = append(skills, skill)
+		}
+	}
+	return skills
 }

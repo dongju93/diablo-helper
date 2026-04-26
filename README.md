@@ -1,25 +1,31 @@
 # Diablo Helper
 
-Windows only key-input helper for Diablo.
+Diablo용 Windows 키 입력 보조 프로그램입니다. 지정한 시작 키를 누르면 사용 설정된 기술 키를 각 기술의 실행 간격에 맞춰 반복 입력하고, 종료 키나 게임 메뉴 키를 누르면 입력을 멈춥니다.
 
-## Features
+## 지원 환경
 
-- Assign every key by clicking a key button, then pressing the target key.
-- Press `Esc` during assignment to clear the selected key.
-- Start and stop hotkeys control repeated skill input.
-- Up to 8 skill keys are supported.
-- Each skill has its own interval in milliseconds.
-- A bulk interval input can apply the same interval to every skill.
-- A hold-style pause key stops skill input only while the key is held.
-- Game menu keys stop skill input like the stop key.
-- Skill rows can be enabled or disabled individually.
-- Settings can be saved to and loaded from a selected `.toml` file.
-- Keyboard keys and standard mouse buttons are assignable.
-- Start and stop keys cannot be assigned to `Mouse Left`.
+- Windows 전용입니다.
+- 키보드 키와 Windows가 표준 마우스 버튼으로 노출하는 입력을 지원합니다.
 
-## Mouse Button Support
+## 지원 기능
 
-Direct mouse-button support covers:
+- 시작 키와 종료 키를 직접 지정할 수 있습니다.
+- 최대 8개의 기술 키를 등록할 수 있습니다.
+- 각 기술은 개별적으로 사용 여부를 켜고 끌 수 있습니다.
+- 각 기술마다 실행 간격을 밀리초 단위로 설정할 수 있습니다.
+- 일괄 간격 입력으로 모든 기술의 실행 간격을 한 번에 적용할 수 있습니다.
+- 키 버튼을 클릭한 뒤 원하는 키를 누르는 방식으로 키를 할당합니다.
+- 키 할당 중 `Esc`를 누르면 해당 키 할당이 해제됩니다.
+- 일시정지 키를 누르고 있는 동안만 기술 입력을 잠시 멈추고, 키를 떼면 다시 진행합니다.
+- 소지품, 기술, 추종자, 지도, 세계지도, 차원문, 채팅, 귓말 키를 게임 메뉴 키로 지정할 수 있습니다.
+- 게임 메뉴 키를 누르면 종료 키와 동일하게 반복 입력을 멈춥니다.
+- 설정을 선택한 `.toml` 파일로 저장하고 다시 불러올 수 있습니다.
+- 실행 파일 옆의 `settings.toml`이 있으면 시작할 때 자동으로 불러옵니다.
+- 실행 가능한 기술이 하나도 없으면 실행 중 상태로 들어가지 않습니다.
+
+## 마우스 버튼 지원
+
+직접 할당할 수 있는 마우스 버튼은 다음과 같습니다.
 
 - `Mouse Left`
 - `Mouse Right`
@@ -27,58 +33,42 @@ Direct mouse-button support covers:
 - `Mouse X1`
 - `Mouse X2`
 
-Extra gaming mouse side buttons beyond `Mouse X1` and `Mouse X2` are not exposed consistently by Windows as normal mouse buttons. They can still be used when the mouse driver maps them to keyboard keys.
+`Mouse Left`는 기술, 일시정지, 게임 메뉴 키에는 사용할 수 있지만 시작 키와 종료 키에는 사용할 수 없습니다. 추가 게이밍 마우스 버튼은 Windows에서 일반 마우스 버튼으로 안정적으로 노출되지 않는 경우가 많으므로, 마우스 드라이버에서 키보드 키로 매핑하면 사용할 수 있습니다.
 
-`Mouse Left` is supported for assignable actions in general, but not for start and stop keys.
+## 기본 설정
 
-## D3Helper Compatibility Notes
+- 일시정지 키: `Mouse Right`
+- 소지품: `C`
+- 기술: `V`
+- 추종자: `F`
+- 지도: `Tab`
+- 세계지도: `M`
+- 차원문: `T`
+- 채팅: `Enter`
+- 귓말: `R`
+- 기술 키: 기본값은 미지정이며, 사용 여부는 꺼져 있습니다.
+- 기술 실행 간격: 기본값은 `1000ms`입니다.
 
-Research baseline:
+## 빌드
 
-- [D3Helper Manual](https://d3helper.com/manual)
-- [D3Helper usage article](https://canfactory.tistory.com/214)
-- [DHelper mouse-button note](https://www.dhelper.co.kr/2021/01/iii.html)
-
-| Area                            | D3Helper behavior                                                                                                                       | This app                                                                                                                    | Status                         |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| Platform                        | Windows desktop helper.                                                                                                                 | Windows-only runtime, with a non-Windows message when built elsewhere.                                                      | Same direction                 |
-| Key assignment                  | Click an input field, then press a keyboard or mouse key.                                                                               | Click a key button, then press a keyboard or supported mouse button.                                                        | Same direction                 |
-| Assignment cancel               | `Esc` clears the selected D3Helper input.                                                                                               | `Esc` clears the selected key assignment.                                                                                   | Same                           |
-| Start key                       | Starts repeated skill input.                                                                                                            | Starts repeated skill input.                                                                                                | Same                           |
-| Stop key                        | Stops repeated skill input.                                                                                                             | Stops repeated skill input.                                                                                                 | Same                           |
-| Start/stop mouse buttons        | D3Helper documents that left mouse is not available for start/stop.                                                                     | Start and stop keys reject `Mouse Left`; other supported mouse buttons can be assigned.                                     | Same                           |
-| Skill keys                      | Up to 8 skill keys with millisecond intervals.                                                                                          | Up to 8 skill keys with per-skill millisecond intervals.                                                                    | Same                           |
-| Bulk interval apply             | Provides an interval apply action for skill rows.                                                                                       | Provides a bulk interval field and apply button for every skill row.                                                        | Same direction                 |
-| Empty or unused skill rows      | D3Helper rows can be left empty or cleared.                                                                                             | Skill rows can be disabled with a toggle, or left unassigned.                                                               | Different, more explicit       |
-| Hold special key                | Holding the special key pauses repeated skill input; releasing it resumes the previous running state.                                   | Holding the pause key pauses repeated skill input only while running; releasing it resumes if the stop key was not pressed. | Same                           |
-| Number of hold special keys     | D3Helper UI shows one special key.                                                                                                      | One pause key is supported.                                                                                                 | Same                           |
-| Game menu stop keys             | D3Helper stops repeated input for game menu actions such as inventory, skill, follower, map, world map, town portal, chat, and whisper. | Inventory, skill, follower, map, world map, town portal, chat, and whisper stop repeated input.                             | Same                           |
-| World map and whisper stop keys | D3Helper-style UI includes separate world map and whisper keys.                                                                         | Separate world map and whisper stop-key fields are supported.                                                               | Same                           |
-| Save and load                   | Saved values can be reused. The referenced usage article describes changing saved values by class.                                      | Save and load open a file picker so a `.toml` settings file can be chosen.                                                  | Same direction                 |
-| Multiple profiles               | D3Helper UI commonly shows a profile name such as `default`.                                                                            | No profile selector or multiple TOML profile manager yet.                                                                   | Not supported                  |
-| Mouse middle button             | D3Helper documents mouse input, including wheel-related assignment.                                                                     | `Mouse Middle` is directly supported.                                                                                       | Same for middle click          |
-| Mouse wheel scroll              | D3Helper documentation says mouse wheel input is possible.                                                                              | Wheel-up and wheel-down scroll events are not assignable yet.                                                               | Not supported                  |
-| Side mouse buttons              | Related helper documentation calls out 5-button mouse support through `XBUTTON1` and `XBUTTON2`.                                        | `Mouse X1` and `Mouse X2` are directly supported. Extra side buttons require driver-level keyboard mapping.                 | Same for standard side buttons |
-| Runtime technique               | Related helper documentation describes Windows keyboard/mouse event and hook usage, not memory or packet manipulation.                  | Uses Windows keyboard/mouse hooks and input events only.                                                                    | Same direction                 |
-
-## Build
+Windows에서 빌드:
 
 ```powershell
 go build -ldflags "-H=windowsgui" -o dist\diablo-helper.exe .\cmd\diablo-helper
 ```
 
-Cross-build from macOS or Linux:
+macOS 또는 Linux에서 Windows 실행 파일로 크로스 빌드:
 
 ```sh
 GOOS=windows GOARCH=amd64 go build -ldflags "-H=windowsgui" -o dist/diablo-helper.exe ./cmd/diablo-helper
 ```
 
-## Usage
+## 사용법
 
-1. Run `diablo-helper.exe` on Windows.
-2. Click a key button and press the key to assign.
-3. Set skill intervals in milliseconds.
-4. Use `저장하기` to choose where to save the `.toml` settings file.
-5. Use the assigned start key to begin skill input.
-6. Use the stop key or one of the game menu keys to stop skill input.
-7. Hold the pause key to suspend skill input temporarily.
+1. Windows에서 `diablo-helper.exe`를 실행합니다.
+2. 키 버튼을 클릭하고 원하는 키를 눌러 시작 키, 종료 키, 기술 키, 메뉴 키를 지정합니다.
+3. 사용할 기술 행을 켜고 실행 간격을 밀리초 단위로 입력합니다.
+4. `저장하기`로 `.toml` 설정 파일을 저장합니다.
+5. 지정한 시작 키를 눌러 반복 입력을 시작합니다.
+6. 종료 키나 게임 메뉴 키를 눌러 반복 입력을 멈춥니다.
+7. 일시정지 키를 누르고 있는 동안만 기술 입력을 잠시 멈춥니다.

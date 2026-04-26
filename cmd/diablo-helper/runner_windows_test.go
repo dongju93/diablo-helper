@@ -12,6 +12,12 @@ import (
 func TestSkillRunnerStartStopState(t *testing.T) {
 	runner := newSkillRunner(func(uint16) {})
 	cfg := config.Default()
+	cfg.Skills[0] = config.Skill{
+		Name:       "Enabled",
+		Key:        config.KeyBinding{Name: "1", VK: int('1')},
+		IntervalMS: config.MinimumIntervalMS,
+		Enabled:    true,
+	}
 
 	if !runner.Start(cfg) {
 		t.Fatal("Start() = false, want true")
@@ -44,6 +50,56 @@ func TestSkillRunnerStartStopState(t *testing.T) {
 	runner.SetPaused(true)
 	if runner.Paused() {
 		t.Fatal("Paused() = true while stopped, want false")
+	}
+}
+
+func TestSkillRunnerDoesNotStartWithoutRunnableSkills(t *testing.T) {
+	runner := newSkillRunner(func(uint16) {})
+	cfg := config.Default()
+
+	if runner.Start(cfg) {
+		t.Fatal("Start() = true for default disabled skills, want false")
+	}
+	if runner.Running() {
+		t.Fatal("Running() = true without runnable skills, want false")
+	}
+
+	cfg.Skills[0] = config.Skill{
+		Name:       "Enabled without key",
+		IntervalMS: config.MinimumIntervalMS,
+		Enabled:    true,
+	}
+	if runner.Start(cfg) {
+		t.Fatal("Start() = true for enabled unassigned skill, want false")
+	}
+}
+
+func TestRunnableSkillsFiltersEnabledAssignedSkills(t *testing.T) {
+	cfg := config.Default()
+	cfg.Skills[0] = config.Skill{
+		Name:       "Runnable",
+		Key:        config.KeyBinding{Name: "1", VK: int('1')},
+		IntervalMS: config.MinimumIntervalMS,
+		Enabled:    true,
+	}
+	cfg.Skills[1] = config.Skill{
+		Name:       "Disabled",
+		Key:        config.KeyBinding{Name: "2", VK: int('2')},
+		IntervalMS: config.MinimumIntervalMS,
+		Enabled:    false,
+	}
+	cfg.Skills[2] = config.Skill{
+		Name:       "Unassigned",
+		IntervalMS: config.MinimumIntervalMS,
+		Enabled:    true,
+	}
+
+	got := runnableSkills(cfg)
+	if len(got) != 1 {
+		t.Fatalf("runnableSkills() length = %d, want 1", len(got))
+	}
+	if got[0].Name != "Runnable" {
+		t.Fatalf("runnable skill = %q, want Runnable", got[0].Name)
 	}
 }
 

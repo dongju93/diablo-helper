@@ -292,6 +292,7 @@ func TestHandleKeyEventSuppressesRepeatedKeyDownUntilKeyUp(t *testing.T) {
 func TestHandleKeyEventPauseOnlyWhileHeld(t *testing.T) {
 	a := newApplication()
 	a.cfg = config.Default()
+	enableRunnableTestSkill(&a.cfg)
 	if !a.runner.Start(a.cfg) {
 		t.Fatal("runner did not start")
 	}
@@ -334,6 +335,7 @@ func TestHandleKeyEventStopsRunnerForStopAndMenuKeys(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			a := newApplication()
 			a.cfg = config.Default()
+			enableRunnableTestSkill(&a.cfg)
 			tt.configure(&a.cfg)
 			if !a.runner.Start(a.cfg) {
 				t.Fatal("runner did not start")
@@ -345,6 +347,15 @@ func TestHandleKeyEventStopsRunnerForStopAndMenuKeys(t *testing.T) {
 				t.Fatal("runner running = true, want stopped")
 			}
 		})
+	}
+}
+
+func enableRunnableTestSkill(cfg *config.Config) {
+	cfg.Skills[0] = config.Skill{
+		Name:       "Enabled",
+		Key:        config.KeyBinding{Name: "1", VK: int('1')},
+		IntervalMS: config.MinimumIntervalMS,
+		Enabled:    true,
 	}
 }
 

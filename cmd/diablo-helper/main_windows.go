@@ -1065,8 +1065,16 @@ func (a *application) loadConfig() {
 }
 
 func (a *application) startRunnerFromHotkey() {
+	if a.runner.Running() {
+		a.updateRuntimeStatus()
+		return
+	}
 	if err := a.syncConfigFromControls(); err != nil {
 		messageBox(a.hwnd, "잘못된 설정", err.Error(), mbOK|mbIconError)
+		return
+	}
+	if len(runnableSkills(a.cfg)) == 0 {
+		a.setStatus("실행할 기술이 없습니다. 기술 사용을 켜고 키를 지정하세요.")
 		return
 	}
 	if a.runner.Start(a.cfg) {
