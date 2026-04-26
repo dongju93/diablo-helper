@@ -261,12 +261,91 @@ func MillisecondsFitDuration(ms int) bool {
 	return ms >= 0 && int64(ms) <= maximumDurationMilliseconds
 }
 
+func KeyDisplayName(vk int) string {
+	if vk < 0 || vk > 255 {
+		return fmt.Sprintf("VK_%d", vk)
+	}
+	if vk >= '0' && vk <= '9' {
+		return string(rune(vk))
+	}
+	if vk >= 'A' && vk <= 'Z' {
+		return string(rune(vk))
+	}
+	if vk >= 0x70 && vk <= 0x87 {
+		return fmt.Sprintf("F%d", vk-0x70+1)
+	}
+	if vk >= 0x60 && vk <= 0x69 {
+		return fmt.Sprintf("Numpad %d", vk-0x60)
+	}
+
+	switch vk {
+	case 0x01:
+		return "Mouse Left"
+	case 0x02:
+		return "Mouse Right"
+	case 0x04:
+		return "Mouse Middle"
+	case 0x05:
+		return "Mouse X1"
+	case 0x06:
+		return "Mouse X2"
+	case 0x08:
+		return "Backspace"
+	case 0x09:
+		return "Tab"
+	case 0x0D:
+		return "Enter"
+	case 0x10:
+		return "Shift"
+	case 0x11:
+		return "Ctrl"
+	case 0x12:
+		return "Alt"
+	case 0x13:
+		return "Pause"
+	case 0x14:
+		return "Caps Lock"
+	case 0x1B:
+		return "Esc"
+	case 0x20:
+		return "Space"
+	case 0x21:
+		return "Page Up"
+	case 0x22:
+		return "Page Down"
+	case 0x23:
+		return "End"
+	case 0x24:
+		return "Home"
+	case 0x25:
+		return "Left"
+	case 0x26:
+		return "Up"
+	case 0x27:
+		return "Right"
+	case 0x28:
+		return "Down"
+	case 0x2D:
+		return "Insert"
+	case 0x2E:
+		return "Delete"
+	case 0x5B:
+		return "Left Win"
+	case 0x5C:
+		return "Right Win"
+	default:
+		return fmt.Sprintf("VK_%d", vk)
+	}
+}
+
 func normalizeKey(binding *KeyBinding) {
 	if binding.VK < 0 || binding.VK > 255 {
 		binding.VK = 0
 	}
 	if binding.VK == 0 {
 		binding.Name = ""
+	} else {
+		binding.Name = KeyDisplayName(binding.VK)
 	}
 }
 
@@ -279,6 +358,9 @@ func validateKey(name string, binding KeyBinding) error {
 	}
 	if binding.VK == 0 && binding.Name != "" {
 		return fmt.Errorf("%s has a name but no virtual-key code", name)
+	}
+	if binding.VK > 0 && binding.Name != KeyDisplayName(binding.VK) {
+		return fmt.Errorf("%s name does not match virtual-key code", name)
 	}
 	return nil
 }

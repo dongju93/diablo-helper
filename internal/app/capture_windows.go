@@ -111,7 +111,7 @@ func (a *application) handleKeyEvent(vk uint16, down bool) bool {
 
 func (a *application) assignCapturedKey(vk uint16) {
 	target := a.capture
-	binding := config.KeyBinding{Name: keyDisplayName(vk), VK: int(vk)}
+	binding := config.KeyBinding{Name: config.KeyDisplayName(int(vk)), VK: int(vk)}
 	switch target.kind {
 	case captureStart:
 		a.cfg.Start = binding
@@ -212,10 +212,7 @@ func bindingText(binding config.KeyBinding) string {
 	if !binding.Assigned() {
 		return "미지정"
 	}
-	if binding.Name != "" {
-		return binding.Name
-	}
-	return keyDisplayName(uint16(binding.VK))
+	return config.KeyDisplayName(binding.VK)
 }
 
 func parseInterval(value string) (int, error) {

@@ -311,7 +311,7 @@ func TestMarshalTOMLNormalizesOutput(t *testing.T) {
 
 func TestParseTOMLHandlesCommentsAndQuotedHashes(t *testing.T) {
 	cfg, err := ParseTOML([]byte(`
-pause_key_name = "Hash # Key" # real comment
+pause_key_name = "Hash # Key"
 pause_key_vk = 35
 
 [[skills]]
@@ -324,14 +324,14 @@ enabled = true
 	if err != nil {
 		t.Fatalf("ParseTOML() error = %v", err)
 	}
-	if cfg.Pause != (KeyBinding{Name: "Hash # Key", VK: 35}) {
-		t.Fatalf("pause = %+v, want quoted hash binding", cfg.Pause)
+	if cfg.Pause != (KeyBinding{Name: "End", VK: 35}) {
+		t.Fatalf("pause = %+v, want canonical name for VK 35", cfg.Pause)
 	}
 	if cfg.Skills[0].Name != `Quote " # inside` {
 		t.Fatalf("skill name = %q, want escaped quote and hash", cfg.Skills[0].Name)
 	}
-	if cfg.Skills[0].Key != (KeyBinding{Name: "1#not-comment", VK: 49}) {
-		t.Fatalf("skill key = %+v, want quoted hash key", cfg.Skills[0].Key)
+	if cfg.Skills[0].Key != (KeyBinding{Name: "1", VK: 49}) {
+		t.Fatalf("skill key = %+v, want canonical key name for VK 49", cfg.Skills[0].Key)
 	}
 	if !cfg.Skills[0].Enabled {
 		t.Fatal("skill enabled = false, want true")

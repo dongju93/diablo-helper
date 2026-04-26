@@ -296,6 +296,13 @@ func TestValidateRejectsInvalidConfig(t *testing.T) {
 			},
 			wantError: "between 0 and 255",
 		},
+		{
+			name: "key name spoofing",
+			mutate: func(cfg *Config) {
+				cfg.Start = KeyBinding{Name: "F12", VK: 0x0D}
+			},
+			wantError: "name does not match virtual-key code",
+		},
 	}
 
 	for _, tt := range tests {
@@ -311,5 +318,65 @@ func TestValidateRejectsInvalidConfig(t *testing.T) {
 				t.Fatalf("Validate() error = %v, want %q", err, tt.wantError)
 			}
 		})
+	}
+}
+
+func TestKeyDisplayName(t *testing.T) {
+	tests := []struct {
+		name string
+		vk   int
+		want string
+	}{
+		{name: "digit", vk: '7', want: "7"},
+		{name: "letter", vk: 'K', want: "K"},
+		{name: "f1", vk: 0x70, want: "F1"},
+		{name: "f24", vk: 0x87, want: "F24"},
+		{name: "numpad", vk: 0x69, want: "Numpad 9"},
+		{name: "mouse left", vk: 0x01, want: "Mouse Left"},
+		{name: "mouse right", vk: 0x02, want: "Mouse Right"},
+		{name: "enter", vk: 0x0D, want: "Enter"},
+		{name: "space", vk: 0x20, want: "Space"},
+		{name: "unknown", vk: 255, want: "VK_255"},
+		{name: "negative", vk: -1, want: "VK_-1"},
+		{name: "over 255", vk: 256, want: "VK_256"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := KeyDisplayName(tt.vk); got != tt.want {
+				t.Fatalf("KeyDisplayName(%d) = %q, want %q", tt.vk, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNormalizeCanonicalizesKeyNames(t *testing.T) {
+	cfg := Config{
+		Start: KeyBinding{Name: "Spoofed", VK: 0x0D},
+		Stop:  KeyBinding{Name: "F12", VK: 0x7B},
+		Pause: KeyBinding{Name: "", VK: 0x41},
+		Menu: MenuKeys{
+			Inventory: KeyBinding{Name: "Wrong", VK: 0x43},
+		},
+		Skills: []Skill{
+			{Name: "S1", Key: KeyBinding{Name: "Fake", VK: 0x31}, IntervalMS: DefaultIntervalMS, Enabled: false},
+		},
+	}
+	cfg.Normalize()
+
+	if cfg.Start.Name != "Enter" {
+		t.Fatalf("start name = %q, want %q", cfg.Start.Name, "Enter")
+	}
+	if cfg.Stop.Name != "F12" {
+		t.Fatalf("stop name = %q, want %q", cfg.Stop.Name, "F12")
+	}
+	if cfg.Pause.Name != "A" {
+		t.Fatalf("pause name = %q, want %q", cfg.Pause.Name, "A")
+	}
+	if cfg.Menu.Inventory.Name != "C" {
+		t.Fatalf("inventory name = %q, want %q", cfg.Menu.Inventory.Name, "C")
+	}
+	if cfg.Skills[0].Key.Name != "1" {
+		t.Fatalf("skill key name = %q, want %q", cfg.Skills[0].Key.Name, "1")
 	}
 }

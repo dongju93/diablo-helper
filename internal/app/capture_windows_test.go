@@ -17,8 +17,8 @@ func TestBindingText(t *testing.T) {
 		want    string
 	}{
 		{name: "unassigned", binding: config.KeyBinding{}, want: "미지정"},
-		{name: "uses saved name", binding: config.KeyBinding{Name: "Custom", VK: int('A')}, want: "Custom"},
-		{name: "falls back to display name", binding: config.KeyBinding{VK: int('A')}, want: "A"},
+		{name: "uses canonical name ignoring stored name", binding: config.KeyBinding{Name: "Spoofed", VK: int('A')}, want: "A"},
+		{name: "canonical name from VK", binding: config.KeyBinding{VK: int('A')}, want: "A"},
 	}
 
 	for _, tt := range tests {
