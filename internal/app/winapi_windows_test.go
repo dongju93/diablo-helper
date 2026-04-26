@@ -3,6 +3,8 @@
 package app
 
 import (
+	"path/filepath"
+	"strings"
 	"syscall"
 	"testing"
 	"unsafe"
@@ -84,5 +86,27 @@ func TestFileDialogBuffer(t *testing.T) {
 	}
 	if buffer[len("custom.toml")] != 0 {
 		t.Fatal("buffer is not null-terminated after the initial name")
+	}
+}
+
+func TestWinAPIDLLsLoadFromSystem32(t *testing.T) {
+	dlls := map[*syscall.LazyDLL]string{
+		user32:   "user32.dll",
+		gdi32:    "gdi32.dll",
+		dwmapi:   "dwmapi.dll",
+		uxtheme:  "uxtheme.dll",
+		comdlg32: "comdlg32.dll",
+	}
+
+	for dll, wantName := range dlls {
+		if !filepath.IsAbs(dll.Name) {
+			t.Fatalf("%s path = %q, want an absolute path", wantName, dll.Name)
+		}
+		if got := filepath.Base(dll.Name); !strings.EqualFold(got, wantName) {
+			t.Fatalf("DLL name = %q, want %q", got, wantName)
+		}
+		if got := filepath.Dir(dll.Name); !strings.EqualFold(got, system32Dir) {
+			t.Fatalf("%s directory = %q, want %q", wantName, got, system32Dir)
+		}
 	}
 }

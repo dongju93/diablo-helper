@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(go build *)",
-      "Bash(go test *)"
+      "Bash(go test *)",
+      "Bash(gh auth *)",
+      "Bash(gh repo *)",
+      "Bash(gh release *)",
+      "Bash(git push *)"
     ]
   }
 }

@@ -3,16 +3,26 @@
 package app
 
 import (
+	"path/filepath"
 	"syscall"
+	"unsafe"
 )
 
 var (
-	user32   = syscall.NewLazyDLL("user32.dll")
+	// Go loads kernel32.dll from System32; it is the bootstrap for resolving other system DLL paths.
 	kernel32 = syscall.NewLazyDLL("kernel32.dll")
-	gdi32    = syscall.NewLazyDLL("gdi32.dll")
-	dwmapi   = syscall.NewLazyDLL("dwmapi.dll")
-	uxtheme  = syscall.NewLazyDLL("uxtheme.dll")
-	comdlg32 = syscall.NewLazyDLL("comdlg32.dll")
+
+	procGetSystemDirectoryW = kernel32.NewProc("GetSystemDirectoryW")
+)
+
+var system32Dir = mustSystemDirectory()
+
+var (
+	user32   = system32LazyDLL("user32.dll")
+	gdi32    = system32LazyDLL("gdi32.dll")
+	dwmapi   = system32LazyDLL("dwmapi.dll")
+	uxtheme  = system32LazyDLL("uxtheme.dll")
+	comdlg32 = system32LazyDLL("comdlg32.dll")
 
 	procBeginPaint        = user32.NewProc("BeginPaint")
 	procCallNextHookEx    = user32.NewProc("CallNextHookEx")
@@ -63,3 +73,24 @@ var (
 	procGetOpenFileNameW     = comdlg32.NewProc("GetOpenFileNameW")
 	procGetSaveFileNameW     = comdlg32.NewProc("GetSaveFileNameW")
 )
+
+func system32LazyDLL(name string) *syscall.LazyDLL {
+	return syscall.NewLazyDLL(filepath.Join(system32Dir, name))
+}
+
+func mustSystemDirectory() string {
+	buffer := make([]uint16, syscall.MAX_PATH)
+	for {
+		n, _, err := procGetSystemDirectoryW.Call(
+			uintptr(unsafe.Pointer(&buffer[0])),
+			uintptr(len(buffer)),
+		)
+		if n == 0 {
+			panic("GetSystemDirectoryW failed: " + err.Error())
+		}
+		if n < uintptr(len(buffer)) {
+			return syscall.UTF16ToString(buffer[:n])
+		}
+		buffer = make([]uint16, n+1)
+	}
+}
