@@ -12,6 +12,7 @@ func TestMarshalParseRoundTrip(t *testing.T) {
 	cfg.Start = KeyBinding{Name: "F5", VK: 0x74}
 	cfg.Stop = KeyBinding{Name: "F6", VK: 0x75}
 	cfg.Pause = KeyBinding{Name: "Space", VK: 0x20}
+	cfg.SkillGapMS = 45
 	cfg.Menu.WorldMap = KeyBinding{Name: "M", VK: 0x4D}
 	cfg.Menu.Whisper = KeyBinding{Name: "R", VK: 0x52}
 	cfg.Skills[0] = Skill{
@@ -45,6 +46,9 @@ func TestMarshalParseRoundTrip(t *testing.T) {
 	}
 	if parsed.Menu.Whisper != cfg.Menu.Whisper {
 		t.Fatalf("whisper binding = %+v, want %+v", parsed.Menu.Whisper, cfg.Menu.Whisper)
+	}
+	if parsed.SkillGapMS != cfg.SkillGapMS {
+		t.Fatalf("skill gap = %d, want %d", parsed.SkillGapMS, cfg.SkillGapMS)
 	}
 	if len(parsed.Skills) != MaxSkills {
 		t.Fatalf("skills length = %d, want %d", len(parsed.Skills), MaxSkills)
@@ -130,6 +134,7 @@ func TestSaveFileAndLoadFileRoundTrip(t *testing.T) {
 	cfg := Default()
 	cfg.Start = KeyBinding{Name: "F5", VK: 0x74}
 	cfg.Stop = KeyBinding{Name: "Mouse X1", VK: 0x05}
+	cfg.SkillGapMS = 25
 	cfg.Skills[0] = Skill{
 		Name:       "Primary",
 		Key:        KeyBinding{Name: "1", VK: 0x31},
@@ -152,6 +157,9 @@ func TestSaveFileAndLoadFileRoundTrip(t *testing.T) {
 	}
 	if loaded.Stop != cfg.Stop {
 		t.Fatalf("stop = %+v, want %+v", loaded.Stop, cfg.Stop)
+	}
+	if loaded.SkillGapMS != cfg.SkillGapMS {
+		t.Fatalf("skill gap = %d, want %d", loaded.SkillGapMS, cfg.SkillGapMS)
 	}
 	if loaded.Skills[0] != cfg.Skills[0] {
 		t.Fatalf("skill 0 = %+v, want %+v", loaded.Skills[0], cfg.Skills[0])
@@ -207,6 +215,7 @@ func TestMarshalTOMLNormalizesOutput(t *testing.T) {
 		`name = "Skill 1"`,
 		`key_name = ""`,
 		`key_vk = 0`,
+		`skill_gap_ms = 0`,
 		`interval_ms = 1000`,
 		`enabled = false`,
 		`name = "Skill 8"`,

@@ -24,6 +24,7 @@ func newSkillRunner(sendKey func(vk uint16)) *skillRunner {
 }
 
 func (r *skillRunner) Start(cfg config.Config) bool {
+	cfg.Normalize()
 	skills := runnableSkills(cfg)
 	if len(skills) == 0 {
 		return false

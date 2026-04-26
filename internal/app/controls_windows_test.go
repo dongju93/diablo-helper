@@ -33,6 +33,30 @@ func TestApplicationControlClassification(t *testing.T) {
 	}
 }
 
+func TestBulkIntervalForSkillAppliesGapByRow(t *testing.T) {
+	tests := []struct {
+		name         string
+		baseInterval int
+		skillGap     int
+		index        int
+		want         int
+	}{
+		{name: "first skill uses base interval", baseInterval: 1000, skillGap: 50, index: 0, want: 1000},
+		{name: "second skill adds one gap", baseInterval: 1000, skillGap: 50, index: 1, want: 1050},
+		{name: "eighth skill adds seven gaps", baseInterval: 1000, skillGap: 50, index: 7, want: 1350},
+		{name: "zero gap keeps same interval", baseInterval: 1000, skillGap: 0, index: 7, want: 1000},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := bulkIntervalForSkill(tt.baseInterval, tt.skillGap, tt.index)
+			if got != tt.want {
+				t.Fatalf("bulkIntervalForSkill() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestHandleCommandStartsKeyCapture(t *testing.T) {
 	tests := []struct {
 		name string

@@ -160,14 +160,15 @@ func (a *application) paint(hwnd uintptr) {
 	}
 
 	// Dividers – right column (scales with rw)
-	a.drawDivider(hdc, lo.rx+lo.w(20), lo.y(198), lo.rw-lo.w(40))
-	for y := 242; y <= 515; y += 39 {
+	a.drawDivider(hdc, lo.rx+lo.w(20), lo.y(skillFirstRowY-6), lo.rw-lo.w(40))
+	for y := skillFirstRowY + 38; y <= skillFirstRowY+38+(config.MaxSkills-1)*skillRowGap; y += skillRowGap {
 		a.drawDivider(hdc, lo.rx+lo.w(20), lo.y(y), lo.rw-lo.w(40))
 	}
 
 	// Input frames
-	a.drawInputFrame(hdc, lo.bulkEditX-lo.w(8), lo.y(124), lo.w(86), lo.h(32))
-	for y := 204; y < 204+config.MaxSkills*39; y += 39 {
+	a.drawInputFrame(hdc, lo.bulkEditX-lo.w(8), lo.y(bulkIntervalEditY-6), lo.w(86), lo.h(32))
+	a.drawInputFrame(hdc, lo.bulkEditX-lo.w(8), lo.y(bulkSkillGapEditY-6), lo.w(86), lo.h(32))
+	for y := skillFirstRowY; y < skillFirstRowY+config.MaxSkills*skillRowGap; y += skillRowGap {
 		a.drawInputFrame(hdc, lo.skillIntervalX-lo.w(8), lo.y(y+1), lo.w(82), lo.h(32))
 	}
 

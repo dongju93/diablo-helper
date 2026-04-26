@@ -65,6 +65,43 @@ func TestParseInterval(t *testing.T) {
 	}
 }
 
+func TestParseSkillGap(t *testing.T) {
+	tests := []struct {
+		name      string
+		value     string
+		want      int
+		wantError string
+	}{
+		{name: "default empty", value: "", want: config.DefaultSkillGapMS},
+		{name: "zero", value: "0", want: 0},
+		{name: "valid", value: "35", want: 35},
+		{name: "trims whitespace", value: " 40 \t", want: 40},
+		{name: "not a number", value: "slow", wantError: "숫자"},
+		{name: "below zero", value: "-1", wantError: "0ms 이상"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseSkillGap(tt.value)
+			if tt.wantError == "" {
+				if err != nil {
+					t.Fatalf("parseSkillGap() error = %v", err)
+				}
+				if got != tt.want {
+					t.Fatalf("parseSkillGap() = %d, want %d", got, tt.want)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("parseSkillGap() error = nil, want error")
+			}
+			if !strings.Contains(err.Error(), tt.wantError) {
+				t.Fatalf("parseSkillGap() error = %v, want %q", err, tt.wantError)
+			}
+		})
+	}
+}
+
 func TestCaptureTargetAndControlID(t *testing.T) {
 	a := newApplication()
 

@@ -5,6 +5,7 @@ import "fmt"
 const (
 	MaxSkills           = 8
 	DefaultIntervalMS   = 1000
+	DefaultSkillGapMS   = 0
 	MinimumIntervalMS   = 10
 	MouseLeftVK         = 0x01
 	DefaultSkillEnabled = false
@@ -44,11 +45,12 @@ type MenuBinding struct {
 }
 
 type Config struct {
-	Start  KeyBinding
-	Stop   KeyBinding
-	Pause  KeyBinding
-	Menu   MenuKeys
-	Skills []Skill
+	Start      KeyBinding
+	Stop       KeyBinding
+	Pause      KeyBinding
+	Menu       MenuKeys
+	Skills     []Skill
+	SkillGapMS int
 }
 
 func Default() Config {
@@ -125,6 +127,9 @@ func (c *Config) Normalize() {
 		}
 		normalizeKey(&c.Skills[i].Key)
 	}
+	if c.SkillGapMS < 0 {
+		c.SkillGapMS = DefaultSkillGapMS
+	}
 	normalizeKey(&c.Start)
 	normalizeKey(&c.Stop)
 	normalizeKey(&c.Pause)
@@ -153,6 +158,9 @@ func (c Config) Validate() error {
 	}
 	if c.Stop.VK == MouseLeftVK {
 		return fmt.Errorf("stop key must not be Mouse Left")
+	}
+	if c.SkillGapMS < 0 {
+		return fmt.Errorf("skill gap must be at least 0ms")
 	}
 	for i, skill := range c.Skills {
 		if skill.IntervalMS < MinimumIntervalMS {

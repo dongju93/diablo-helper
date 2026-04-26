@@ -186,3 +186,18 @@ func parseInterval(value string) (int, error) {
 	}
 	return interval, nil
 }
+
+func parseSkillGap(value string) (int, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return config.DefaultSkillGapMS, nil
+	}
+	gap, err := strconv.Atoi(trimmed)
+	if err != nil {
+		return 0, fmt.Errorf("키별 간격은 숫자여야 합니다")
+	}
+	if gap < 0 {
+		return 0, fmt.Errorf("키별 간격은 0ms 이상이어야 합니다")
+	}
+	return gap, nil
+}

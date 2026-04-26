@@ -35,6 +35,7 @@ func MarshalTOML(cfg Config) ([]byte, error) {
 	writeKey(&buf, "start", cfg.Start)
 	writeKey(&buf, "stop", cfg.Stop)
 	writeKey(&buf, "pause", cfg.Pause)
+	writeInt(&buf, "skill_gap_ms", cfg.SkillGapMS)
 	buf.WriteByte('\n')
 	writeKey(&buf, "menu_inventory", cfg.Menu.Inventory)
 	writeKey(&buf, "menu_skills", cfg.Menu.Skills)
@@ -124,6 +125,8 @@ func setTopLevelValue(cfg *Config, key string, value string) error {
 		return setString(&cfg.Pause.Name, value)
 	case "pause_key_vk":
 		return setInt(&cfg.Pause.VK, value)
+	case "skill_gap_ms":
+		return setInt(&cfg.SkillGapMS, value)
 	case "menu_inventory_key_name":
 		return setString(&cfg.Menu.Inventory.Name, value)
 	case "menu_inventory_key_vk":

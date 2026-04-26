@@ -1,12 +1,12 @@
 package meta
 
 var (
-	Version   = "0.1.0-dev"
+	Version   = "dev"
 	Commit    = "none"
 	BuildDate = "unknown"
 	Author    = "dongju93"
 	Repo      = "github.com/dongju93/diablo-helper"
-	GoVersion = "1.26.2"
+	GoVersion = "unknown"
 )
 
 func Title() string {

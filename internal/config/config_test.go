@@ -43,6 +43,9 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.Menu.Whisper != (KeyBinding{Name: "R", VK: 0x52}) {
 		t.Fatalf("whisper = %+v, want R", cfg.Menu.Whisper)
 	}
+	if cfg.SkillGapMS != DefaultSkillGapMS {
+		t.Fatalf("skill gap = %d, want %d", cfg.SkillGapMS, DefaultSkillGapMS)
+	}
 	if len(cfg.Skills) != MaxSkills {
 		t.Fatalf("skills length = %d, want %d", len(cfg.Skills), MaxSkills)
 	}
@@ -71,6 +74,7 @@ func TestNormalizeRepairsConfigShapeAndValues(t *testing.T) {
 		Menu: MenuKeys{
 			Inventory: KeyBinding{Name: "Bad Menu", VK: 999},
 		},
+		SkillGapMS: -1,
 	}
 	for range MaxSkills + 2 {
 		cfg.Skills = append(cfg.Skills, Skill{
@@ -109,6 +113,9 @@ func TestNormalizeRepairsConfigShapeAndValues(t *testing.T) {
 	}
 	if cfg.Menu.Inventory != (KeyBinding{}) {
 		t.Fatalf("inventory = %+v, want cleared", cfg.Menu.Inventory)
+	}
+	if cfg.SkillGapMS != DefaultSkillGapMS {
+		t.Fatalf("skill gap = %d, want %d", cfg.SkillGapMS, DefaultSkillGapMS)
 	}
 }
 
@@ -155,6 +162,13 @@ func TestValidateRejectsInvalidConfig(t *testing.T) {
 				cfg.Skills[0].IntervalMS = MinimumIntervalMS - 1
 			},
 			wantError: "interval must be at least",
+		},
+		{
+			name: "skill gap below zero",
+			mutate: func(cfg *Config) {
+				cfg.SkillGapMS = -1
+			},
+			wantError: "skill gap must be at least",
 		},
 		{
 			name: "skill key below range",
