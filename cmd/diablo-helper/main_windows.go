@@ -1022,21 +1022,41 @@ func (a *application) saveConfig() {
 		messageBox(a.hwnd, "잘못된 설정", err.Error(), mbOK|mbIconError)
 		return
 	}
-	if err := config.SaveFile(a.configPath, a.cfg); err != nil {
+	path, ok, err := chooseConfigSavePath(a.hwnd, a.configPath)
+	if err != nil {
+		messageBox(a.hwnd, "파일 선택 실패", err.Error(), mbOK|mbIconError)
+		return
+	}
+	if !ok {
+		a.setStatus("저장을 취소했습니다.")
+		return
+	}
+	if err := config.SaveFile(path, a.cfg); err != nil {
 		messageBox(a.hwnd, "저장 실패", err.Error(), mbOK|mbIconError)
 		return
 	}
+	a.configPath = path
 	a.setStatus("저장 완료: " + a.configPath)
 }
 
 func (a *application) loadConfig() {
-	loaded, err := config.LoadFile(a.configPath)
+	path, ok, err := chooseConfigOpenPath(a.hwnd, a.configPath)
 	if err != nil {
-		messageBox(a.hwnd, "불러오기 실패", err.Error(), mbOK|mbIconError)
+		messageBox(a.hwnd, "파일 선택 실패", err.Error(), mbOK|mbIconError)
+		return
+	}
+	if !ok {
+		a.setStatus("불러오기를 취소했습니다.")
+		return
+	}
+	loaded, err := config.LoadFile(path)
+	if err != nil {
+		messageBox(a.hwnd, "설정 파일 경고", "올바른 diablo-helper 설정 파일이 아닙니다.\n\n"+err.Error(), mbOK|mbIconWarning)
 		return
 	}
 	a.runner.Stop()
 	a.cfg = loaded
+	a.configPath = path
 	previous := a.capture
 	a.capture = captureTarget{}
 	a.updateControlsFromConfig()

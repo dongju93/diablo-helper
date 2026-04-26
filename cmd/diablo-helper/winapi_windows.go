@@ -3,7 +3,11 @@
 package main
 
 import (
+	"fmt"
+	"path/filepath"
+	"runtime"
 	"syscall"
+	"unicode/utf16"
 	"unsafe"
 )
 
@@ -53,6 +57,7 @@ const (
 	llmhfInjected         = 0x00000001
 	mbOK                  = 0x00000000
 	mbIconError           = 0x00000010
+	mbIconWarning         = 0x00000030
 	mbIconInfo            = 0x00000040
 	mouseEventLeftDown    = 0x0002
 	mouseEventLeftUp      = 0x0004
@@ -98,6 +103,16 @@ const (
 	psSolid               = 0
 	xButton1              = 0x0001
 	xButton2              = 0x0002
+
+	maxFileDialogPath = 32768
+
+	ofnOverwritePrompt  = 0x00000002
+	ofnHideReadonly     = 0x00000004
+	ofnNoChangeDir      = 0x00000008
+	ofnPathMustExist    = 0x00000800
+	ofnFileMustExist    = 0x00001000
+	ofnNoReadonlyReturn = 0x00008000
+	ofnExplorer         = 0x00080000
 )
 
 var (
@@ -106,6 +121,7 @@ var (
 	gdi32    = syscall.NewLazyDLL("gdi32.dll")
 	dwmapi   = syscall.NewLazyDLL("dwmapi.dll")
 	uxtheme  = syscall.NewLazyDLL("uxtheme.dll")
+	comdlg32 = syscall.NewLazyDLL("comdlg32.dll")
 
 	procBeginPaint        = user32.NewProc("BeginPaint")
 	procCallNextHookEx    = user32.NewProc("CallNextHookEx")
@@ -150,6 +166,10 @@ var (
 
 	procDwmSetWindowAttribute = dwmapi.NewProc("DwmSetWindowAttribute")
 	procSetWindowTheme        = uxtheme.NewProc("SetWindowTheme")
+
+	procCommDlgExtendedError = comdlg32.NewProc("CommDlgExtendedError")
+	procGetOpenFileNameW     = comdlg32.NewProc("GetOpenFileNameW")
+	procGetSaveFileNameW     = comdlg32.NewProc("GetSaveFileNameW")
 )
 
 type point struct {
@@ -225,6 +245,32 @@ type drawItemStruct struct {
 	ItemData   uintptr
 }
 
+type openFileName struct {
+	StructSize    uint32
+	HwndOwner     uintptr
+	Instance      uintptr
+	Filter        *uint16
+	CustomFilter  *uint16
+	MaxCustFilter uint32
+	FilterIndex   uint32
+	File          *uint16
+	MaxFile       uint32
+	FileTitle     *uint16
+	MaxFileTitle  uint32
+	InitialDir    *uint16
+	Title         *uint16
+	Flags         uint32
+	FileOffset    uint16
+	FileExtension uint16
+	DefExt        *uint16
+	CustData      uintptr
+	FnHook        uintptr
+	TemplateName  *uint16
+	PvReserved    uintptr
+	DwReserved    uint32
+	FlagsEx       uint32
+}
+
 type mouseInput struct {
 	DX          int32
 	DY          int32
@@ -253,6 +299,10 @@ func utf16Ptr(value string) *uint16 {
 		panic(err)
 	}
 	return ptr
+}
+
+func utf16Slice(value string) []uint16 {
+	return append(utf16.Encode([]rune(value)), 0)
 }
 
 func lowWord(value uintptr) int {
@@ -332,6 +382,98 @@ func messageBox(hwnd uintptr, title string, text string, flags uintptr) {
 		uintptr(unsafe.Pointer(utf16Ptr(title))),
 		flags,
 	)
+}
+
+func chooseConfigOpenPath(hwnd uintptr, initialPath string) (string, bool, error) {
+	return chooseConfigPath(hwnd, "설정 불러오기", initialPath, false)
+}
+
+func chooseConfigSavePath(hwnd uintptr, initialPath string) (string, bool, error) {
+	return chooseConfigPath(hwnd, "설정 저장", initialPath, true)
+}
+
+func chooseConfigPath(hwnd uintptr, title string, initialPath string, save bool) (string, bool, error) {
+	initialName, initialDir := fileDialogInitialNameAndDir(initialPath)
+	fileBuffer := fileDialogBuffer(initialName)
+	filter := utf16Slice("TOML 설정 파일 (*.toml)\x00*.toml\x00모든 파일 (*.*)\x00*.*\x00")
+	titleText := utf16Slice(title)
+	defExt := utf16Slice("toml")
+
+	flags := uint32(ofnExplorer | ofnHideReadonly | ofnNoChangeDir | ofnPathMustExist)
+	if save {
+		flags |= ofnOverwritePrompt | ofnNoReadonlyReturn
+	} else {
+		flags |= ofnFileMustExist
+	}
+
+	ofn := openFileName{
+		StructSize:  uint32(unsafe.Sizeof(openFileName{})),
+		HwndOwner:   hwnd,
+		Filter:      &filter[0],
+		FilterIndex: 1,
+		File:        &fileBuffer[0],
+		MaxFile:     uint32(len(fileBuffer)),
+		Title:       &titleText[0],
+		Flags:       flags,
+		DefExt:      &defExt[0],
+	}
+
+	var initialDirText []uint16
+	if initialDir != "" {
+		initialDirText = utf16Slice(initialDir)
+		ofn.InitialDir = &initialDirText[0]
+	}
+
+	var ret uintptr
+	if save {
+		ret, _, _ = procGetSaveFileNameW.Call(uintptr(unsafe.Pointer(&ofn)))
+	} else {
+		ret, _, _ = procGetOpenFileNameW.Call(uintptr(unsafe.Pointer(&ofn)))
+	}
+	runtime.KeepAlive(fileBuffer)
+	runtime.KeepAlive(filter)
+	runtime.KeepAlive(titleText)
+	runtime.KeepAlive(defExt)
+	runtime.KeepAlive(initialDirText)
+
+	if ret == 0 {
+		errCode, _, _ := procCommDlgExtendedError.Call()
+		if errCode == 0 {
+			return "", false, nil
+		}
+		return "", false, fmt.Errorf("file dialog failed with code 0x%04x", errCode)
+	}
+
+	path := syscall.UTF16ToString(fileBuffer)
+	if path == "" {
+		return "", false, fmt.Errorf("file dialog returned an empty path")
+	}
+	return path, true, nil
+}
+
+func fileDialogInitialNameAndDir(initialPath string) (string, string) {
+	if initialPath == "" {
+		return "settings.toml", ""
+	}
+	name := filepath.Base(initialPath)
+	if name == "." || name == string(filepath.Separator) {
+		name = "settings.toml"
+	}
+	dir := filepath.Dir(initialPath)
+	if dir == "." || dir == name {
+		dir = ""
+	}
+	return name, dir
+}
+
+func fileDialogBuffer(initialName string) []uint16 {
+	buffer := make([]uint16, maxFileDialogPath)
+	initial := utf16.Encode([]rune(initialName))
+	if len(initial) >= len(buffer) {
+		initial = initial[:len(buffer)-1]
+	}
+	copy(buffer, initial)
+	return buffer
 }
 
 func checked(hwnd uintptr) bool {

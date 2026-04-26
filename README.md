@@ -13,7 +13,7 @@ Windows only key-input helper for Diablo.
 - A hold-style pause key stops skill input only while the key is held.
 - Game menu keys stop skill input like the stop key.
 - Skill rows can be enabled or disabled individually.
-- Settings are saved to and loaded from `settings.toml`.
+- Settings can be saved to and loaded from a selected `.toml` file.
 - Keyboard keys and standard mouse buttons are assignable.
 - Start and stop keys cannot be assigned to `Mouse Left`.
 
@@ -54,7 +54,7 @@ Research baseline:
 | Number of hold special keys     | D3Helper UI shows one special key.                                                                                                      | One pause key is supported.                                                                                                 | Same                           |
 | Game menu stop keys             | D3Helper stops repeated input for game menu actions such as inventory, skill, follower, map, world map, town portal, chat, and whisper. | Inventory, skill, follower, map, world map, town portal, chat, and whisper stop repeated input.                             | Same                           |
 | World map and whisper stop keys | D3Helper-style UI includes separate world map and whisper keys.                                                                         | Separate world map and whisper stop-key fields are supported.                                                               | Same                           |
-| Save and load                   | Saved values can be reused. The referenced usage article describes changing saved values by class.                                      | Saves and loads one `settings.toml` file next to the executable.                                                            | Partial                        |
+| Save and load                   | Saved values can be reused. The referenced usage article describes changing saved values by class.                                      | Save and load open a file picker so a `.toml` settings file can be chosen.                                                  | Same direction                 |
 | Multiple profiles               | D3Helper UI commonly shows a profile name such as `default`.                                                                            | No profile selector or multiple TOML profile manager yet.                                                                   | Not supported                  |
 | Mouse middle button             | D3Helper documents mouse input, including wheel-related assignment.                                                                     | `Mouse Middle` is directly supported.                                                                                       | Same for middle click          |
 | Mouse wheel scroll              | D3Helper documentation says mouse wheel input is possible.                                                                              | Wheel-up and wheel-down scroll events are not assignable yet.                                                               | Not supported                  |
@@ -78,7 +78,7 @@ GOOS=windows GOARCH=amd64 go build -ldflags "-H=windowsgui" -o dist/diablo-helpe
 1. Run `diablo-helper.exe` on Windows.
 2. Click a key button and press the key to assign.
 3. Set skill intervals in milliseconds.
-4. Use `Save TOML` to write `settings.toml` next to the executable.
+4. Use `저장하기` to choose where to save the `.toml` settings file.
 5. Use the assigned start key to begin skill input.
 6. Use the stop key or one of the game menu keys to stop skill input.
 7. Hold the pause key to suspend skill input temporarily.
