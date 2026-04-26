@@ -26,11 +26,14 @@ const (
 	bstChecked            = 1
 	cleartypeQuality      = 5
 	defaultCharset        = 1
+	dwmSystemBackdropMain = 2
 	esNumber              = 0x00002000
+	esAutoHScroll         = 0x00000080
 	transparent           = 1
 	ssLeft                = 0x00000000
 	defaultGUIFont        = 17
 	dwmwaWindowCornerPref = 33
+	dwmwaSystemBackdrop   = 38
 	dwmwcpRound           = 2
 	dtCenter              = 0x00000001
 	dtVCenter             = 0x00000004
@@ -91,6 +94,7 @@ const (
 	odsSelected           = 0x0001
 	odsDisabled           = 0x0004
 	odsFocus              = 0x0010
+	odsHotLight           = 0x0040
 	psSolid               = 0
 	xButton1              = 0x0001
 	xButton2              = 0x0002
@@ -133,6 +137,7 @@ var (
 
 	procGetModuleHandleW = kernel32.NewProc("GetModuleHandleW")
 	procCreateFontW      = gdi32.NewProc("CreateFontW")
+	procEllipse          = gdi32.NewProc("Ellipse")
 	procCreatePen        = gdi32.NewProc("CreatePen")
 	procCreateSolidBrush = gdi32.NewProc("CreateSolidBrush")
 	procDeleteObject     = gdi32.NewProc("DeleteObject")
@@ -296,13 +301,20 @@ func setWindowTheme(hwnd uintptr, theme string) {
 	procSetWindowTheme.Call(hwnd, uintptr(unsafe.Pointer(utf16Ptr(theme))), 0)
 }
 
-func setRoundedWindowCorners(hwnd uintptr) {
-	preference := int32(dwmwcpRound)
+func setWindowVisuals(hwnd uintptr) {
+	cornerPreference := int32(dwmwcpRound)
 	procDwmSetWindowAttribute.Call(
 		hwnd,
 		uintptr(dwmwaWindowCornerPref),
-		uintptr(unsafe.Pointer(&preference)),
-		unsafe.Sizeof(preference),
+		uintptr(unsafe.Pointer(&cornerPreference)),
+		unsafe.Sizeof(cornerPreference),
+	)
+	backdrop := int32(dwmSystemBackdropMain)
+	procDwmSetWindowAttribute.Call(
+		hwnd,
+		uintptr(dwmwaSystemBackdrop),
+		uintptr(unsafe.Pointer(&backdrop)),
+		unsafe.Sizeof(backdrop),
 	)
 }
 

@@ -109,14 +109,17 @@ var (
 	mouseHookProc    = syscall.NewCallback(lowLevelMouseProc)
 	uiBackground     = rgb(243, 243, 243)
 	uiPanel          = rgb(255, 255, 255)
-	uiPanelAlt       = rgb(250, 250, 250)
-	uiBorder         = rgb(221, 221, 221)
-	uiBorderStrong   = rgb(198, 198, 198)
+	uiPanelAlt       = rgb(251, 251, 251)
+	uiBorder         = rgb(229, 229, 229)
+	uiBorderStrong   = rgb(199, 199, 199)
 	uiText           = rgb(32, 32, 32)
 	uiTextSubtle     = rgb(96, 96, 96)
 	uiAccent         = rgb(0, 103, 192)
 	uiAccentPressed  = rgb(0, 90, 158)
+	uiAccentHover    = rgb(0, 95, 184)
 	uiAccentSoft     = rgb(232, 241, 252)
+	uiSuccess        = rgb(16, 124, 16)
+	uiWarning        = rgb(159, 98, 0)
 	menuControls     = []menuControl{
 		{id: "inventory", label: "소지품", control: idMenuInventory},
 		{id: "skills", label: "기술", control: idMenuSkills},
@@ -186,7 +189,7 @@ func (a *application) run() error {
 		return fmt.Errorf("CreateWindowExW failed: %w", err)
 	}
 	a.hwnd = hwnd
-	setRoundedWindowCorners(hwnd)
+	setWindowVisuals(hwnd)
 
 	hook, _, err := procSetWindowsHookExW.Call(whKeyboardLL, keyboardHookProc, a.instance, 0)
 	if hook == 0 {
@@ -365,7 +368,7 @@ func (a *application) initUIResources() {
 		a.font = createUIFont("Malgun Gothic", -15, fwNormal)
 	}
 	if a.titleFont == 0 {
-		a.titleFont = createUIFont("Segoe UI", -26, fwSemiBold)
+		a.titleFont = createUIFont("Segoe UI Variable Display", -28, fwSemiBold)
 	}
 	if a.sectionFont == 0 {
 		a.sectionFont = createUIFont("Malgun Gothic", -16, fwSemiBold)
@@ -451,8 +454,24 @@ func (a *application) paint(hwnd uintptr) {
 	a.drawPanel(hdc, 396, 92, 540, 498)
 	a.drawPanel(hdc, 396, 606, 540, 84)
 	a.drawPanel(hdc, 24, 700, 912, 40)
+	a.drawAccentMark(hdc, 28, 26, 4, 24)
 
-	drawText(hdc, "Diablo Helper", a.titleFont, uiText, 28, 20, 300, 36, dtSingleLine|dtNoPrefix)
+	a.drawDivider(hdc, 44, 174, 308)
+	for y := 320; y <= 560; y += 40 {
+		a.drawDivider(hdc, 44, y, 308)
+	}
+	a.drawDivider(hdc, 416, 198, 500)
+	for y := 242; y <= 515; y += 39 {
+		a.drawDivider(hdc, 416, y, 500)
+	}
+
+	a.drawInputFrame(hdc, 678, 124, 86, 32)
+	for y := 204; y < 204+config.MaxSkills*39; y += 39 {
+		a.drawInputFrame(hdc, 732, y+1, 82, 32)
+	}
+	a.drawStatusDot(hdc, 92, 719)
+
+	drawText(hdc, "Diablo Helper", a.titleFont, uiText, 40, 18, 300, 40, dtSingleLine|dtNoPrefix)
 	drawText(hdc, "시작/종료 키", a.sectionFont, uiText, 44, 108, 210, 28, dtSingleLine|dtNoPrefix)
 	drawText(hdc, "게임 메뉴 키", a.sectionFont, uiText, 44, 250, 210, 28, dtSingleLine|dtNoPrefix)
 	drawText(hdc, "기술 키", a.sectionFont, uiText, 416, 108, 160, 28, dtSingleLine|dtNoPrefix)
@@ -473,6 +492,66 @@ func (a *application) drawPanel(hdc uintptr, x int, y int, width int, height int
 		16,
 		16,
 	)
+	procSelectObject.Call(hdc, oldPen)
+	procSelectObject.Call(hdc, oldBrush)
+	deleteGDIObject(pen)
+	deleteGDIObject(brush)
+}
+
+func (a *application) drawInputFrame(hdc uintptr, x int, y int, width int, height int) {
+	brush := createBrush(uiPanel)
+	pen := createPen(uiBorderStrong, 1)
+	oldBrush, _, _ := procSelectObject.Call(hdc, brush)
+	oldPen, _, _ := procSelectObject.Call(hdc, pen)
+	procRoundRect.Call(
+		hdc,
+		uintptr(x),
+		uintptr(y),
+		uintptr(x+width),
+		uintptr(y+height),
+		8,
+		8,
+	)
+	procSelectObject.Call(hdc, oldPen)
+	procSelectObject.Call(hdc, oldBrush)
+	deleteGDIObject(pen)
+	deleteGDIObject(brush)
+}
+
+func (a *application) drawDivider(hdc uintptr, x int, y int, width int) {
+	rc := rect{Left: int32(x), Top: int32(y), Right: int32(x + width), Bottom: int32(y + 1)}
+	brush := createBrush(uiBorder)
+	procFillRect.Call(hdc, uintptr(unsafe.Pointer(&rc)), brush)
+	deleteGDIObject(brush)
+}
+
+func (a *application) drawAccentMark(hdc uintptr, x int, y int, width int, height int) {
+	brush := createBrush(uiAccent)
+	pen := createPen(uiAccent, 1)
+	oldBrush, _, _ := procSelectObject.Call(hdc, brush)
+	oldPen, _, _ := procSelectObject.Call(hdc, pen)
+	procRoundRect.Call(hdc, uintptr(x), uintptr(y), uintptr(x+width), uintptr(y+height), 4, 4)
+	procSelectObject.Call(hdc, oldPen)
+	procSelectObject.Call(hdc, oldBrush)
+	deleteGDIObject(pen)
+	deleteGDIObject(brush)
+}
+
+func (a *application) drawStatusDot(hdc uintptr, x int, y int) {
+	color := uiTextSubtle
+	switch {
+	case a.capture.valid():
+		color = uiAccent
+	case a.runner.Paused():
+		color = uiWarning
+	case a.runner.Running():
+		color = uiSuccess
+	}
+	brush := createBrush(color)
+	pen := createPen(color, 1)
+	oldBrush, _, _ := procSelectObject.Call(hdc, brush)
+	oldPen, _, _ := procSelectObject.Call(hdc, pen)
+	procEllipse.Call(hdc, uintptr(x), uintptr(y), uintptr(x+10), uintptr(y+10))
 	procSelectObject.Call(hdc, oldPen)
 	procSelectObject.Call(hdc, oldBrush)
 	deleteGDIObject(pen)
@@ -528,6 +607,7 @@ func (a *application) drawButton(item *drawItemStruct) {
 	selected := item.ItemState&odsSelected != 0
 	disabled := item.ItemState&odsDisabled != 0
 	focused := item.ItemState&odsFocus != 0
+	hovered := item.ItemState&odsHotLight != 0
 	capturing := a.captureControlID(a.capture) == id
 
 	fill := uiPanelAlt
@@ -549,6 +629,13 @@ func (a *application) drawButton(item *drawItemStruct) {
 		fill = uiAccentSoft
 		border = uiAccent
 		textColor = uiAccentPressed
+	}
+	if hovered && !capturing && !disabled {
+		if a.isPrimaryButton(id) {
+			fill = uiAccentHover
+		} else {
+			fill = rgb(246, 246, 246)
+		}
 	}
 	if selected {
 		if a.isPrimaryButton(id) {
@@ -661,8 +748,8 @@ func (a *application) invalidateCaptureControls(targets ...captureTarget) {
 func (a *application) createControls(hwnd uintptr) {
 	a.initUIResources()
 
-	a.createButton(hwnd, idLoad, "불러오기", 740, 26, 88, 34)
-	a.createButton(hwnd, idSave, "저장하기", 840, 26, 88, 34)
+	a.createButton(hwnd, idLoad, "불러오기", 680, 26, 120, 34)
+	a.createButton(hwnd, idSave, "저장하기", 812, 26, 120, 34)
 
 	a.createStatic(hwnd, "시작 키", 48, 139, 95, 24)
 	a.controls.startButton = a.createButton(hwnd, idStartKey, "", 154, 134, 190, 34)
@@ -677,9 +764,9 @@ func (a *application) createControls(hwnd uintptr) {
 	}
 
 	a.createStatic(hwnd, "일괄 간격", 598, 129, 78, 24)
-	a.controls.bulkInterval = a.createEdit(hwnd, idBulkInterval, strconv.Itoa(config.DefaultIntervalMS), 678, 124, 78, 32)
+	a.controls.bulkInterval = a.createEdit(hwnd, idBulkInterval, strconv.Itoa(config.DefaultIntervalMS), 686, 130, 62, 22)
 	a.createStatic(hwnd, "ms", 766, 129, 30, 24)
-	a.createButton(hwnd, idApplyBulk, "적용", 812, 124, 76, 32)
+	a.createButton(hwnd, idApplyBulk, "적용", 812, 124, 92, 32)
 
 	a.createStatic(hwnd, "사용", 430, 174, 45, 24)
 	a.createStatic(hwnd, "기술", 492, 174, 55, 24)
@@ -690,7 +777,7 @@ func (a *application) createControls(hwnd uintptr) {
 		a.controls.skillEnabled[i] = a.createCheckbox(hwnd, idSkillEnabledBase+i, "", 438, y+6, 22, 22)
 		a.createStatic(hwnd, strconv.Itoa(i+1), 501, y+7, 30, 22)
 		a.controls.skillButtons[i] = a.createButton(hwnd, idSkillKeyBase+i, "", 548, y, 160, 34)
-		a.controls.skillInterval[i] = a.createEdit(hwnd, idSkillIntervalBase+i, "", 732, y+1, 78, 32)
+		a.controls.skillInterval[i] = a.createEdit(hwnd, idSkillIntervalBase+i, "", 740, y+7, 56, 22)
 		a.createStatic(hwnd, "ms", 822, y+6, 32, 22)
 		y += 39
 	}
@@ -720,8 +807,8 @@ func (a *application) createCheckbox(parent uintptr, id int, text string, x int,
 }
 
 func (a *application) createEdit(parent uintptr, id int, text string, x int, y int, width int, height int) uintptr {
-	hwnd := a.createControl(parent, "EDIT", text, wsChild|wsVisible|wsTabStop|wsBorder|esNumber, x, y, width, height, id)
-	sendMessage(hwnd, emSetMargins, ecLeftMargin|ecRightMargin, makeLong(8, 8))
+	hwnd := a.createControl(parent, "EDIT", text, wsChild|wsVisible|wsTabStop|esNumber|esAutoHScroll, x, y, width, height, id)
+	sendMessage(hwnd, emSetMargins, ecLeftMargin|ecRightMargin, makeLong(0, 0))
 	return hwnd
 }
 
@@ -1005,6 +1092,9 @@ func (a *application) updateRuntimeStatus() {
 func (a *application) setStatus(text string) {
 	if a.controls.status != 0 {
 		setWindowText(a.controls.status, text)
+	}
+	if a.hwnd != 0 {
+		invalidateRect(a.hwnd, false)
 	}
 }
 
