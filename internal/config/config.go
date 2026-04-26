@@ -1,6 +1,10 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+	"time"
+)
 
 const (
 	MaxSkills                = 8
@@ -8,9 +12,13 @@ const (
 	DefaultSkillGapMS        = 0
 	DefaultClickerIntervalMS = 100
 	MinimumIntervalMS        = 10
+	MaximumIntervalMS        = 60 * 60 * 1000
+	MaximumSkillGapMS        = 60 * 60 * 1000
 	MouseLeftVK              = 0x01
 	DefaultSkillEnabled      = false
 )
+
+var maximumDurationMilliseconds = int64(math.MaxInt64 / int64(time.Millisecond))
 
 type KeyBinding struct {
 	Name string
@@ -187,12 +195,30 @@ func (c Config) Validate() error {
 	if c.SkillGapMS < 0 {
 		return fmt.Errorf("skill gap must be at least 0ms")
 	}
+	if c.SkillGapMS > MaximumSkillGapMS {
+		return fmt.Errorf("skill gap must be at most %dms", MaximumSkillGapMS)
+	}
+	if !MillisecondsFitDuration(c.SkillGapMS) {
+		return fmt.Errorf("skill gap is too large for time.Duration")
+	}
 	if c.Clicker.IntervalMS < MinimumIntervalMS {
 		return fmt.Errorf("clicker interval must be at least %dms", MinimumIntervalMS)
+	}
+	if c.Clicker.IntervalMS > MaximumIntervalMS {
+		return fmt.Errorf("clicker interval must be at most %dms", MaximumIntervalMS)
+	}
+	if !MillisecondsFitDuration(c.Clicker.IntervalMS) {
+		return fmt.Errorf("clicker interval is too large for time.Duration")
 	}
 	for i, skill := range c.Skills {
 		if skill.IntervalMS < MinimumIntervalMS {
 			return fmt.Errorf("skill %d interval must be at least %dms", i+1, MinimumIntervalMS)
+		}
+		if skill.IntervalMS > MaximumIntervalMS {
+			return fmt.Errorf("skill %d interval must be at most %dms", i+1, MaximumIntervalMS)
+		}
+		if !MillisecondsFitDuration(skill.IntervalMS) {
+			return fmt.Errorf("skill %d interval is too large for time.Duration", i+1)
 		}
 		if err := validateKey("skill "+skill.Name, skill.Key); err != nil {
 			return err
@@ -219,6 +245,10 @@ func (c Config) Validate() error {
 		}
 	}
 	return nil
+}
+
+func MillisecondsFitDuration(ms int) bool {
+	return ms >= 0 && int64(ms) <= maximumDurationMilliseconds
 }
 
 func normalizeKey(binding *KeyBinding) {

@@ -72,6 +72,16 @@ func TestSkillRunnerDoesNotStartWithoutRunnableSkills(t *testing.T) {
 	if runner.Start(cfg) {
 		t.Fatal("Start() = true for enabled unassigned skill, want false")
 	}
+
+	cfg.Skills[0] = config.Skill{
+		Name:       "Interval too large",
+		Key:        config.KeyBinding{Name: "1", VK: int('1')},
+		IntervalMS: config.MaximumIntervalMS + 1,
+		Enabled:    true,
+	}
+	if runner.Start(cfg) {
+		t.Fatal("Start() = true for too-large interval, want false")
+	}
 }
 
 func TestRunnableSkillsFiltersEnabledAssignedSkills(t *testing.T) {
@@ -218,6 +228,9 @@ func TestClickerRunnerDoesNotStartWithoutRunnableKey(t *testing.T) {
 	}
 	if runner.Start(config.Clicker{Key: config.KeyBinding{Name: "Mouse Left", VK: vkLButton}, IntervalMS: config.MinimumIntervalMS - 1}) {
 		t.Fatal("Start() = true for too-small interval, want false")
+	}
+	if runner.Start(config.Clicker{Key: config.KeyBinding{Name: "Mouse Left", VK: vkLButton}, IntervalMS: config.MaximumIntervalMS + 1}) {
+		t.Fatal("Start() = true for too-large interval, want false")
 	}
 }
 

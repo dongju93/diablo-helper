@@ -4,6 +4,7 @@ package app
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"unsafe"
 
@@ -449,7 +450,12 @@ func (a *application) applyBulkInterval() {
 	a.cfg.SkillGapMS = skillGap
 	setWindowText(a.controls.bulkSkillGap, strconv.Itoa(skillGap))
 	for i := range config.MaxSkills {
-		setWindowText(a.controls.skillInterval[i], strconv.Itoa(bulkIntervalForSkill(interval, skillGap, i)))
+		skillInterval, err := bulkIntervalForSkill(interval, skillGap, i)
+		if err != nil {
+			messageBox(a.hwnd, "잘못된 간격", err.Error(), mbOK|mbIconError)
+			return
+		}
+		setWindowText(a.controls.skillInterval[i], strconv.Itoa(skillInterval))
 	}
 	if skillGap > 0 {
 		a.setStatus("일괄 간격을 키별 간격만큼 벌려 적용했습니다.")
@@ -458,8 +464,37 @@ func (a *application) applyBulkInterval() {
 	a.setStatus("일괄 간격을 적용했습니다.")
 }
 
-func bulkIntervalForSkill(baseInterval int, skillGap int, index int) int {
-	return baseInterval + skillGap*index
+func bulkIntervalForSkill(baseInterval int, skillGap int, index int) (int, error) {
+	if baseInterval < config.MinimumIntervalMS {
+		return 0, fmt.Errorf("실행 간격은 최소 %dms 이상이어야 합니다", config.MinimumIntervalMS)
+	}
+	if baseInterval > config.MaximumIntervalMS {
+		return 0, fmt.Errorf("실행 간격은 최대 %dms 이하여야 합니다", config.MaximumIntervalMS)
+	}
+	if skillGap < 0 {
+		return 0, fmt.Errorf("키별 간격은 0ms 이상이어야 합니다")
+	}
+	if skillGap > config.MaximumSkillGapMS {
+		return 0, fmt.Errorf("키별 간격은 최대 %dms 이하여야 합니다", config.MaximumSkillGapMS)
+	}
+	if index < 0 {
+		return 0, fmt.Errorf("기술 번호가 올바르지 않습니다")
+	}
+
+	base := int64(baseInterval)
+	gap := int64(skillGap)
+	row := int64(index)
+	if gap > 0 && row > (math.MaxInt64-base)/gap {
+		return 0, fmt.Errorf("적용된 실행 간격이 너무 큽니다")
+	}
+	interval := base + gap*row
+	if interval > int64(config.MaximumIntervalMS) {
+		return 0, fmt.Errorf("적용된 실행 간격은 최대 %dms 이하여야 합니다", config.MaximumIntervalMS)
+	}
+	if !config.MillisecondsFitDuration(int(interval)) {
+		return 0, fmt.Errorf("적용된 실행 간격이 너무 큽니다")
+	}
+	return int(interval), nil
 }
 
 func (a *application) saveConfig() {

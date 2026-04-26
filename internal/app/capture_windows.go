@@ -230,6 +230,12 @@ func parseInterval(value string) (int, error) {
 	if interval < config.MinimumIntervalMS {
 		return 0, fmt.Errorf("실행 간격은 최소 %dms 이상이어야 합니다", config.MinimumIntervalMS)
 	}
+	if interval > config.MaximumIntervalMS {
+		return 0, fmt.Errorf("실행 간격은 최대 %dms 이하여야 합니다", config.MaximumIntervalMS)
+	}
+	if !config.MillisecondsFitDuration(interval) {
+		return 0, fmt.Errorf("실행 간격이 너무 큽니다")
+	}
 	return interval, nil
 }
 
@@ -244,6 +250,12 @@ func parseSkillGap(value string) (int, error) {
 	}
 	if gap < 0 {
 		return 0, fmt.Errorf("키별 간격은 0ms 이상이어야 합니다")
+	}
+	if gap > config.MaximumSkillGapMS {
+		return 0, fmt.Errorf("키별 간격은 최대 %dms 이하여야 합니다", config.MaximumSkillGapMS)
+	}
+	if !config.MillisecondsFitDuration(gap) {
+		return 0, fmt.Errorf("키별 간격이 너무 큽니다")
 	}
 	return gap, nil
 }

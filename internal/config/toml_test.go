@@ -121,6 +121,48 @@ bad_key = 123
 	}
 }
 
+func TestParseTOMLRejectsIntervalsAboveMaximum(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantError string
+	}{
+		{
+			name:      "skill gap",
+			input:     fmt.Sprintf("skill_gap_ms = %d\n", MaximumSkillGapMS+1),
+			wantError: "skill gap must be at most",
+		},
+		{
+			name:      "clicker interval",
+			input:     fmt.Sprintf("clicker_interval_ms = %d\n", MaximumIntervalMS+1),
+			wantError: "clicker interval must be at most",
+		},
+		{
+			name: "skill interval",
+			input: fmt.Sprintf(`[[skills]]
+name = "Too Large"
+key_name = "1"
+key_vk = 49
+interval_ms = %d
+enabled = true
+`, MaximumIntervalMS+1),
+			wantError: "interval must be at most",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseTOML([]byte(tt.input))
+			if err == nil {
+				t.Fatal("ParseTOML() error = nil, want error")
+			}
+			if !strings.Contains(err.Error(), tt.wantError) {
+				t.Fatalf("ParseTOML() error = %v, want %q", err, tt.wantError)
+			}
+		})
+	}
+}
+
 func TestParseTOMLNormalizesSkillCountAndIntervals(t *testing.T) {
 	cfg, err := ParseTOML([]byte(`[[skills]]
 name = "Only"

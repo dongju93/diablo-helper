@@ -77,7 +77,10 @@ func (r *skillRunner) Paused() bool {
 }
 
 func (r *skillRunner) runSkill(ctx context.Context, skill config.Skill) {
-	interval := time.Duration(skill.IntervalMS) * time.Millisecond
+	interval, ok := intervalDuration(skill.IntervalMS)
+	if !ok {
+		return
+	}
 	timer := time.NewTimer(0)
 	defer timer.Stop()
 
@@ -97,11 +100,16 @@ func (r *skillRunner) runSkill(ctx context.Context, skill config.Skill) {
 func runnableSkills(cfg config.Config) []config.Skill {
 	skills := make([]config.Skill, 0, len(cfg.Skills))
 	for _, skill := range cfg.Skills {
-		if skill.Enabled && skill.Key.Assigned() {
+		if skillRunnable(skill) {
 			skills = append(skills, skill)
 		}
 	}
 	return skills
+}
+
+func skillRunnable(skill config.Skill) bool {
+	_, ok := intervalDuration(skill.IntervalMS)
+	return skill.Enabled && skill.Key.Assigned() && ok
 }
 
 type clickerRunner struct {
@@ -151,7 +159,10 @@ func (r *clickerRunner) Running() bool {
 }
 
 func (r *clickerRunner) run(ctx context.Context, clicker config.Clicker) {
-	interval := time.Duration(clicker.IntervalMS) * time.Millisecond
+	interval, ok := intervalDuration(clicker.IntervalMS)
+	if !ok {
+		return
+	}
 	timer := time.NewTimer(0)
 	defer timer.Stop()
 
@@ -167,5 +178,13 @@ func (r *clickerRunner) run(ctx context.Context, clicker config.Clicker) {
 }
 
 func clickerRunnable(clicker config.Clicker) bool {
-	return clicker.Key.Assigned() && clicker.IntervalMS >= config.MinimumIntervalMS
+	_, ok := intervalDuration(clicker.IntervalMS)
+	return clicker.Key.Assigned() && ok
+}
+
+func intervalDuration(ms int) (time.Duration, bool) {
+	if ms < config.MinimumIntervalMS || ms > config.MaximumIntervalMS || !config.MillisecondsFitDuration(ms) {
+		return 0, false
+	}
+	return time.Duration(ms) * time.Millisecond, true
 }

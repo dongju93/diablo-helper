@@ -185,6 +185,13 @@ func TestValidateRejectsInvalidConfig(t *testing.T) {
 			wantError: "interval must be at least",
 		},
 		{
+			name: "skill interval above maximum",
+			mutate: func(cfg *Config) {
+				cfg.Skills[0].IntervalMS = MaximumIntervalMS + 1
+			},
+			wantError: "interval must be at most",
+		},
+		{
 			name: "skill gap below zero",
 			mutate: func(cfg *Config) {
 				cfg.SkillGapMS = -1
@@ -192,11 +199,25 @@ func TestValidateRejectsInvalidConfig(t *testing.T) {
 			wantError: "skill gap must be at least",
 		},
 		{
+			name: "skill gap above maximum",
+			mutate: func(cfg *Config) {
+				cfg.SkillGapMS = MaximumSkillGapMS + 1
+			},
+			wantError: "skill gap must be at most",
+		},
+		{
 			name: "clicker interval below minimum",
 			mutate: func(cfg *Config) {
 				cfg.Clicker.IntervalMS = MinimumIntervalMS - 1
 			},
 			wantError: "clicker interval must be at least",
+		},
+		{
+			name: "clicker interval above maximum",
+			mutate: func(cfg *Config) {
+				cfg.Clicker.IntervalMS = MaximumIntervalMS + 1
+			},
+			wantError: "clicker interval must be at most",
 		},
 		{
 			name: "clicker start mouse left",
