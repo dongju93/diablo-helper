@@ -338,6 +338,47 @@ enabled = true
 	}
 }
 
+func TestParseTOMLRejectsUnsafeStrings(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantError string
+	}{
+		{
+			name:      "key name nul",
+			input:     `start_key_name = "\u0000"` + "\n",
+			wantError: "must not contain NUL",
+		},
+		{
+			name:      "key name control character",
+			input:     `start_key_name = "Bad\nName"` + "\n",
+			wantError: "must not contain control characters",
+		},
+		{
+			name:      "key name too long",
+			input:     fmt.Sprintf("start_key_name = %q\n", strings.Repeat("A", MaxKeyNameLength+1)),
+			wantError: "must not exceed",
+		},
+		{
+			name:      "skill name too long",
+			input:     fmt.Sprintf("[[skills]]\nname = %q\n", strings.Repeat("A", MaxSkillNameLength+1)),
+			wantError: "must not exceed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseTOML([]byte(tt.input))
+			if err == nil {
+				t.Fatal("ParseTOML() error = nil, want error")
+			}
+			if !strings.Contains(err.Error(), tt.wantError) {
+				t.Fatalf("ParseTOML() error = %v, want %q", err, tt.wantError)
+			}
+		})
+	}
+}
+
 func TestParseTOMLRejectsMalformedInput(t *testing.T) {
 	tests := []struct {
 		name      string

@@ -262,6 +262,34 @@ func TestValidateRejectsInvalidConfig(t *testing.T) {
 			wantError: "has a name but no virtual-key code",
 		},
 		{
+			name: "key name contains nul",
+			mutate: func(cfg *Config) {
+				cfg.Start = KeyBinding{Name: "Bad\x00Name", VK: 0x41}
+			},
+			wantError: "must not contain NUL",
+		},
+		{
+			name: "key name too long",
+			mutate: func(cfg *Config) {
+				cfg.Start = KeyBinding{Name: strings.Repeat("A", MaxKeyNameLength+1), VK: 0x41}
+			},
+			wantError: "must not exceed",
+		},
+		{
+			name: "skill name contains control character",
+			mutate: func(cfg *Config) {
+				cfg.Skills[0].Name = "Bad\nName"
+			},
+			wantError: "must not contain control characters",
+		},
+		{
+			name: "skill name too long",
+			mutate: func(cfg *Config) {
+				cfg.Skills[0].Name = strings.Repeat("A", MaxSkillNameLength+1)
+			},
+			wantError: "must not exceed",
+		},
+		{
 			name: "pause key above range",
 			mutate: func(cfg *Config) {
 				cfg.Pause = KeyBinding{Name: "Bad", VK: 999}
