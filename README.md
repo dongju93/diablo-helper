@@ -64,13 +64,13 @@ Research baseline:
 ## Build
 
 ```powershell
-go build -o dist\diablo-helper.exe .\cmd\diablo-helper
+go build -ldflags "-H=windowsgui" -o dist\diablo-helper.exe .\cmd\diablo-helper
 ```
 
 Cross-build from macOS or Linux:
 
 ```sh
-GOOS=windows GOARCH=amd64 go build -o dist/diablo-helper.exe ./cmd/diablo-helper
+GOOS=windows GOARCH=amd64 go build -ldflags "-H=windowsgui" -o dist/diablo-helper.exe ./cmd/diablo-helper
 ```
 
 ## Usage

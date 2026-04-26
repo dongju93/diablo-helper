@@ -467,9 +467,10 @@ func (a *application) handleKeyEvent(vk uint16, down bool) bool {
 
 	if a.capture.valid() {
 		if vk == vkEscape {
+			target := a.capture
 			a.clearCapturedKey()
 			a.capture = captureTarget{}
-			a.updateControlsFromConfig()
+			a.updateBindingControl(target)
 			a.setStatus("키 할당을 해제했습니다.")
 			return true
 		}
@@ -482,6 +483,8 @@ func (a *application) handleKeyEvent(vk uint16, down bool) bool {
 	}
 
 	switch {
+	case a.runner.Running() && sameKey(vk, a.cfg.Stop):
+		a.stopRunner("종료 키 입력으로 정지했습니다.")
 	case sameKey(vk, a.cfg.Start):
 		a.startRunnerFromHotkey()
 	case sameKey(vk, a.cfg.Stop):
@@ -496,8 +499,9 @@ func (a *application) handleKeyEvent(vk uint16, down bool) bool {
 }
 
 func (a *application) assignCapturedKey(vk uint16) {
+	target := a.capture
 	binding := config.KeyBinding{Name: keyDisplayName(vk), VK: int(vk)}
-	switch a.capture.kind {
+	switch target.kind {
 	case captureStart:
 		a.cfg.Start = binding
 	case captureStop:
@@ -505,14 +509,14 @@ func (a *application) assignCapturedKey(vk uint16) {
 	case capturePause:
 		a.cfg.Pause = binding
 	case captureSkill:
-		if a.capture.index >= 0 && a.capture.index < len(a.cfg.Skills) {
-			a.cfg.Skills[a.capture.index].Key = binding
+		if target.index >= 0 && target.index < len(a.cfg.Skills) {
+			a.cfg.Skills[target.index].Key = binding
 		}
 	case captureMenu:
-		a.setMenuBinding(a.capture.menuID, binding)
+		a.setMenuBinding(target.menuID, binding)
 	}
 	a.capture = captureTarget{}
-	a.updateControlsFromConfig()
+	a.updateBindingControl(target)
 	a.setStatus("키 입력 완료.")
 }
 
@@ -530,6 +534,30 @@ func (a *application) clearCapturedKey() {
 		}
 	case captureMenu:
 		a.setMenuBinding(a.capture.menuID, config.KeyBinding{})
+	}
+}
+
+func (a *application) updateBindingControl(target captureTarget) {
+	switch target.kind {
+	case captureStart:
+		setWindowText(a.controls.startButton, bindingText(a.cfg.Start))
+	case captureStop:
+		setWindowText(a.controls.stopButton, bindingText(a.cfg.Stop))
+	case capturePause:
+		setWindowText(a.controls.pauseButton, bindingText(a.cfg.Pause))
+	case captureSkill:
+		if target.index >= 0 && target.index < len(a.cfg.Skills) {
+			setWindowText(a.controls.skillButtons[target.index], bindingText(a.cfg.Skills[target.index].Key))
+		}
+	case captureMenu:
+		if hwnd := a.controls.menuButtons[target.menuID]; hwnd != 0 {
+			for _, menu := range a.cfg.MenuBindings() {
+				if menu.ID == target.menuID {
+					setWindowText(hwnd, bindingText(menu.Binding))
+					return
+				}
+			}
+		}
 	}
 }
 

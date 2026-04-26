@@ -3,10 +3,11 @@ package config
 import "fmt"
 
 const (
-	MaxSkills         = 8
-	DefaultIntervalMS = 1000
-	MinimumIntervalMS = 10
-	MouseLeftVK       = 0x01
+	MaxSkills           = 8
+	DefaultIntervalMS   = 1000
+	MinimumIntervalMS   = 10
+	MouseLeftVK         = 0x01
+	DefaultSkillEnabled = false
 )
 
 type KeyBinding struct {
@@ -77,7 +78,7 @@ func (c *Config) Normalize() {
 		c.Skills = append(c.Skills, Skill{
 			Name:       fmt.Sprintf("Skill %d", index),
 			IntervalMS: DefaultIntervalMS,
-			Enabled:    true,
+			Enabled:    DefaultSkillEnabled,
 		})
 	}
 	for i := range c.Skills {

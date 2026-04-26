@@ -69,6 +69,15 @@ func TestValidateRejectsLeftMouseStartAndStop(t *testing.T) {
 	}
 }
 
+func TestDefaultSkillsStartDisabled(t *testing.T) {
+	cfg := Default()
+	for i, skill := range cfg.Skills {
+		if skill.Enabled {
+			t.Fatalf("skill %d enabled = true, want false", i+1)
+		}
+	}
+}
+
 func TestParseTOMLRejectsUnknownKeys(t *testing.T) {
 	_, err := ParseTOML([]byte(`start_key_name = "F5"
 bad_key = 123
@@ -97,5 +106,20 @@ enabled = true
 	}
 	if cfg.Skills[0].IntervalMS != DefaultIntervalMS {
 		t.Fatalf("interval = %d, want %d", cfg.Skills[0].IntervalMS, DefaultIntervalMS)
+	}
+}
+
+func TestParseTOMLDefaultsMissingSkillEnabledToFalse(t *testing.T) {
+	cfg, err := ParseTOML([]byte(`[[skills]]
+name = "Only"
+key_name = "1"
+key_vk = 49
+interval_ms = 100
+`))
+	if err != nil {
+		t.Fatalf("ParseTOML() error = %v", err)
+	}
+	if cfg.Skills[0].Enabled {
+		t.Fatal("skill enabled = true, want false")
 	}
 }

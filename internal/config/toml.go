@@ -70,7 +70,7 @@ func ParseTOML(data []byte) (Config, error) {
 			cfg.Skills = append(cfg.Skills, Skill{
 				Name:       fmt.Sprintf("Skill %d", len(cfg.Skills)+1),
 				IntervalMS: DefaultIntervalMS,
-				Enabled:    true,
+				Enabled:    DefaultSkillEnabled,
 			})
 			currentSkill = &cfg.Skills[len(cfg.Skills)-1]
 			continue
