@@ -12,6 +12,8 @@ const (
 	wsVisible          = 0x10000000
 	wsTabStop          = 0x00010000
 
+	wsExComposited = 0x02000000
+
 	bsAutoCheckbox        = 0x00000003
 	bsOwnerDraw           = 0x0000000B
 	bstChecked            = 1

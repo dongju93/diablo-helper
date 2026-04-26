@@ -92,7 +92,7 @@ func (a *application) run() error {
 
 	appInstance = a
 	hwnd, _, err := procCreateWindowExW.Call(
-		0,
+		wsExComposited,
 		uintptr(unsafe.Pointer(utf16Ptr("DiabloHelperWindow"))),
 		uintptr(unsafe.Pointer(utf16Ptr(meta.Title()))),
 		wsOverlappedWindow,
