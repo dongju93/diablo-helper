@@ -1,0 +1,151 @@
+//go:build windows
+
+package main
+
+import (
+	"testing"
+	"time"
+
+	"github.com/dongju93/diablo-helper/internal/config"
+)
+
+func TestSkillRunnerStartStopState(t *testing.T) {
+	runner := newSkillRunner(func(uint16) {})
+	cfg := config.Default()
+
+	if !runner.Start(cfg) {
+		t.Fatal("Start() = false, want true")
+	}
+	if !runner.Running() {
+		t.Fatal("Running() = false, want true")
+	}
+	if runner.Start(cfg) {
+		t.Fatal("second Start() = true, want false")
+	}
+
+	runner.SetPaused(true)
+	if !runner.Paused() {
+		t.Fatal("Paused() = false, want true")
+	}
+
+	if !runner.Stop() {
+		t.Fatal("Stop() = false, want true")
+	}
+	if runner.Running() {
+		t.Fatal("Running() = true after Stop(), want false")
+	}
+	if runner.Paused() {
+		t.Fatal("Paused() = true after Stop(), want false")
+	}
+	if runner.Stop() {
+		t.Fatal("second Stop() = true, want false")
+	}
+
+	runner.SetPaused(true)
+	if runner.Paused() {
+		t.Fatal("Paused() = true while stopped, want false")
+	}
+}
+
+func TestSkillRunnerSendsEnabledAssignedSkillsOnly(t *testing.T) {
+	sent := make(chan uint16, 20)
+	runner := newSkillRunner(func(vk uint16) {
+		sent <- vk
+	})
+	cfg := config.Default()
+	cfg.Skills[0] = config.Skill{
+		Name:       "Enabled",
+		Key:        config.KeyBinding{Name: "1", VK: int('1')},
+		IntervalMS: config.MinimumIntervalMS,
+		Enabled:    true,
+	}
+	cfg.Skills[1] = config.Skill{
+		Name:       "Disabled",
+		Key:        config.KeyBinding{Name: "2", VK: int('2')},
+		IntervalMS: config.MinimumIntervalMS,
+		Enabled:    false,
+	}
+	cfg.Skills[2] = config.Skill{
+		Name:       "Unassigned",
+		IntervalMS: config.MinimumIntervalMS,
+		Enabled:    true,
+	}
+
+	if !runner.Start(cfg) {
+		t.Fatal("Start() = false, want true")
+	}
+	defer runner.Stop()
+
+	deadline := time.After(80 * time.Millisecond)
+	received := 0
+	for {
+		select {
+		case vk := <-sent:
+			received++
+			if vk != '1' {
+				t.Fatalf("sent key = %d, want only %d", vk, '1')
+			}
+		case <-deadline:
+			if received == 0 {
+				t.Fatal("received no key sends")
+			}
+			return
+		}
+	}
+}
+
+func TestSkillRunnerPauseSuppressesAndResumes(t *testing.T) {
+	sent := make(chan uint16, 20)
+	runner := newSkillRunner(func(vk uint16) {
+		sent <- vk
+	})
+	cfg := config.Default()
+	cfg.Skills[0] = config.Skill{
+		Name:       "Enabled",
+		Key:        config.KeyBinding{Name: "1", VK: int('1')},
+		IntervalMS: 20,
+		Enabled:    true,
+	}
+
+	if !runner.Start(cfg) {
+		t.Fatal("Start() = false, want true")
+	}
+	defer runner.Stop()
+
+	expectKey(t, sent, '1')
+	runner.SetPaused(true)
+	drainKeys(sent)
+
+	time.Sleep(60 * time.Millisecond)
+	select {
+	case vk := <-sent:
+		t.Fatalf("received key %d while paused", vk)
+	default:
+	}
+
+	runner.SetPaused(false)
+	expectKey(t, sent, '1')
+}
+
+func expectKey(t *testing.T, ch <-chan uint16, want uint16) {
+	t.Helper()
+
+	select {
+	case got := <-ch:
+		if got != want {
+			t.Fatalf("received key = %d, want %d", got, want)
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatalf("timed out waiting for key %d", want)
+	}
+}
+
+func drainKeys(ch <-chan uint16) {
+	for {
+		select {
+		case <-ch:
+		default:
+			return
+		}
+	}
+}
