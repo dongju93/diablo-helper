@@ -37,6 +37,7 @@ type application struct {
 	capture         captureTarget
 	pressed         map[uint16]bool
 	runner          *skillRunner
+	clicker         *clickerRunner
 }
 
 var (
@@ -68,6 +69,7 @@ func newApplication() *application {
 			menuLabels:  make(map[string]uintptr),
 			menuButtons: make(map[string]uintptr),
 		},
+		clicker: newClickerRunner(sendVirtualKey),
 	}
 }
 

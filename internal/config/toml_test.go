@@ -13,6 +13,10 @@ func TestMarshalParseRoundTrip(t *testing.T) {
 	cfg.Stop = KeyBinding{Name: "F6", VK: 0x75}
 	cfg.Pause = KeyBinding{Name: "Space", VK: 0x20}
 	cfg.SkillGapMS = 45
+	cfg.Clicker.Start = KeyBinding{Name: "F7", VK: 0x76}
+	cfg.Clicker.Stop = KeyBinding{Name: "F8", VK: 0x77}
+	cfg.Clicker.Key = KeyBinding{Name: "Mouse Left", VK: MouseLeftVK}
+	cfg.Clicker.IntervalMS = 75
 	cfg.Menu.WorldMap = KeyBinding{Name: "M", VK: 0x4D}
 	cfg.Menu.Whisper = KeyBinding{Name: "R", VK: 0x52}
 	cfg.Skills[0] = Skill{
@@ -50,6 +54,9 @@ func TestMarshalParseRoundTrip(t *testing.T) {
 	if parsed.SkillGapMS != cfg.SkillGapMS {
 		t.Fatalf("skill gap = %d, want %d", parsed.SkillGapMS, cfg.SkillGapMS)
 	}
+	if parsed.Clicker != cfg.Clicker {
+		t.Fatalf("clicker = %+v, want %+v", parsed.Clicker, cfg.Clicker)
+	}
 	if len(parsed.Skills) != MaxSkills {
 		t.Fatalf("skills length = %d, want %d", len(parsed.Skills), MaxSkills)
 	}
@@ -72,6 +79,24 @@ func TestValidateRejectsLeftMouseStartAndStop(t *testing.T) {
 	cfg.Stop = KeyBinding{Name: "Mouse Left", VK: MouseLeftVK}
 	if err := cfg.Validate(); err == nil {
 		t.Fatal("Validate() error = nil, want stop Mouse Left error")
+	}
+
+	cfg = Default()
+	cfg.Clicker.Start = KeyBinding{Name: "Mouse Left", VK: MouseLeftVK}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("Validate() error = nil, want clicker start Mouse Left error")
+	}
+
+	cfg = Default()
+	cfg.Clicker.Stop = KeyBinding{Name: "Mouse Left", VK: MouseLeftVK}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("Validate() error = nil, want clicker stop Mouse Left error")
+	}
+
+	cfg = Default()
+	cfg.Clicker.Key = KeyBinding{Name: "Mouse Left", VK: MouseLeftVK}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v, want clicker key Mouse Left to be allowed", err)
 	}
 }
 
@@ -161,6 +186,9 @@ func TestSaveFileAndLoadFileRoundTrip(t *testing.T) {
 	if loaded.SkillGapMS != cfg.SkillGapMS {
 		t.Fatalf("skill gap = %d, want %d", loaded.SkillGapMS, cfg.SkillGapMS)
 	}
+	if loaded.Clicker != cfg.Clicker {
+		t.Fatalf("clicker = %+v, want %+v", loaded.Clicker, cfg.Clicker)
+	}
 	if loaded.Skills[0] != cfg.Skills[0] {
 		t.Fatalf("skill 0 = %+v, want %+v", loaded.Skills[0], cfg.Skills[0])
 	}
@@ -184,6 +212,18 @@ func TestMarshalTOMLRejectsInvalidStartStopBindings(t *testing.T) {
 			name: "stop mouse left",
 			mutate: func(cfg *Config) {
 				cfg.Stop = KeyBinding{Name: "Mouse Left", VK: MouseLeftVK}
+			},
+		},
+		{
+			name: "clicker start mouse left",
+			mutate: func(cfg *Config) {
+				cfg.Clicker.Start = KeyBinding{Name: "Mouse Left", VK: MouseLeftVK}
+			},
+		},
+		{
+			name: "clicker stop mouse left",
+			mutate: func(cfg *Config) {
+				cfg.Clicker.Stop = KeyBinding{Name: "Mouse Left", VK: MouseLeftVK}
 			},
 		},
 	}
@@ -216,6 +256,7 @@ func TestMarshalTOMLNormalizesOutput(t *testing.T) {
 		`key_name = ""`,
 		`key_vk = 0`,
 		`skill_gap_ms = 0`,
+		`clicker_interval_ms = 100`,
 		`interval_ms = 1000`,
 		`enabled = false`,
 		`name = "Skill 8"`,

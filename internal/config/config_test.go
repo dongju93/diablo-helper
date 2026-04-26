@@ -46,6 +46,15 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.SkillGapMS != DefaultSkillGapMS {
 		t.Fatalf("skill gap = %d, want %d", cfg.SkillGapMS, DefaultSkillGapMS)
 	}
+	if cfg.Clicker.Key != (KeyBinding{Name: "Mouse Left", VK: MouseLeftVK}) {
+		t.Fatalf("clicker key = %+v, want Mouse Left", cfg.Clicker.Key)
+	}
+	if cfg.Clicker.IntervalMS != DefaultClickerIntervalMS {
+		t.Fatalf("clicker interval = %d, want %d", cfg.Clicker.IntervalMS, DefaultClickerIntervalMS)
+	}
+	if cfg.Clicker.Start.Assigned() || cfg.Clicker.Stop.Assigned() {
+		t.Fatalf("clicker start/stop = %+v/%+v, want unassigned", cfg.Clicker.Start, cfg.Clicker.Stop)
+	}
 	if len(cfg.Skills) != MaxSkills {
 		t.Fatalf("skills length = %d, want %d", len(cfg.Skills), MaxSkills)
 	}
@@ -75,6 +84,12 @@ func TestNormalizeRepairsConfigShapeAndValues(t *testing.T) {
 			Inventory: KeyBinding{Name: "Bad Menu", VK: 999},
 		},
 		SkillGapMS: -1,
+		Clicker: Clicker{
+			Start:      KeyBinding{Name: "Bad Clicker Start", VK: 999},
+			Stop:       KeyBinding{Name: "Bad Clicker Stop", VK: -1},
+			Key:        KeyBinding{Name: "Bad Clicker Key", VK: 300},
+			IntervalMS: 1,
+		},
 	}
 	for range MaxSkills + 2 {
 		cfg.Skills = append(cfg.Skills, Skill{
@@ -116,6 +131,12 @@ func TestNormalizeRepairsConfigShapeAndValues(t *testing.T) {
 	}
 	if cfg.SkillGapMS != DefaultSkillGapMS {
 		t.Fatalf("skill gap = %d, want %d", cfg.SkillGapMS, DefaultSkillGapMS)
+	}
+	if cfg.Clicker.Start != (KeyBinding{}) || cfg.Clicker.Stop != (KeyBinding{}) || cfg.Clicker.Key != (KeyBinding{}) {
+		t.Fatalf("clicker bindings = %+v, want cleared", cfg.Clicker)
+	}
+	if cfg.Clicker.IntervalMS != DefaultClickerIntervalMS {
+		t.Fatalf("clicker interval = %d, want %d", cfg.Clicker.IntervalMS, DefaultClickerIntervalMS)
 	}
 }
 
@@ -169,6 +190,27 @@ func TestValidateRejectsInvalidConfig(t *testing.T) {
 				cfg.SkillGapMS = -1
 			},
 			wantError: "skill gap must be at least",
+		},
+		{
+			name: "clicker interval below minimum",
+			mutate: func(cfg *Config) {
+				cfg.Clicker.IntervalMS = MinimumIntervalMS - 1
+			},
+			wantError: "clicker interval must be at least",
+		},
+		{
+			name: "clicker start mouse left",
+			mutate: func(cfg *Config) {
+				cfg.Clicker.Start = KeyBinding{Name: "Mouse Left", VK: MouseLeftVK}
+			},
+			wantError: "clicker start key must not be Mouse Left",
+		},
+		{
+			name: "clicker stop mouse left",
+			mutate: func(cfg *Config) {
+				cfg.Clicker.Stop = KeyBinding{Name: "Mouse Left", VK: MouseLeftVK}
+			},
+			wantError: "clicker stop key must not be Mouse Left",
 		},
 		{
 			name: "skill key below range",

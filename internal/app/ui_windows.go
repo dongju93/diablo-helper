@@ -147,15 +147,17 @@ func (a *application) paint(hwnd uintptr) {
 
 	// Panels
 	a.drawPanel(hdc, lo.leftX, lo.y(92), lo.leftW, lo.h(126))
-	a.drawPanel(hdc, lo.leftX, lo.y(234), lo.leftW, lo.h(386))
+	a.drawPanel(hdc, lo.leftX, lo.y(clickerPanelY), lo.leftW, lo.h(clickerPanelH))
+	a.drawPanel(hdc, lo.leftX, lo.y(menuPanelY), lo.leftW, lo.h(menuPanelH))
 	a.drawPanel(hdc, lo.rx, lo.y(92), lo.rw, lo.h(498))
-	a.drawPanel(hdc, lo.rx, lo.y(606), lo.rw, lo.h(84))
-	a.drawPanel(hdc, lo.leftX, lo.y(700), lo.statusBarW, lo.h(40))
+	a.drawPanel(hdc, lo.rx, lo.y(pausePanelY), lo.rw, lo.h(pausePanelH))
+	a.drawPanel(hdc, lo.leftX, lo.y(statusBarY), lo.statusBarW, lo.h(40))
 	a.drawAccentMark(hdc, lo.x(28), lo.y(26), lo.w(4), lo.h(24))
 
 	// Dividers – left column
 	a.drawDivider(hdc, lo.x(layoutLX+20), lo.y(174), lo.w(layoutLW-40))
-	for y := 320; y <= 560; y += 40 {
+	a.drawDivider(hdc, lo.x(layoutLX+20), lo.y(clickerHotkeyY+38), lo.w(layoutLW-40))
+	for y := menuFirstY + 38; y <= menuFirstY+38+(len(menuControls)-2)*40; y += 40 {
 		a.drawDivider(hdc, lo.x(layoutLX+20), lo.y(y), lo.w(layoutLW-40))
 	}
 
@@ -171,14 +173,16 @@ func (a *application) paint(hwnd uintptr) {
 	for y := skillFirstRowY; y < skillFirstRowY+config.MaxSkills*skillRowGap; y += skillRowGap {
 		a.drawInputFrame(hdc, lo.skillIntervalX-lo.w(8), lo.y(y+1), lo.w(82), lo.h(32))
 	}
+	a.drawInputFrame(hdc, lo.x(layoutLX+226), lo.y(clickerSettingY+1), lo.w(86), lo.h(32))
 
-	a.drawStatusDot(hdc, lo.statusDotX, lo.y(719), lo.s(10))
+	a.drawStatusDot(hdc, lo.statusDotX, lo.y(statusBarY+19), lo.s(10))
 
 	drawText(hdc, "Diablo Helper", a.titleFont, uiText, lo.x(40), lo.y(18), lo.w(300), lo.h(40), dtSingleLine|dtNoPrefix)
 	drawText(hdc, "시작/종료 키", a.sectionFont, uiText, lo.x(layoutLX+20), lo.y(108), lo.w(210), lo.h(28), dtSingleLine|dtNoPrefix)
-	drawText(hdc, "게임 메뉴 키", a.sectionFont, uiText, lo.x(layoutLX+20), lo.y(250), lo.w(210), lo.h(28), dtSingleLine|dtNoPrefix)
+	drawText(hdc, "클릭 반복", a.sectionFont, uiText, lo.x(layoutLX+20), lo.y(clickerTitleY), lo.w(210), lo.h(28), dtSingleLine|dtNoPrefix)
+	drawText(hdc, "게임 메뉴 키", a.sectionFont, uiText, lo.x(layoutLX+20), lo.y(menuTitleY), lo.w(210), lo.h(28), dtSingleLine|dtNoPrefix)
 	drawText(hdc, "기술 키", a.sectionFont, uiText, lo.rx+lo.w(20), lo.y(108), lo.w(160), lo.h(28), dtSingleLine|dtNoPrefix)
-	drawText(hdc, "일시정지 키", a.sectionFont, uiText, lo.rx+lo.w(20), lo.y(622), lo.w(180), lo.h(28), dtSingleLine|dtNoPrefix)
+	drawText(hdc, "일시정지 키", a.sectionFont, uiText, lo.rx+lo.w(20), lo.y(pauseTitleY), lo.w(180), lo.h(28), dtSingleLine|dtNoPrefix)
 }
 
 func (a *application) drawPanel(hdc uintptr, x int, y int, width int, height int) {
@@ -232,7 +236,7 @@ func (a *application) drawStatusDot(hdc uintptr, x int, y int, size int) {
 		color = uiAccent
 	case a.runner.Paused():
 		color = uiWarning
-	case a.runner.Running():
+	case a.runner.Running() || a.clicker.Running():
 		color = uiSuccess
 	}
 	brush := createBrush(color)

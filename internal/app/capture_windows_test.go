@@ -120,6 +120,9 @@ func TestCaptureTargetAndControlID(t *testing.T) {
 		{name: "start", target: captureTarget{kind: captureStart}, want: idStartKey},
 		{name: "stop", target: captureTarget{kind: captureStop}, want: idStopKey},
 		{name: "pause", target: captureTarget{kind: capturePause}, want: idPauseKey},
+		{name: "clicker start", target: captureTarget{kind: captureClickerStart}, want: idClickerStartKey},
+		{name: "clicker stop", target: captureTarget{kind: captureClickerStop}, want: idClickerStopKey},
+		{name: "clicker key", target: captureTarget{kind: captureClickerKey}, want: idClickerKey},
 		{name: "skill", target: captureTarget{kind: captureSkill, index: 3}, want: idSkillKeyBase + 3},
 		{name: "skill below range", target: captureTarget{kind: captureSkill, index: -1}, want: 0},
 		{name: "skill above range", target: captureTarget{kind: captureSkill, index: config.MaxSkills}, want: 0},
@@ -192,6 +195,14 @@ func TestHandleKeyEventAssignsCapturedKeys(t *testing.T) {
 	if a.cfg.Menu.Whisper != (config.KeyBinding{Name: "F1", VK: vkF1}) {
 		t.Fatalf("whisper = %+v, want F1", a.cfg.Menu.Whisper)
 	}
+
+	a.startCapture(captureTarget{kind: captureClickerKey})
+	if !a.handleKeyEvent(vkLButton, true) {
+		t.Fatal("captured clicker key was not consumed")
+	}
+	if a.cfg.Clicker.Key != (config.KeyBinding{Name: "Mouse Left", VK: vkLButton}) {
+		t.Fatalf("clicker key = %+v, want Mouse Left", a.cfg.Clicker.Key)
+	}
 }
 
 func TestHandleKeyEventEscapeClearsCapturedKey(t *testing.T) {
@@ -217,6 +228,8 @@ func TestHandleKeyEventRejectsMouseLeftForStartAndStopCapture(t *testing.T) {
 	}{
 		{name: "start", kind: captureStart},
 		{name: "stop", kind: captureStop},
+		{name: "clicker start", kind: captureClickerStart},
+		{name: "clicker stop", kind: captureClickerStop},
 	}
 
 	for _, tt := range tests {
@@ -227,8 +240,8 @@ func TestHandleKeyEventRejectsMouseLeftForStartAndStopCapture(t *testing.T) {
 			if !a.handleKeyEvent(vkLButton, true) {
 				t.Fatal("Mouse Left during start/stop capture was not consumed")
 			}
-			if a.cfg.Start.Assigned() || a.cfg.Stop.Assigned() {
-				t.Fatalf("start/stop = %+v/%+v, want unassigned", a.cfg.Start, a.cfg.Stop)
+			if a.cfg.Start.Assigned() || a.cfg.Stop.Assigned() || a.cfg.Clicker.Start.Assigned() || a.cfg.Clicker.Stop.Assigned() {
+				t.Fatalf("start/stop = %+v/%+v clicker %+v/%+v, want unassigned", a.cfg.Start, a.cfg.Stop, a.cfg.Clicker.Start, a.cfg.Clicker.Stop)
 			}
 			if !a.capture.valid() {
 				t.Fatal("capture should remain active after rejected Mouse Left")
@@ -318,6 +331,46 @@ func TestHandleKeyEventStopsRunnerForStopAndMenuKeys(t *testing.T) {
 			if a.runner.Running() {
 				a.runner.Stop()
 				t.Fatal("runner running = true, want stopped")
+			}
+		})
+	}
+}
+
+func TestHandleKeyEventStopsClickerForClickerStopAndMenuKeys(t *testing.T) {
+	tests := []struct {
+		name      string
+		vk        uint16
+		configure func(*config.Config)
+	}{
+		{
+			name: "clicker stop key",
+			vk:   vkF1,
+			configure: func(cfg *config.Config) {
+				cfg.Clicker.Stop = config.KeyBinding{Name: "F1", VK: vkF1}
+			},
+		},
+		{
+			name: "menu key",
+			vk:   'C',
+			configure: func(cfg *config.Config) {
+				cfg.Menu.Inventory = config.KeyBinding{Name: "C", VK: int('C')}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := newApplication()
+			a.cfg = config.Default()
+			tt.configure(&a.cfg)
+			if !a.clicker.Start(a.cfg.Clicker) {
+				t.Fatal("clicker did not start")
+			}
+
+			a.handleKeyEvent(tt.vk, true)
+			if a.clicker.Running() {
+				a.clicker.Stop()
+				t.Fatal("clicker running = true, want stopped")
 			}
 		})
 	}

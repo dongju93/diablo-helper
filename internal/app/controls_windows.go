@@ -15,6 +15,11 @@ const (
 	idStopKey  = 101
 	idPauseKey = 102
 
+	idClickerStartKey = 103
+	idClickerStopKey  = 104
+	idClickerKey      = 105
+	idClickerInterval = 106
+
 	idBulkInterval = 110
 	idApplyBulk    = 111
 	idBulkSkillGap = 112
@@ -46,6 +51,20 @@ const (
 	skillHeaderY       = 204
 	skillFirstRowY     = 234
 	skillRowGap        = 39
+	clickerPanelY      = 234
+	clickerPanelH      = 144
+	clickerTitleY      = 250
+	clickerHotkeyY     = 282
+	clickerSettingY    = 322
+	menuPanelY         = 394
+	menuPanelH         = 386
+	menuTitleY         = 410
+	menuFirstY         = 442
+	pausePanelY        = 606
+	pausePanelH        = 84
+	pauseTitleY        = 622
+	pauseRowY          = 642
+	statusBarY         = 800
 )
 
 type controlRefs struct {
@@ -87,6 +106,17 @@ type controlRefs struct {
 	// Right column – pause section
 	pauseLabel uintptr
 
+	// Left column – single-key clicker section
+	clickerStartLabel    uintptr
+	clickerStartButton   uintptr
+	clickerStopLabel     uintptr
+	clickerStopButton    uintptr
+	clickerKeyLabel      uintptr
+	clickerKeyButton     uintptr
+	clickerIntervalLabel uintptr
+	clickerInterval      uintptr
+	clickerMsLabel       uintptr
+
 	// Status bar
 	statusLabel uintptr
 	status      uintptr
@@ -116,7 +146,8 @@ func (a *application) isPrimaryButton(id int) bool {
 }
 
 func (a *application) isBindingButton(id int) bool {
-	if id == idStartKey || id == idStopKey || id == idPauseKey {
+	if id == idStartKey || id == idStopKey || id == idPauseKey ||
+		id == idClickerStartKey || id == idClickerStopKey || id == idClickerKey {
 		return true
 	}
 	if id >= idSkillKeyBase && id < idSkillKeyBase+config.MaxSkills {
@@ -138,6 +169,12 @@ func (a *application) captureControlID(target captureTarget) int {
 		return idStopKey
 	case capturePause:
 		return idPauseKey
+	case captureClickerStart:
+		return idClickerStartKey
+	case captureClickerStop:
+		return idClickerStopKey
+	case captureClickerKey:
+		return idClickerKey
 	case captureSkill:
 		if target.index >= 0 && target.index < config.MaxSkills {
 			return idSkillKeyBase + target.index
@@ -180,7 +217,7 @@ func (a *application) createControls(hwnd uintptr) {
 	a.controls.stopLabel = a.createStatic(hwnd, "종료 키", lo.x(layoutLX+24), lo.y(181), lo.w(95), lo.h(24))
 	a.controls.stopButton = a.createButton(hwnd, idStopKey, "", lo.x(layoutLX+130), lo.y(176), lo.w(190), lo.h(34))
 
-	menuY := 282
+	menuY := menuFirstY
 	for _, menu := range menuControls {
 		a.controls.menuLabels[menu.id] = a.createStatic(hwnd, menu.label, lo.x(layoutLX+24), lo.y(menuY+5), lo.w(120), lo.h(24))
 		a.controls.menuButtons[menu.id] = a.createButton(hwnd, menu.control, "", lo.x(layoutLX+150), lo.y(menuY), lo.w(170), lo.h(34))
@@ -214,12 +251,23 @@ func (a *application) createControls(hwnd uintptr) {
 	}
 
 	// Right column – pause section
-	a.controls.pauseLabel = a.createStatic(hwnd, "키", lo.pauseLabelX, lo.y(648), lo.w(45), lo.h(24))
-	a.controls.pauseButton = a.createButton(hwnd, idPauseKey, "", lo.pauseBtnX, lo.y(642), lo.pauseBtnW, lo.h(34))
+	a.controls.pauseLabel = a.createStatic(hwnd, "키", lo.pauseLabelX, lo.y(pauseRowY+6), lo.w(45), lo.h(24))
+	a.controls.pauseButton = a.createButton(hwnd, idPauseKey, "", lo.pauseBtnX, lo.y(pauseRowY), lo.pauseBtnW, lo.h(34))
+
+	// Left column – single-key clicker section
+	a.controls.clickerStartLabel = a.createStatic(hwnd, "시작", lo.x(layoutLX+24), lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
+	a.controls.clickerStartButton = a.createButton(hwnd, idClickerStartKey, "", lo.x(layoutLX+72), lo.y(clickerHotkeyY), lo.w(104), lo.h(34))
+	a.controls.clickerStopLabel = a.createStatic(hwnd, "종료", lo.x(layoutLX+186), lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
+	a.controls.clickerStopButton = a.createButton(hwnd, idClickerStopKey, "", lo.x(layoutLX+234), lo.y(clickerHotkeyY), lo.w(100), lo.h(34))
+	a.controls.clickerKeyLabel = a.createStatic(hwnd, "입력", lo.x(layoutLX+24), lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
+	a.controls.clickerKeyButton = a.createButton(hwnd, idClickerKey, "", lo.x(layoutLX+72), lo.y(clickerSettingY), lo.w(104), lo.h(34))
+	a.controls.clickerIntervalLabel = a.createStatic(hwnd, "간격", lo.x(layoutLX+186), lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
+	a.controls.clickerInterval = a.createEdit(hwnd, idClickerInterval, strconv.Itoa(config.DefaultClickerIntervalMS), lo.x(layoutLX+234), lo.y(clickerSettingY+7), lo.w(62), lo.h(22))
+	a.controls.clickerMsLabel = a.createStatic(hwnd, "ms", lo.x(layoutLX+306), lo.y(clickerSettingY+6), lo.w(32), lo.h(24))
 
 	// Status bar
-	a.controls.statusLabel = a.createStatic(hwnd, "상태", lo.x(layoutLX+24), lo.y(711), lo.w(55), lo.h(24))
-	a.controls.status = a.createStatic(hwnd, "정지.", lo.statusTextX, lo.y(711), lo.statusTextW, lo.h(24))
+	a.controls.statusLabel = a.createStatic(hwnd, "상태", lo.x(layoutLX+24), lo.y(statusBarY+11), lo.w(55), lo.h(24))
+	a.controls.status = a.createStatic(hwnd, "정지.", lo.statusTextX, lo.y(statusBarY+11), lo.statusTextW, lo.h(24))
 
 	a.updateControlsFromConfig()
 }
@@ -236,7 +284,7 @@ func (a *application) repositionControls() {
 	moveControl(a.controls.stopLabel, lo.x(layoutLX+24), lo.y(181), lo.w(95), lo.h(24))
 	moveControl(a.controls.stopButton, lo.x(layoutLX+130), lo.y(176), lo.w(190), lo.h(34))
 
-	menuY := 282
+	menuY := menuFirstY
 	for _, menu := range menuControls {
 		moveControl(a.controls.menuLabels[menu.id], lo.x(layoutLX+24), lo.y(menuY+5), lo.w(120), lo.h(24))
 		moveControl(a.controls.menuButtons[menu.id], lo.x(layoutLX+150), lo.y(menuY), lo.w(170), lo.h(34))
@@ -266,11 +314,21 @@ func (a *application) repositionControls() {
 		y += skillRowGap
 	}
 
-	moveControl(a.controls.pauseLabel, lo.pauseLabelX, lo.y(648), lo.w(45), lo.h(24))
-	moveControl(a.controls.pauseButton, lo.pauseBtnX, lo.y(642), lo.pauseBtnW, lo.h(34))
+	moveControl(a.controls.pauseLabel, lo.pauseLabelX, lo.y(pauseRowY+6), lo.w(45), lo.h(24))
+	moveControl(a.controls.pauseButton, lo.pauseBtnX, lo.y(pauseRowY), lo.pauseBtnW, lo.h(34))
 
-	moveControl(a.controls.statusLabel, lo.x(layoutLX+24), lo.y(711), lo.w(55), lo.h(24))
-	moveControl(a.controls.status, lo.statusTextX, lo.y(711), lo.statusTextW, lo.h(24))
+	moveControl(a.controls.clickerStartLabel, lo.x(layoutLX+24), lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
+	moveControl(a.controls.clickerStartButton, lo.x(layoutLX+72), lo.y(clickerHotkeyY), lo.w(104), lo.h(34))
+	moveControl(a.controls.clickerStopLabel, lo.x(layoutLX+186), lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
+	moveControl(a.controls.clickerStopButton, lo.x(layoutLX+234), lo.y(clickerHotkeyY), lo.w(100), lo.h(34))
+	moveControl(a.controls.clickerKeyLabel, lo.x(layoutLX+24), lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
+	moveControl(a.controls.clickerKeyButton, lo.x(layoutLX+72), lo.y(clickerSettingY), lo.w(104), lo.h(34))
+	moveControl(a.controls.clickerIntervalLabel, lo.x(layoutLX+186), lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
+	moveControl(a.controls.clickerInterval, lo.x(layoutLX+234), lo.y(clickerSettingY+7), lo.w(62), lo.h(22))
+	moveControl(a.controls.clickerMsLabel, lo.x(layoutLX+306), lo.y(clickerSettingY+6), lo.w(32), lo.h(24))
+
+	moveControl(a.controls.statusLabel, lo.x(layoutLX+24), lo.y(statusBarY+11), lo.w(55), lo.h(24))
+	moveControl(a.controls.status, lo.statusTextX, lo.y(statusBarY+11), lo.statusTextW, lo.h(24))
 
 	invalidateRect(a.hwnd, true)
 }
@@ -328,6 +386,12 @@ func (a *application) handleCommand(wParam uintptr) bool {
 		a.startCapture(captureTarget{kind: captureStop})
 	case id == idPauseKey:
 		a.startCapture(captureTarget{kind: capturePause})
+	case id == idClickerStartKey:
+		a.startCapture(captureTarget{kind: captureClickerStart})
+	case id == idClickerStopKey:
+		a.startCapture(captureTarget{kind: captureClickerStop})
+	case id == idClickerKey:
+		a.startCapture(captureTarget{kind: captureClickerKey})
 	case id >= idSkillKeyBase && id < idSkillKeyBase+config.MaxSkills:
 		a.startCapture(captureTarget{kind: captureSkill, index: id - idSkillKeyBase})
 	case id == idApplyBulk:
@@ -353,6 +417,10 @@ func (a *application) updateControlsFromConfig() {
 	setWindowText(a.controls.startButton, bindingText(a.cfg.Start))
 	setWindowText(a.controls.stopButton, bindingText(a.cfg.Stop))
 	setWindowText(a.controls.pauseButton, bindingText(a.cfg.Pause))
+	setWindowText(a.controls.clickerStartButton, bindingText(a.cfg.Clicker.Start))
+	setWindowText(a.controls.clickerStopButton, bindingText(a.cfg.Clicker.Stop))
+	setWindowText(a.controls.clickerKeyButton, bindingText(a.cfg.Clicker.Key))
+	setWindowText(a.controls.clickerInterval, strconv.Itoa(a.cfg.Clicker.IntervalMS))
 	for _, menu := range a.cfg.MenuBindings() {
 		if hwnd := a.controls.menuButtons[menu.ID]; hwnd != 0 {
 			setWindowText(hwnd, bindingText(menu.Binding))
@@ -432,6 +500,7 @@ func (a *application) loadConfig() {
 		return
 	}
 	a.runner.Stop()
+	a.clicker.Stop()
 	a.cfg = loaded
 	a.configPath = path
 	previous := a.capture
@@ -455,7 +524,27 @@ func (a *application) startRunnerFromHotkey() {
 		return
 	}
 	if a.runner.Start(a.cfg) {
-		a.setStatus("실행 중.")
+		a.updateRuntimeStatus()
+		return
+	}
+	a.updateRuntimeStatus()
+}
+
+func (a *application) startClickerFromHotkey() {
+	if a.clicker.Running() {
+		a.updateRuntimeStatus()
+		return
+	}
+	if err := a.syncConfigFromControls(); err != nil {
+		messageBox(a.hwnd, "잘못된 설정", err.Error(), mbOK|mbIconError)
+		return
+	}
+	if !clickerRunnable(a.cfg.Clicker) {
+		a.setStatus("클릭 반복에 사용할 입력 키와 간격을 지정하세요.")
+		return
+	}
+	if a.clicker.Start(a.cfg.Clicker) {
+		a.updateRuntimeStatus()
 		return
 	}
 	a.updateRuntimeStatus()
@@ -469,6 +558,16 @@ func (a *application) stopRunner(status string) {
 	a.updateRuntimeStatus()
 }
 
+func (a *application) stopAllRunners(status string) {
+	stopped := a.runner.Stop()
+	stopped = a.clicker.Stop() || stopped
+	if stopped {
+		a.setStatus(status)
+		return
+	}
+	a.updateRuntimeStatus()
+}
+
 func (a *application) syncConfigFromControls() error {
 	a.cfg.Normalize()
 	skillGap, err := parseSkillGap(getWindowText(a.controls.bulkSkillGap))
@@ -476,6 +575,11 @@ func (a *application) syncConfigFromControls() error {
 		return fmt.Errorf("키별 간격: %w", err)
 	}
 	a.cfg.SkillGapMS = skillGap
+	clickerInterval, err := parseInterval(getWindowText(a.controls.clickerInterval))
+	if err != nil {
+		return fmt.Errorf("클릭 반복: %w", err)
+	}
+	a.cfg.Clicker.IntervalMS = clickerInterval
 	for i := range config.MaxSkills {
 		interval, err := parseInterval(getWindowText(a.controls.skillInterval[i]))
 		if err != nil {
@@ -490,10 +594,16 @@ func (a *application) syncConfigFromControls() error {
 
 func (a *application) updateRuntimeStatus() {
 	switch {
+	case a.runner.Paused() && a.clicker.Running():
+		a.setStatus("기술 입력은 일시정지, 클릭 반복 실행 중.")
 	case a.runner.Paused():
 		a.setStatus("일시정지 키를 누르고 있어 기술 입력을 중지했습니다.")
+	case a.runner.Running() && a.clicker.Running():
+		a.setStatus("기술 반복과 클릭 반복 실행 중.")
 	case a.runner.Running():
-		a.setStatus("실행 중.")
+		a.setStatus("기술 반복 실행 중.")
+	case a.clicker.Running():
+		a.setStatus("클릭 반복 실행 중.")
 	default:
 		a.setStatus("정지.")
 	}

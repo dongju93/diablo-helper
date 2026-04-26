@@ -103,3 +103,69 @@ func runnableSkills(cfg config.Config) []config.Skill {
 	}
 	return skills
 }
+
+type clickerRunner struct {
+	mu      sync.Mutex
+	cancel  context.CancelFunc
+	running atomic.Bool
+	sendKey func(vk uint16)
+}
+
+func newClickerRunner(sendKey func(vk uint16)) *clickerRunner {
+	return &clickerRunner{sendKey: sendKey}
+}
+
+func (r *clickerRunner) Start(clicker config.Clicker) bool {
+	if !clickerRunnable(clicker) {
+		return false
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.cancel != nil {
+		return false
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	r.cancel = cancel
+	r.running.Store(true)
+
+	go r.run(ctx, clicker)
+	return true
+}
+
+func (r *clickerRunner) Stop() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.cancel == nil {
+		return false
+	}
+	r.cancel()
+	r.cancel = nil
+	r.running.Store(false)
+	return true
+}
+
+func (r *clickerRunner) Running() bool {
+	return r.running.Load()
+}
+
+func (r *clickerRunner) run(ctx context.Context, clicker config.Clicker) {
+	interval := time.Duration(clicker.IntervalMS) * time.Millisecond
+	timer := time.NewTimer(0)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-timer.C:
+			r.sendKey(uint16(clicker.Key.VK))
+			timer.Reset(interval)
+		}
+	}
+}
+
+func clickerRunnable(clicker config.Clicker) bool {
+	return clicker.Key.Assigned() && clicker.IntervalMS >= config.MinimumIntervalMS
+}

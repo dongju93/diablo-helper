@@ -37,6 +37,11 @@ func MarshalTOML(cfg Config) ([]byte, error) {
 	writeKey(&buf, "pause", cfg.Pause)
 	writeInt(&buf, "skill_gap_ms", cfg.SkillGapMS)
 	buf.WriteByte('\n')
+	writeKey(&buf, "clicker_start", cfg.Clicker.Start)
+	writeKey(&buf, "clicker_stop", cfg.Clicker.Stop)
+	writeKey(&buf, "clicker", cfg.Clicker.Key)
+	writeInt(&buf, "clicker_interval_ms", cfg.Clicker.IntervalMS)
+	buf.WriteByte('\n')
 	writeKey(&buf, "menu_inventory", cfg.Menu.Inventory)
 	writeKey(&buf, "menu_skills", cfg.Menu.Skills)
 	writeKey(&buf, "menu_follower", cfg.Menu.Follower)
@@ -127,6 +132,20 @@ func setTopLevelValue(cfg *Config, key string, value string) error {
 		return setInt(&cfg.Pause.VK, value)
 	case "skill_gap_ms":
 		return setInt(&cfg.SkillGapMS, value)
+	case "clicker_start_key_name":
+		return setString(&cfg.Clicker.Start.Name, value)
+	case "clicker_start_key_vk":
+		return setInt(&cfg.Clicker.Start.VK, value)
+	case "clicker_stop_key_name":
+		return setString(&cfg.Clicker.Stop.Name, value)
+	case "clicker_stop_key_vk":
+		return setInt(&cfg.Clicker.Stop.VK, value)
+	case "clicker_key_name":
+		return setString(&cfg.Clicker.Key.Name, value)
+	case "clicker_key_vk":
+		return setInt(&cfg.Clicker.Key.VK, value)
+	case "clicker_interval_ms":
+		return setInt(&cfg.Clicker.IntervalMS, value)
 	case "menu_inventory_key_name":
 		return setString(&cfg.Menu.Inventory.Name, value)
 	case "menu_inventory_key_vk":

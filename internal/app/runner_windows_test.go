@@ -183,6 +183,62 @@ func TestSkillRunnerPauseSuppressesAndResumes(t *testing.T) {
 	expectKey(t, sent, '1')
 }
 
+func TestClickerRunnerStartStopState(t *testing.T) {
+	runner := newClickerRunner(func(uint16) {})
+	clicker := config.Clicker{
+		Key:        config.KeyBinding{Name: "Mouse Left", VK: vkLButton},
+		IntervalMS: config.MinimumIntervalMS,
+	}
+
+	if !runner.Start(clicker) {
+		t.Fatal("Start() = false, want true")
+	}
+	if !runner.Running() {
+		t.Fatal("Running() = false, want true")
+	}
+	if runner.Start(clicker) {
+		t.Fatal("second Start() = true, want false")
+	}
+	if !runner.Stop() {
+		t.Fatal("Stop() = false, want true")
+	}
+	if runner.Running() {
+		t.Fatal("Running() = true after Stop(), want false")
+	}
+	if runner.Stop() {
+		t.Fatal("second Stop() = true, want false")
+	}
+}
+
+func TestClickerRunnerDoesNotStartWithoutRunnableKey(t *testing.T) {
+	runner := newClickerRunner(func(uint16) {})
+
+	if runner.Start(config.Clicker{IntervalMS: config.MinimumIntervalMS}) {
+		t.Fatal("Start() = true for unassigned clicker key, want false")
+	}
+	if runner.Start(config.Clicker{Key: config.KeyBinding{Name: "Mouse Left", VK: vkLButton}, IntervalMS: config.MinimumIntervalMS - 1}) {
+		t.Fatal("Start() = true for too-small interval, want false")
+	}
+}
+
+func TestClickerRunnerSendsConfiguredKey(t *testing.T) {
+	sent := make(chan uint16, 20)
+	runner := newClickerRunner(func(vk uint16) {
+		sent <- vk
+	})
+	clicker := config.Clicker{
+		Key:        config.KeyBinding{Name: "Mouse Left", VK: vkLButton},
+		IntervalMS: config.MinimumIntervalMS,
+	}
+
+	if !runner.Start(clicker) {
+		t.Fatal("Start() = false, want true")
+	}
+	defer runner.Stop()
+
+	expectKey(t, sent, vkLButton)
+}
+
 func expectKey(t *testing.T, ch <-chan uint16, want uint16) {
 	t.Helper()
 

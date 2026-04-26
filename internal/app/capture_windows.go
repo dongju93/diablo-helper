@@ -19,6 +19,9 @@ const (
 	capturePause
 	captureMenu
 	captureSkill
+	captureClickerStart
+	captureClickerStop
+	captureClickerKey
 )
 
 type captureTarget struct {
@@ -63,7 +66,7 @@ func (a *application) handleKeyEvent(vk uint16, down bool) bool {
 			a.setStatus("키 할당을 해제했습니다.")
 			return true
 		}
-		if vk == vkLButton && (a.capture.kind == captureStart || a.capture.kind == captureStop) {
+		if vk == vkLButton && captureRejectsMouseLeft(a.capture.kind) {
 			a.setStatus("시작/종료 키에는 Mouse Left를 사용할 수 없습니다.")
 			return true
 		}
@@ -71,13 +74,34 @@ func (a *application) handleKeyEvent(vk uint16, down bool) bool {
 		return true
 	}
 
-	switch {
-	case a.runner.Running() && sameKey(vk, a.cfg.Stop):
-		a.stopRunner("종료 키 입력으로 정지했습니다.")
-	case sameKey(vk, a.cfg.Start):
+	stopped := false
+	if a.runner.Running() && sameKey(vk, a.cfg.Stop) {
+		stopped = a.runner.Stop()
+	}
+	if a.clicker.Running() && sameKey(vk, a.cfg.Clicker.Stop) {
+		stopped = a.clicker.Stop() || stopped
+	}
+	if stopped {
+		a.setStatus("종료 키 입력으로 정지했습니다.")
+		return false
+	}
+
+	started := false
+	if sameKey(vk, a.cfg.Start) {
 		a.startRunnerFromHotkey()
+		started = true
+	}
+	if sameKey(vk, a.cfg.Clicker.Start) {
+		a.startClickerFromHotkey()
+		started = true
+	}
+	if started {
+		return false
+	}
+
+	switch {
 	case a.menuKeyMatches(vk):
-		a.stopRunner("게임 메뉴 키 입력으로 정지했습니다.")
+		a.stopAllRunners("게임 메뉴 키 입력으로 정지했습니다.")
 	case sameKey(vk, a.cfg.Pause):
 		a.runner.SetPaused(true)
 		a.updateRuntimeStatus()
@@ -99,6 +123,12 @@ func (a *application) assignCapturedKey(vk uint16) {
 		if target.index >= 0 && target.index < len(a.cfg.Skills) {
 			a.cfg.Skills[target.index].Key = binding
 		}
+	case captureClickerStart:
+		a.cfg.Clicker.Start = binding
+	case captureClickerStop:
+		a.cfg.Clicker.Stop = binding
+	case captureClickerKey:
+		a.cfg.Clicker.Key = binding
 	case captureMenu:
 		a.cfg.Menu.SetKeyByID(target.menuID, binding)
 	}
@@ -120,6 +150,12 @@ func (a *application) clearCapturedKey() {
 		if a.capture.index >= 0 && a.capture.index < len(a.cfg.Skills) {
 			a.cfg.Skills[a.capture.index].Key = config.KeyBinding{}
 		}
+	case captureClickerStart:
+		a.cfg.Clicker.Start = config.KeyBinding{}
+	case captureClickerStop:
+		a.cfg.Clicker.Stop = config.KeyBinding{}
+	case captureClickerKey:
+		a.cfg.Clicker.Key = config.KeyBinding{}
 	case captureMenu:
 		a.cfg.Menu.SetKeyByID(a.capture.menuID, config.KeyBinding{})
 	}
@@ -137,6 +173,12 @@ func (a *application) updateBindingControl(target captureTarget) {
 		if target.index >= 0 && target.index < len(a.cfg.Skills) {
 			setWindowText(a.controls.skillButtons[target.index], bindingText(a.cfg.Skills[target.index].Key))
 		}
+	case captureClickerStart:
+		setWindowText(a.controls.clickerStartButton, bindingText(a.cfg.Clicker.Start))
+	case captureClickerStop:
+		setWindowText(a.controls.clickerStopButton, bindingText(a.cfg.Clicker.Stop))
+	case captureClickerKey:
+		setWindowText(a.controls.clickerKeyButton, bindingText(a.cfg.Clicker.Key))
 	case captureMenu:
 		if hwnd := a.controls.menuButtons[target.menuID]; hwnd != 0 {
 			for _, menu := range a.cfg.MenuBindings() {
@@ -156,6 +198,10 @@ func (a *application) menuKeyMatches(vk uint16) bool {
 		}
 	}
 	return false
+}
+
+func captureRejectsMouseLeft(kind captureKind) bool {
+	return kind == captureStart || kind == captureStop || kind == captureClickerStart || kind == captureClickerStop
 }
 
 func sameKey(vk uint16, binding config.KeyBinding) bool {

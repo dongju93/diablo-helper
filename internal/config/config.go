@@ -3,12 +3,13 @@ package config
 import "fmt"
 
 const (
-	MaxSkills           = 8
-	DefaultIntervalMS   = 1000
-	DefaultSkillGapMS   = 0
-	MinimumIntervalMS   = 10
-	MouseLeftVK         = 0x01
-	DefaultSkillEnabled = false
+	MaxSkills                = 8
+	DefaultIntervalMS        = 1000
+	DefaultSkillGapMS        = 0
+	DefaultClickerIntervalMS = 100
+	MinimumIntervalMS        = 10
+	MouseLeftVK              = 0x01
+	DefaultSkillEnabled      = false
 )
 
 type KeyBinding struct {
@@ -38,6 +39,13 @@ type MenuKeys struct {
 	Whisper    KeyBinding
 }
 
+type Clicker struct {
+	Start      KeyBinding
+	Stop       KeyBinding
+	Key        KeyBinding
+	IntervalMS int
+}
+
 type MenuBinding struct {
 	ID      string
 	Label   string
@@ -51,11 +59,16 @@ type Config struct {
 	Menu       MenuKeys
 	Skills     []Skill
 	SkillGapMS int
+	Clicker    Clicker
 }
 
 func Default() Config {
 	cfg := Config{
 		Pause: KeyBinding{Name: "Mouse Right", VK: 0x02},
+		Clicker: Clicker{
+			Key:        KeyBinding{Name: "Mouse Left", VK: MouseLeftVK},
+			IntervalMS: DefaultClickerIntervalMS,
+		},
 		Menu: MenuKeys{
 			Inventory:  KeyBinding{Name: "C", VK: 0x43},
 			Skills:     KeyBinding{Name: "V", VK: 0x56},
@@ -130,9 +143,15 @@ func (c *Config) Normalize() {
 	if c.SkillGapMS < 0 {
 		c.SkillGapMS = DefaultSkillGapMS
 	}
+	if c.Clicker.IntervalMS < MinimumIntervalMS {
+		c.Clicker.IntervalMS = DefaultClickerIntervalMS
+	}
 	normalizeKey(&c.Start)
 	normalizeKey(&c.Stop)
 	normalizeKey(&c.Pause)
+	normalizeKey(&c.Clicker.Start)
+	normalizeKey(&c.Clicker.Stop)
+	normalizeKey(&c.Clicker.Key)
 	c.Menu.forEachKey(normalizeKey)
 }
 
@@ -159,8 +178,17 @@ func (c Config) Validate() error {
 	if c.Stop.VK == MouseLeftVK {
 		return fmt.Errorf("stop key must not be Mouse Left")
 	}
+	if c.Clicker.Start.VK == MouseLeftVK {
+		return fmt.Errorf("clicker start key must not be Mouse Left")
+	}
+	if c.Clicker.Stop.VK == MouseLeftVK {
+		return fmt.Errorf("clicker stop key must not be Mouse Left")
+	}
 	if c.SkillGapMS < 0 {
 		return fmt.Errorf("skill gap must be at least 0ms")
+	}
+	if c.Clicker.IntervalMS < MinimumIntervalMS {
+		return fmt.Errorf("clicker interval must be at least %dms", MinimumIntervalMS)
 	}
 	for i, skill := range c.Skills {
 		if skill.IntervalMS < MinimumIntervalMS {
@@ -174,6 +202,9 @@ func (c Config) Validate() error {
 		"start":            c.Start,
 		"stop":             c.Stop,
 		"pause":            c.Pause,
+		"clicker start":    c.Clicker.Start,
+		"clicker stop":     c.Clicker.Stop,
+		"clicker key":      c.Clicker.Key,
 		"menu inventory":   c.Menu.Inventory,
 		"menu skills":      c.Menu.Skills,
 		"menu follower":    c.Menu.Follower,

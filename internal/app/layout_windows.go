@@ -6,12 +6,12 @@ import "math"
 
 const (
 	windowMaxW = 980
-	windowMaxH = 780
+	windowMaxH = 880
 	windowMinW = 760
-	windowMinH = 600
+	windowMinH = 700
 
 	layoutDesignW  = 964
-	layoutDesignH  = 740
+	layoutDesignH  = 840
 	layoutMinScale = 0.7
 
 	layoutLX  = 24

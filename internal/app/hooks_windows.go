@@ -61,6 +61,7 @@ func wndProc(hwnd uintptr, msg uint32, wParam uintptr, lParam unsafe.Pointer) ui
 			appInstance.mouseHook = 0
 		}
 		appInstance.runner.Stop()
+		appInstance.clicker.Stop()
 		appInstance.disposeUIResources()
 		procPostQuitMessage.Call(0)
 		return 0
