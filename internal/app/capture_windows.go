@@ -86,6 +86,12 @@ func (a *application) handleKeyEvent(vk uint16, down bool) bool {
 		return false
 	}
 
+	if a.runner.Running() && sameKey(vk, a.cfg.Pause) {
+		a.runner.SetPaused(true)
+		a.updateRuntimeStatus()
+		return false
+	}
+
 	started := false
 	if sameKey(vk, a.cfg.Start) {
 		a.startRunnerFromHotkey()
@@ -99,12 +105,8 @@ func (a *application) handleKeyEvent(vk uint16, down bool) bool {
 		return false
 	}
 
-	switch {
-	case a.menuKeyMatches(vk):
+	if a.menuKeyMatches(vk) {
 		a.stopAllRunners("게임 메뉴 키 입력으로 정지했습니다.")
-	case sameKey(vk, a.cfg.Pause):
-		a.runner.SetPaused(true)
-		a.updateRuntimeStatus()
 	}
 	return false
 }
