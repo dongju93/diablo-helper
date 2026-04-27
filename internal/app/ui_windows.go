@@ -302,6 +302,14 @@ func (a *application) drawButton(item *drawItemStruct) {
 	hovered := item.ItemState&odsHotLight != 0
 	capturing := a.captureControlID(a.capture) == id
 
+	// Toggle switch (pill track + sliding knob, right=ON blue)
+	if a.isToggleButton(id) {
+		idx := id - idSkillEnabledBase
+		on := idx >= 0 && idx < len(a.skillEnabled) && a.skillEnabled[idx]
+		a.drawToggleSwitch(item.HDC, item.RcItem, on, hovered, selected)
+		return
+	}
+
 	fill := uiPanelAlt
 	border := uiBorderStrong
 	textColor := uiText
@@ -376,6 +384,81 @@ func (a *application) fillRoundedButton(hdc uintptr, rc rect, fill uintptr, bord
 	procSelectObject.Call(hdc, oldBrush)
 	deleteGDIObject(pen)
 	deleteGDIObject(brush)
+}
+
+// drawToggleSwitch renders a pill-shaped toggle switch.
+// The track fills the full control rect. The knob sits on the left (OFF) or
+// right (ON) side of the track with a small margin.
+func (a *application) drawToggleSwitch(hdc uintptr, rc rect, on bool, hovered bool, pressed bool) {
+	// Clear background with panel colour so the control blends in.
+	procFillRect.Call(hdc, uintptr(unsafe.Pointer(&rc)), a.panelBrush)
+
+	// Track colours
+	var trackColor uintptr
+	if on {
+		trackColor = uiAccent
+		if hovered {
+			trackColor = uiAccentHover
+		}
+		if pressed {
+			trackColor = uiAccentPressed
+		}
+	} else {
+		trackColor = uiBorderStrong
+		if hovered {
+			trackColor = rgb(170, 170, 170)
+		}
+		if pressed {
+			trackColor = rgb(150, 150, 150)
+		}
+	}
+
+	// Draw the pill track (fully rounded ends).
+	trackH := rc.Bottom - rc.Top
+	trackW := rc.Right - rc.Left
+	corner := trackH // corner radius = full height → pill shape
+	trackBrush := createBrush(trackColor)
+	trackPen := createPen(trackColor, 1)
+	oldBrush, _, _ := procSelectObject.Call(hdc, trackBrush)
+	oldPen, _, _ := procSelectObject.Call(hdc, trackPen)
+	procRoundRect.Call(
+		hdc,
+		uintptr(rc.Left), uintptr(rc.Top),
+		uintptr(rc.Right), uintptr(rc.Bottom),
+		uintptr(corner), uintptr(corner),
+	)
+	procSelectObject.Call(hdc, oldPen)
+	procSelectObject.Call(hdc, oldBrush)
+	deleteGDIObject(trackPen)
+	deleteGDIObject(trackBrush)
+
+	// Draw the knob (white circle) inside the track.
+	margin := int32(3)
+	knobSize := trackH - 2*margin // diameter
+	var knobLeft int32
+	if on {
+		knobLeft = rc.Left + trackW - margin - knobSize
+	} else {
+		knobLeft = rc.Left + margin
+	}
+	knobTop := rc.Top + margin
+	knobRight := knobLeft + knobSize
+	knobBottom := knobTop + knobSize
+
+	knobColor := rgb(255, 255, 255)
+	knobBrush := createBrush(knobColor)
+	knobPen := createPen(knobColor, 1)
+	oldBrush, _, _ = procSelectObject.Call(hdc, knobBrush)
+	oldPen, _, _ = procSelectObject.Call(hdc, knobPen)
+	procEllipse.Call(
+		hdc,
+		uintptr(knobLeft), uintptr(knobTop),
+		uintptr(knobRight), uintptr(knobBottom),
+	)
+	procSelectObject.Call(hdc, oldPen)
+	procSelectObject.Call(hdc, oldBrush)
+	deleteGDIObject(knobPen)
+	deleteGDIObject(knobBrush)
 }
 
 func drawTextInRect(hdc uintptr, text string, font uintptr, color uintptr, rc rect, flags uintptr) {

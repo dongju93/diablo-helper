@@ -146,6 +146,10 @@ func (a *application) isPrimaryButton(id int) bool {
 	return id == idSave || id == idApplyBulk
 }
 
+func (a *application) isToggleButton(id int) bool {
+	return id >= idSkillEnabledBase && id < idSkillEnabledBase+config.MaxSkills
+}
+
 func (a *application) isBindingButton(id int) bool {
 	if id == idStartKey || id == idStopKey || id == idPauseKey ||
 		id == idClickerStartKey || id == idClickerStopKey || id == idClickerKey {
@@ -235,7 +239,7 @@ func (a *application) createControls(hwnd uintptr) {
 	a.controls.applyBulk = a.createButton(hwnd, idApplyBulk, "일괄 적용", lo.bulkApplyX, lo.y(bulkApplyY), lo.w(bulkApplyW), lo.h(bulkApplyH))
 
 	// Right column – skill grid headers
-	a.controls.skillUseHdr = a.createStatic(hwnd, "사용", lo.skillUseHdrX, lo.y(skillHeaderY), lo.w(45), lo.h(24))
+	a.controls.skillUseHdr = a.createStatic(hwnd, "사용", lo.skillUseHdrX, lo.y(skillHeaderY), lo.w(55), lo.h(24))
 	a.controls.skillNumHdr = a.createStatic(hwnd, "기술", lo.skillNumHdrX, lo.y(skillHeaderY), lo.w(55), lo.h(24))
 	a.controls.skillKeyHdr = a.createStatic(hwnd, "키", lo.skillKeyHdrX, lo.y(skillHeaderY), lo.w(35), lo.h(24))
 	a.controls.skillIntHdr = a.createStatic(hwnd, "실행 간격", lo.skillIntHdrX, lo.y(skillHeaderY), lo.w(80), lo.h(24))
@@ -243,7 +247,7 @@ func (a *application) createControls(hwnd uintptr) {
 	// Right column – skill rows
 	y := skillFirstRowY
 	for i := range config.MaxSkills {
-		a.controls.skillEnabled[i] = a.createCheckbox(hwnd, idSkillEnabledBase+i, "", lo.skillChkX, lo.y(y+6), lo.w(22), lo.h(22))
+		a.controls.skillEnabled[i] = a.createButton(hwnd, idSkillEnabledBase+i, "", lo.skillChkX, lo.y(y+4), lo.w(52), lo.h(26))
 		a.controls.skillNums[i] = a.createStatic(hwnd, strconv.Itoa(i+1), lo.skillNumX, lo.y(y+7), lo.w(skillNumW), lo.h(22))
 		a.controls.skillButtons[i] = a.createButton(hwnd, idSkillKeyBase+i, "", lo.skillBtnX, lo.y(y), lo.skillBtnW, lo.h(34))
 		a.controls.skillInterval[i] = a.createEdit(hwnd, idSkillIntervalBase+i, "", lo.skillIntervalX, lo.y(y+7), lo.w(skillEditW), lo.h(22))
@@ -300,14 +304,14 @@ func (a *application) repositionControls() {
 	moveControl(a.controls.bulkGapMsLabel, lo.bulkMsX, lo.y(bulkSkillGapLabelY), lo.w(bulkMsW), lo.h(24))
 	moveControl(a.controls.applyBulk, lo.bulkApplyX, lo.y(bulkApplyY), lo.w(bulkApplyW), lo.h(bulkApplyH))
 
-	moveControl(a.controls.skillUseHdr, lo.skillUseHdrX, lo.y(skillHeaderY), lo.w(45), lo.h(24))
+	moveControl(a.controls.skillUseHdr, lo.skillUseHdrX, lo.y(skillHeaderY), lo.w(55), lo.h(24))
 	moveControl(a.controls.skillNumHdr, lo.skillNumHdrX, lo.y(skillHeaderY), lo.w(55), lo.h(24))
 	moveControl(a.controls.skillKeyHdr, lo.skillKeyHdrX, lo.y(skillHeaderY), lo.w(35), lo.h(24))
 	moveControl(a.controls.skillIntHdr, lo.skillIntHdrX, lo.y(skillHeaderY), lo.w(80), lo.h(24))
 
 	y := skillFirstRowY
 	for i := range config.MaxSkills {
-		moveControl(a.controls.skillEnabled[i], lo.skillChkX, lo.y(y+6), lo.w(22), lo.h(22))
+		moveControl(a.controls.skillEnabled[i], lo.skillChkX, lo.y(y+4), lo.w(52), lo.h(26))
 		moveControl(a.controls.skillNums[i], lo.skillNumX, lo.y(y+7), lo.w(skillNumW), lo.h(22))
 		moveControl(a.controls.skillButtons[i], lo.skillBtnX, lo.y(y), lo.skillBtnW, lo.h(34))
 		moveControl(a.controls.skillInterval[i], lo.skillIntervalX, lo.y(y+7), lo.w(skillEditW), lo.h(22))
@@ -394,6 +398,12 @@ func (a *application) handleCommand(wParam uintptr) bool {
 		a.startCapture(captureTarget{kind: captureClickerStop})
 	case id == idClickerKey:
 		a.startCapture(captureTarget{kind: captureClickerKey})
+	case id >= idSkillEnabledBase && id < idSkillEnabledBase+config.MaxSkills:
+		idx := id - idSkillEnabledBase
+		a.skillEnabled[idx] = !a.skillEnabled[idx]
+		if hwnd := a.controls.skillEnabled[idx]; hwnd != 0 {
+			invalidateRect(hwnd, true)
+		}
 	case id >= idSkillKeyBase && id < idSkillKeyBase+config.MaxSkills:
 		a.startCapture(captureTarget{kind: captureSkill, index: id - idSkillKeyBase})
 	case id == idApplyBulk:
@@ -430,7 +440,10 @@ func (a *application) updateControlsFromConfig() {
 	}
 	setWindowText(a.controls.bulkSkillGap, strconv.Itoa(a.cfg.SkillGapMS))
 	for i := range config.MaxSkills {
-		setChecked(a.controls.skillEnabled[i], a.cfg.Skills[i].Enabled)
+		a.skillEnabled[i] = a.cfg.Skills[i].Enabled
+		if hwnd := a.controls.skillEnabled[i]; hwnd != 0 {
+			invalidateRect(hwnd, true)
+		}
 		setWindowText(a.controls.skillButtons[i], bindingText(a.cfg.Skills[i].Key))
 		setWindowText(a.controls.skillInterval[i], strconv.Itoa(a.cfg.Skills[i].IntervalMS))
 	}
@@ -644,7 +657,7 @@ func (a *application) syncConfigFromControls() error {
 			return fmt.Errorf("기술 %d: %w", i+1, err)
 		}
 		a.cfg.Skills[i].IntervalMS = interval
-		a.cfg.Skills[i].Enabled = checked(a.controls.skillEnabled[i])
+		a.cfg.Skills[i].Enabled = a.skillEnabled[i]
 	}
 	a.cfg.Normalize()
 	return a.cfg.Validate()
