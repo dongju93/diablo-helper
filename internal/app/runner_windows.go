@@ -16,10 +16,10 @@ type skillRunner struct {
 	cancel  context.CancelFunc
 	running atomic.Bool
 	paused  atomic.Bool
-	sendKey func(vk uint16)
+	sendKey func(vk uint16) error
 }
 
-func newSkillRunner(sendKey func(vk uint16)) *skillRunner {
+func newSkillRunner(sendKey func(vk uint16) error) *skillRunner {
 	return &skillRunner{sendKey: sendKey}
 }
 
@@ -90,7 +90,10 @@ func (r *skillRunner) runSkill(ctx context.Context, skill config.Skill) {
 			return
 		case <-timer.C:
 			if !r.paused.Load() {
-				r.sendKey(uint16(skill.Key.VK))
+				if err := r.sendKey(uint16(skill.Key.VK)); err != nil {
+					r.Stop()
+					return
+				}
 			}
 			timer.Reset(interval)
 		}
@@ -116,10 +119,10 @@ type clickerRunner struct {
 	mu      sync.Mutex
 	cancel  context.CancelFunc
 	running atomic.Bool
-	sendKey func(vk uint16)
+	sendKey func(vk uint16) error
 }
 
-func newClickerRunner(sendKey func(vk uint16)) *clickerRunner {
+func newClickerRunner(sendKey func(vk uint16) error) *clickerRunner {
 	return &clickerRunner{sendKey: sendKey}
 }
 
@@ -171,7 +174,10 @@ func (r *clickerRunner) run(ctx context.Context, clicker config.Clicker) {
 		case <-ctx.Done():
 			return
 		case <-timer.C:
-			r.sendKey(uint16(clicker.Key.VK))
+			if err := r.sendKey(uint16(clicker.Key.VK)); err != nil {
+				r.Stop()
+				return
+			}
 			timer.Reset(interval)
 		}
 	}

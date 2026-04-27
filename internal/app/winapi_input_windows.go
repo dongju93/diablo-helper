@@ -3,27 +3,36 @@
 package app
 
 import (
+	"fmt"
 	"unsafe"
 )
 
-func sendVirtualKey(vk uint16) {
-	if sendMouseButton(vk) {
-		return
+func sendVirtualKey(vk uint16) error {
+	isMouse, err := sendMouseButton(vk)
+	if isMouse {
+		return err
 	}
 	down := newKeyboardInput(vk, 0)
 	up := newKeyboardInput(vk, keyEventKeyUp)
 	inputs := []input{down, up}
-	procSendInput.Call(
+	n, _, _ := procSendInput.Call(
 		uintptr(len(inputs)),
 		uintptr(unsafe.Pointer(&inputs[0])),
 		unsafe.Sizeof(inputs[0]),
 	)
+	if int(n) == len(inputs) {
+		return nil
+	}
+	// down injected but up was not — best-effort recovery to avoid stuck key
+	if int(n) == 1 {
+		upOnly := []input{up}
+		procSendInput.Call(1, uintptr(unsafe.Pointer(&upOnly[0])), unsafe.Sizeof(upOnly[0]))
+	}
+	return fmt.Errorf("SendInput: sent %d of %d keyboard events for vk %d", int(n), len(inputs), vk)
 }
 
-func sendMouseButton(vk uint16) bool {
-	var downFlags uint32
-	var upFlags uint32
-	var data uint32
+func sendMouseButton(vk uint16) (bool, error) {
+	var downFlags, upFlags, data uint32
 
 	switch vk {
 	case vkLButton:
@@ -44,18 +53,26 @@ func sendMouseButton(vk uint16) bool {
 		upFlags = mouseEventXUp
 		data = xButton2
 	default:
-		return false
+		return false, nil
 	}
 
 	down := newMouseInput(downFlags, data)
 	up := newMouseInput(upFlags, data)
 	inputs := []input{down, up}
-	procSendInput.Call(
+	n, _, _ := procSendInput.Call(
 		uintptr(len(inputs)),
 		uintptr(unsafe.Pointer(&inputs[0])),
 		unsafe.Sizeof(inputs[0]),
 	)
-	return true
+	if int(n) == len(inputs) {
+		return true, nil
+	}
+	// mouseDown injected but mouseUp was not — best-effort recovery
+	if int(n) == 1 {
+		upOnly := []input{up}
+		procSendInput.Call(1, uintptr(unsafe.Pointer(&upOnly[0])), unsafe.Sizeof(upOnly[0]))
+	}
+	return true, fmt.Errorf("SendInput: sent %d of %d mouse events for vk %d", int(n), len(inputs), vk)
 }
 
 func newKeyboardInput(vk uint16, flags uint32) input {
