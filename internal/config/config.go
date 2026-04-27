@@ -25,6 +25,21 @@ const (
 
 var maximumDurationMilliseconds = int64(math.MaxInt64 / int64(time.Millisecond))
 
+// forbiddenOutputVKs is the set of virtual-key codes that must not be used as
+// automated output (skill keys, clicker key). Synthesising these system-wide
+// triggers OS-level or application-global side effects that the user cannot
+// easily interrupt.
+var forbiddenOutputVKs = map[int]string{
+	0x10: "Shift",
+	0x11: "Ctrl",
+	0x12: "Alt",
+	0x13: "Pause",
+	0x14: "Caps Lock",
+	0x1B: "Esc",
+	0x5B: "Left Win",
+	0x5C: "Right Win",
+}
+
 type KeyBinding struct {
 	Name string
 	VK   int
@@ -228,9 +243,12 @@ func (c Config) Validate() error {
 		if err := validateConfigString(fmt.Sprintf("skill %d name", i+1), skill.Name, MaxSkillNameLength); err != nil {
 			return err
 		}
-		if err := validateKey(fmt.Sprintf("skill %d key", i+1), skill.Key); err != nil {
+		if err := validateOutputKey(fmt.Sprintf("skill %d key", i+1), skill.Key); err != nil {
 			return err
 		}
+	}
+	if err := validateOutputKey("clicker key", c.Clicker.Key); err != nil {
+		return err
 	}
 	for _, item := range []struct {
 		name    string
@@ -241,7 +259,6 @@ func (c Config) Validate() error {
 		{name: "pause key", binding: c.Pause},
 		{name: "clicker start key", binding: c.Clicker.Start},
 		{name: "clicker stop key", binding: c.Clicker.Stop},
-		{name: "clicker key", binding: c.Clicker.Key},
 		{name: "menu inventory key", binding: c.Menu.Inventory},
 		{name: "menu skills key", binding: c.Menu.Skills},
 		{name: "menu follower key", binding: c.Menu.Follower},
@@ -348,6 +365,16 @@ func normalizeKey(binding *KeyBinding) {
 	} else {
 		binding.Name = KeyDisplayName(binding.VK)
 	}
+}
+
+func validateOutputKey(name string, binding KeyBinding) error {
+	if err := validateKey(name, binding); err != nil {
+		return err
+	}
+	if label, forbidden := forbiddenOutputVKs[binding.VK]; forbidden {
+		return fmt.Errorf("%s must not be a system key (%s)", name, label)
+	}
+	return nil
 }
 
 func validateKey(name string, binding KeyBinding) error {

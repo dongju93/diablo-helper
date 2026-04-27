@@ -303,6 +303,68 @@ func TestValidateRejectsInvalidConfig(t *testing.T) {
 			},
 			wantError: "name does not match virtual-key code",
 		},
+		{
+			name: "skill key is Left Win",
+			mutate: func(cfg *Config) {
+				cfg.Skills[0].Key = KeyBinding{Name: "Left Win", VK: 0x5B}
+				cfg.Skills[0].Enabled = true
+			},
+			wantError: "must not be a system key",
+		},
+		{
+			name: "skill key is Right Win",
+			mutate: func(cfg *Config) {
+				cfg.Skills[0].Key = KeyBinding{Name: "Right Win", VK: 0x5C}
+				cfg.Skills[0].Enabled = true
+			},
+			wantError: "must not be a system key",
+		},
+		{
+			name: "skill key is Esc",
+			mutate: func(cfg *Config) {
+				cfg.Skills[0].Key = KeyBinding{Name: "Esc", VK: 0x1B}
+				cfg.Skills[0].Enabled = true
+			},
+			wantError: "must not be a system key",
+		},
+		{
+			name: "skill key is Shift",
+			mutate: func(cfg *Config) {
+				cfg.Skills[0].Key = KeyBinding{Name: "Shift", VK: 0x10}
+				cfg.Skills[0].Enabled = true
+			},
+			wantError: "must not be a system key",
+		},
+		{
+			name: "skill key is Ctrl",
+			mutate: func(cfg *Config) {
+				cfg.Skills[0].Key = KeyBinding{Name: "Ctrl", VK: 0x11}
+				cfg.Skills[0].Enabled = true
+			},
+			wantError: "must not be a system key",
+		},
+		{
+			name: "skill key is Alt",
+			mutate: func(cfg *Config) {
+				cfg.Skills[0].Key = KeyBinding{Name: "Alt", VK: 0x12}
+				cfg.Skills[0].Enabled = true
+			},
+			wantError: "must not be a system key",
+		},
+		{
+			name: "clicker key is Left Win",
+			mutate: func(cfg *Config) {
+				cfg.Clicker.Key = KeyBinding{Name: "Left Win", VK: 0x5B}
+			},
+			wantError: "must not be a system key",
+		},
+		{
+			name: "clicker key is Esc",
+			mutate: func(cfg *Config) {
+				cfg.Clicker.Key = KeyBinding{Name: "Esc", VK: 0x1B}
+			},
+			wantError: "must not be a system key",
+		},
 	}
 
 	for _, tt := range tests {
@@ -316,6 +378,44 @@ func TestValidateRejectsInvalidConfig(t *testing.T) {
 			}
 			if !strings.Contains(err.Error(), tt.wantError) {
 				t.Fatalf("Validate() error = %v, want %q", err, tt.wantError)
+			}
+		})
+	}
+}
+
+func TestHotkeysPermitKeysBlockedForOutput(t *testing.T) {
+	// Hotkeys (start/stop/pause) use validateKey, not validateOutputKey, so
+	// system keys like Esc and Shift are allowed as user-controlled triggers.
+	tests := []struct {
+		name   string
+		mutate func(*Config)
+	}{
+		{
+			name: "start key can be Esc",
+			mutate: func(cfg *Config) {
+				cfg.Start = KeyBinding{Name: "Esc", VK: 0x1B}
+			},
+		},
+		{
+			name: "stop key can be Shift",
+			mutate: func(cfg *Config) {
+				cfg.Stop = KeyBinding{Name: "Shift", VK: 0x10}
+			},
+		},
+		{
+			name: "pause key can be Alt",
+			mutate: func(cfg *Config) {
+				cfg.Pause = KeyBinding{Name: "Alt", VK: 0x12}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Default()
+			tt.mutate(&cfg)
+			if err := cfg.Validate(); err != nil {
+				t.Fatalf("Validate() error = %v, want nil", err)
 			}
 		})
 	}
