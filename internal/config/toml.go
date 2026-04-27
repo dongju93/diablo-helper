@@ -4,13 +4,28 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
 )
 
 func LoadFile(path string) (Config, error) {
-	data, err := os.ReadFile(path)
+	f, err := os.Open(path)
+	if err != nil {
+		return Config{}, err
+	}
+	defer f.Close()
+
+	fi, err := f.Stat()
+	if err != nil {
+		return Config{}, err
+	}
+	if fi.Size() > MaxConfigFileBytes {
+		return Config{}, fmt.Errorf("config file too large (%d bytes, max %d)", fi.Size(), MaxConfigFileBytes)
+	}
+
+	data, err := io.ReadAll(f)
 	if err != nil {
 		return Config{}, err
 	}
@@ -73,6 +88,9 @@ func ParseTOML(data []byte) (Config, error) {
 			continue
 		}
 		if line == "[[skills]]" {
+			if len(cfg.Skills) >= MaxSkills {
+				return Config{}, fmt.Errorf("line %d: too many [[skills]] sections (max %d)", lineNumber, MaxSkills)
+			}
 			cfg.Skills = append(cfg.Skills, Skill{
 				Name:       fmt.Sprintf("Skill %d", len(cfg.Skills)+1),
 				IntervalMS: DefaultIntervalMS,
@@ -119,63 +137,63 @@ func ParseTOML(data []byte) (Config, error) {
 func setTopLevelValue(cfg *Config, key string, value string) error {
 	switch key {
 	case "start_key_name":
-		return setString(&cfg.Start.Name, value)
+		return setKeyName(&cfg.Start.Name, key, value)
 	case "start_key_vk":
 		return setInt(&cfg.Start.VK, value)
 	case "stop_key_name":
-		return setString(&cfg.Stop.Name, value)
+		return setKeyName(&cfg.Stop.Name, key, value)
 	case "stop_key_vk":
 		return setInt(&cfg.Stop.VK, value)
 	case "pause_key_name":
-		return setString(&cfg.Pause.Name, value)
+		return setKeyName(&cfg.Pause.Name, key, value)
 	case "pause_key_vk":
 		return setInt(&cfg.Pause.VK, value)
 	case "skill_gap_ms":
 		return setInt(&cfg.SkillGapMS, value)
 	case "clicker_start_key_name":
-		return setString(&cfg.Clicker.Start.Name, value)
+		return setKeyName(&cfg.Clicker.Start.Name, key, value)
 	case "clicker_start_key_vk":
 		return setInt(&cfg.Clicker.Start.VK, value)
 	case "clicker_stop_key_name":
-		return setString(&cfg.Clicker.Stop.Name, value)
+		return setKeyName(&cfg.Clicker.Stop.Name, key, value)
 	case "clicker_stop_key_vk":
 		return setInt(&cfg.Clicker.Stop.VK, value)
 	case "clicker_key_name":
-		return setString(&cfg.Clicker.Key.Name, value)
+		return setKeyName(&cfg.Clicker.Key.Name, key, value)
 	case "clicker_key_vk":
 		return setInt(&cfg.Clicker.Key.VK, value)
 	case "clicker_interval_ms":
 		return setInt(&cfg.Clicker.IntervalMS, value)
 	case "menu_inventory_key_name":
-		return setString(&cfg.Menu.Inventory.Name, value)
+		return setKeyName(&cfg.Menu.Inventory.Name, key, value)
 	case "menu_inventory_key_vk":
 		return setInt(&cfg.Menu.Inventory.VK, value)
 	case "menu_skills_key_name":
-		return setString(&cfg.Menu.Skills.Name, value)
+		return setKeyName(&cfg.Menu.Skills.Name, key, value)
 	case "menu_skills_key_vk":
 		return setInt(&cfg.Menu.Skills.VK, value)
 	case "menu_follower_key_name":
-		return setString(&cfg.Menu.Follower.Name, value)
+		return setKeyName(&cfg.Menu.Follower.Name, key, value)
 	case "menu_follower_key_vk":
 		return setInt(&cfg.Menu.Follower.VK, value)
 	case "menu_map_key_name":
-		return setString(&cfg.Menu.Map.Name, value)
+		return setKeyName(&cfg.Menu.Map.Name, key, value)
 	case "menu_map_key_vk":
 		return setInt(&cfg.Menu.Map.VK, value)
 	case "menu_world_map_key_name":
-		return setString(&cfg.Menu.WorldMap.Name, value)
+		return setKeyName(&cfg.Menu.WorldMap.Name, key, value)
 	case "menu_world_map_key_vk":
 		return setInt(&cfg.Menu.WorldMap.VK, value)
 	case "menu_town_portal_key_name":
-		return setString(&cfg.Menu.TownPortal.Name, value)
+		return setKeyName(&cfg.Menu.TownPortal.Name, key, value)
 	case "menu_town_portal_key_vk":
 		return setInt(&cfg.Menu.TownPortal.VK, value)
 	case "menu_chat_key_name":
-		return setString(&cfg.Menu.Chat.Name, value)
+		return setKeyName(&cfg.Menu.Chat.Name, key, value)
 	case "menu_chat_key_vk":
 		return setInt(&cfg.Menu.Chat.VK, value)
 	case "menu_whisper_key_name":
-		return setString(&cfg.Menu.Whisper.Name, value)
+		return setKeyName(&cfg.Menu.Whisper.Name, key, value)
 	case "menu_whisper_key_vk":
 		return setInt(&cfg.Menu.Whisper.VK, value)
 	default:
@@ -186,9 +204,9 @@ func setTopLevelValue(cfg *Config, key string, value string) error {
 func setSkillValue(skill *Skill, key string, value string) error {
 	switch key {
 	case "name":
-		return setString(&skill.Name, value)
+		return setString(&skill.Name, value, "skill name", MaxSkillNameLength)
 	case "key_name":
-		return setString(&skill.Key.Name, value)
+		return setKeyName(&skill.Key.Name, key, value)
 	case "key_vk":
 		return setInt(&skill.Key.VK, value)
 	case "interval_ms":
@@ -226,10 +244,17 @@ func writeBool(buf *bytes.Buffer, key string, value bool) {
 	buf.WriteByte('\n')
 }
 
-func setString(target *string, value string) error {
+func setKeyName(target *string, key string, value string) error {
+	return setString(target, value, key, MaxKeyNameLength)
+}
+
+func setString(target *string, value string, name string, maxLength int) error {
 	parsed, err := strconv.Unquote(value)
 	if err != nil {
 		return fmt.Errorf("expected quoted string: %w", err)
+	}
+	if err := validateConfigString(name, parsed, maxLength); err != nil {
+		return err
 	}
 	*target = parsed
 	return nil

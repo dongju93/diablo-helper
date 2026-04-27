@@ -16,10 +16,10 @@ type skillRunner struct {
 	cancel  context.CancelFunc
 	running atomic.Bool
 	paused  atomic.Bool
-	sendKey func(vk uint16)
+	sendKey func(vk uint16) error
 }
 
-func newSkillRunner(sendKey func(vk uint16)) *skillRunner {
+func newSkillRunner(sendKey func(vk uint16) error) *skillRunner {
 	return &skillRunner{sendKey: sendKey}
 }
 
@@ -77,7 +77,10 @@ func (r *skillRunner) Paused() bool {
 }
 
 func (r *skillRunner) runSkill(ctx context.Context, skill config.Skill) {
-	interval := time.Duration(skill.IntervalMS) * time.Millisecond
+	interval, ok := intervalDuration(skill.IntervalMS)
+	if !ok {
+		return
+	}
 	timer := time.NewTimer(0)
 	defer timer.Stop()
 
@@ -87,7 +90,10 @@ func (r *skillRunner) runSkill(ctx context.Context, skill config.Skill) {
 			return
 		case <-timer.C:
 			if !r.paused.Load() {
-				r.sendKey(uint16(skill.Key.VK))
+				if err := r.sendKey(uint16(skill.Key.VK)); err != nil {
+					r.Stop()
+					return
+				}
 			}
 			timer.Reset(interval)
 		}
@@ -97,21 +103,26 @@ func (r *skillRunner) runSkill(ctx context.Context, skill config.Skill) {
 func runnableSkills(cfg config.Config) []config.Skill {
 	skills := make([]config.Skill, 0, len(cfg.Skills))
 	for _, skill := range cfg.Skills {
-		if skill.Enabled && skill.Key.Assigned() {
+		if skillRunnable(skill) {
 			skills = append(skills, skill)
 		}
 	}
 	return skills
 }
 
+func skillRunnable(skill config.Skill) bool {
+	_, ok := intervalDuration(skill.IntervalMS)
+	return skill.Enabled && skill.Key.Assigned() && ok
+}
+
 type clickerRunner struct {
 	mu      sync.Mutex
 	cancel  context.CancelFunc
 	running atomic.Bool
-	sendKey func(vk uint16)
+	sendKey func(vk uint16) error
 }
 
-func newClickerRunner(sendKey func(vk uint16)) *clickerRunner {
+func newClickerRunner(sendKey func(vk uint16) error) *clickerRunner {
 	return &clickerRunner{sendKey: sendKey}
 }
 
@@ -151,7 +162,10 @@ func (r *clickerRunner) Running() bool {
 }
 
 func (r *clickerRunner) run(ctx context.Context, clicker config.Clicker) {
-	interval := time.Duration(clicker.IntervalMS) * time.Millisecond
+	interval, ok := intervalDuration(clicker.IntervalMS)
+	if !ok {
+		return
+	}
 	timer := time.NewTimer(0)
 	defer timer.Stop()
 
@@ -160,12 +174,23 @@ func (r *clickerRunner) run(ctx context.Context, clicker config.Clicker) {
 		case <-ctx.Done():
 			return
 		case <-timer.C:
-			r.sendKey(uint16(clicker.Key.VK))
+			if err := r.sendKey(uint16(clicker.Key.VK)); err != nil {
+				r.Stop()
+				return
+			}
 			timer.Reset(interval)
 		}
 	}
 }
 
 func clickerRunnable(clicker config.Clicker) bool {
-	return clicker.Key.Assigned() && clicker.IntervalMS >= config.MinimumIntervalMS
+	_, ok := intervalDuration(clicker.IntervalMS)
+	return clicker.Key.Assigned() && ok
+}
+
+func intervalDuration(ms int) (time.Duration, bool) {
+	if ms < config.MinimumIntervalMS || ms > config.MaximumIntervalMS || !config.MillisecondsFitDuration(ms) {
+		return 0, false
+	}
+	return time.Duration(ms) * time.Millisecond, true
 }

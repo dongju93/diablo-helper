@@ -121,6 +121,48 @@ bad_key = 123
 	}
 }
 
+func TestParseTOMLRejectsIntervalsAboveMaximum(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantError string
+	}{
+		{
+			name:      "skill gap",
+			input:     fmt.Sprintf("skill_gap_ms = %d\n", MaximumSkillGapMS+1),
+			wantError: "skill gap must be at most",
+		},
+		{
+			name:      "clicker interval",
+			input:     fmt.Sprintf("clicker_interval_ms = %d\n", MaximumIntervalMS+1),
+			wantError: "clicker interval must be at most",
+		},
+		{
+			name: "skill interval",
+			input: fmt.Sprintf(`[[skills]]
+name = "Too Large"
+key_name = "1"
+key_vk = 49
+interval_ms = %d
+enabled = true
+`, MaximumIntervalMS+1),
+			wantError: "interval must be at most",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseTOML([]byte(tt.input))
+			if err == nil {
+				t.Fatal("ParseTOML() error = nil, want error")
+			}
+			if !strings.Contains(err.Error(), tt.wantError) {
+				t.Fatalf("ParseTOML() error = %v, want %q", err, tt.wantError)
+			}
+		})
+	}
+}
+
 func TestParseTOMLNormalizesSkillCountAndIntervals(t *testing.T) {
 	cfg, err := ParseTOML([]byte(`[[skills]]
 name = "Only"
@@ -269,7 +311,7 @@ func TestMarshalTOMLNormalizesOutput(t *testing.T) {
 
 func TestParseTOMLHandlesCommentsAndQuotedHashes(t *testing.T) {
 	cfg, err := ParseTOML([]byte(`
-pause_key_name = "Hash # Key" # real comment
+pause_key_name = "Hash # Key"
 pause_key_vk = 35
 
 [[skills]]
@@ -282,17 +324,58 @@ enabled = true
 	if err != nil {
 		t.Fatalf("ParseTOML() error = %v", err)
 	}
-	if cfg.Pause != (KeyBinding{Name: "Hash # Key", VK: 35}) {
-		t.Fatalf("pause = %+v, want quoted hash binding", cfg.Pause)
+	if cfg.Pause != (KeyBinding{Name: "End", VK: 35}) {
+		t.Fatalf("pause = %+v, want canonical name for VK 35", cfg.Pause)
 	}
 	if cfg.Skills[0].Name != `Quote " # inside` {
 		t.Fatalf("skill name = %q, want escaped quote and hash", cfg.Skills[0].Name)
 	}
-	if cfg.Skills[0].Key != (KeyBinding{Name: "1#not-comment", VK: 49}) {
-		t.Fatalf("skill key = %+v, want quoted hash key", cfg.Skills[0].Key)
+	if cfg.Skills[0].Key != (KeyBinding{Name: "1", VK: 49}) {
+		t.Fatalf("skill key = %+v, want canonical key name for VK 49", cfg.Skills[0].Key)
 	}
 	if !cfg.Skills[0].Enabled {
 		t.Fatal("skill enabled = false, want true")
+	}
+}
+
+func TestParseTOMLRejectsUnsafeStrings(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantError string
+	}{
+		{
+			name:      "key name nul",
+			input:     `start_key_name = "\u0000"` + "\n",
+			wantError: "must not contain NUL",
+		},
+		{
+			name:      "key name control character",
+			input:     `start_key_name = "Bad\nName"` + "\n",
+			wantError: "must not contain control characters",
+		},
+		{
+			name:      "key name too long",
+			input:     fmt.Sprintf("start_key_name = %q\n", strings.Repeat("A", MaxKeyNameLength+1)),
+			wantError: "must not exceed",
+		},
+		{
+			name:      "skill name too long",
+			input:     fmt.Sprintf("[[skills]]\nname = %q\n", strings.Repeat("A", MaxSkillNameLength+1)),
+			wantError: "must not exceed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseTOML([]byte(tt.input))
+			if err == nil {
+				t.Fatal("ParseTOML() error = nil, want error")
+			}
+			if !strings.Contains(err.Error(), tt.wantError) {
+				t.Fatalf("ParseTOML() error = %v, want %q", err, tt.wantError)
+			}
+		})
 	}
 }
 
@@ -325,7 +408,7 @@ func TestParseTOMLRejectsMalformedInput(t *testing.T) {
 	}
 }
 
-func TestParseTOMLTruncatesExtraSkills(t *testing.T) {
+func TestParseTOMLRejectsExtraSkills(t *testing.T) {
 	var input strings.Builder
 	for i := 1; i <= MaxSkills+2; i++ {
 		fmt.Fprintf(&input, `
@@ -338,14 +421,11 @@ enabled = true
 `, i, i, 48+i, MinimumIntervalMS)
 	}
 
-	cfg, err := ParseTOML([]byte(input.String()))
-	if err != nil {
-		t.Fatalf("ParseTOML() error = %v", err)
+	_, err := ParseTOML([]byte(input.String()))
+	if err == nil {
+		t.Fatal("ParseTOML() error = nil, want error for too many [[skills]] sections")
 	}
-	if len(cfg.Skills) != MaxSkills {
-		t.Fatalf("skills length = %d, want %d", len(cfg.Skills), MaxSkills)
-	}
-	if cfg.Skills[MaxSkills-1].Name != "Skill 8" {
-		t.Fatalf("last skill name = %q, want Skill 8", cfg.Skills[MaxSkills-1].Name)
+	if !strings.Contains(err.Error(), "too many [[skills]]") {
+		t.Fatalf("ParseTOML() error = %v, want 'too many [[skills]]'", err)
 	}
 }

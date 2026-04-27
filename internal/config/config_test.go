@@ -185,6 +185,13 @@ func TestValidateRejectsInvalidConfig(t *testing.T) {
 			wantError: "interval must be at least",
 		},
 		{
+			name: "skill interval above maximum",
+			mutate: func(cfg *Config) {
+				cfg.Skills[0].IntervalMS = MaximumIntervalMS + 1
+			},
+			wantError: "interval must be at most",
+		},
+		{
 			name: "skill gap below zero",
 			mutate: func(cfg *Config) {
 				cfg.SkillGapMS = -1
@@ -192,11 +199,25 @@ func TestValidateRejectsInvalidConfig(t *testing.T) {
 			wantError: "skill gap must be at least",
 		},
 		{
+			name: "skill gap above maximum",
+			mutate: func(cfg *Config) {
+				cfg.SkillGapMS = MaximumSkillGapMS + 1
+			},
+			wantError: "skill gap must be at most",
+		},
+		{
 			name: "clicker interval below minimum",
 			mutate: func(cfg *Config) {
 				cfg.Clicker.IntervalMS = MinimumIntervalMS - 1
 			},
 			wantError: "clicker interval must be at least",
+		},
+		{
+			name: "clicker interval above maximum",
+			mutate: func(cfg *Config) {
+				cfg.Clicker.IntervalMS = MaximumIntervalMS + 1
+			},
+			wantError: "clicker interval must be at most",
 		},
 		{
 			name: "clicker start mouse left",
@@ -241,11 +262,108 @@ func TestValidateRejectsInvalidConfig(t *testing.T) {
 			wantError: "has a name but no virtual-key code",
 		},
 		{
+			name: "key name contains nul",
+			mutate: func(cfg *Config) {
+				cfg.Start = KeyBinding{Name: "Bad\x00Name", VK: 0x41}
+			},
+			wantError: "must not contain NUL",
+		},
+		{
+			name: "key name too long",
+			mutate: func(cfg *Config) {
+				cfg.Start = KeyBinding{Name: strings.Repeat("A", MaxKeyNameLength+1), VK: 0x41}
+			},
+			wantError: "must not exceed",
+		},
+		{
+			name: "skill name contains control character",
+			mutate: func(cfg *Config) {
+				cfg.Skills[0].Name = "Bad\nName"
+			},
+			wantError: "must not contain control characters",
+		},
+		{
+			name: "skill name too long",
+			mutate: func(cfg *Config) {
+				cfg.Skills[0].Name = strings.Repeat("A", MaxSkillNameLength+1)
+			},
+			wantError: "must not exceed",
+		},
+		{
 			name: "pause key above range",
 			mutate: func(cfg *Config) {
 				cfg.Pause = KeyBinding{Name: "Bad", VK: 999}
 			},
 			wantError: "between 0 and 255",
+		},
+		{
+			name: "key name spoofing",
+			mutate: func(cfg *Config) {
+				cfg.Start = KeyBinding{Name: "F12", VK: 0x0D}
+			},
+			wantError: "name does not match virtual-key code",
+		},
+		{
+			name: "skill key is Left Win",
+			mutate: func(cfg *Config) {
+				cfg.Skills[0].Key = KeyBinding{Name: "Left Win", VK: 0x5B}
+				cfg.Skills[0].Enabled = true
+			},
+			wantError: "must not be a system key",
+		},
+		{
+			name: "skill key is Right Win",
+			mutate: func(cfg *Config) {
+				cfg.Skills[0].Key = KeyBinding{Name: "Right Win", VK: 0x5C}
+				cfg.Skills[0].Enabled = true
+			},
+			wantError: "must not be a system key",
+		},
+		{
+			name: "skill key is Esc",
+			mutate: func(cfg *Config) {
+				cfg.Skills[0].Key = KeyBinding{Name: "Esc", VK: 0x1B}
+				cfg.Skills[0].Enabled = true
+			},
+			wantError: "must not be a system key",
+		},
+		{
+			name: "skill key is Shift",
+			mutate: func(cfg *Config) {
+				cfg.Skills[0].Key = KeyBinding{Name: "Shift", VK: 0x10}
+				cfg.Skills[0].Enabled = true
+			},
+			wantError: "must not be a system key",
+		},
+		{
+			name: "skill key is Ctrl",
+			mutate: func(cfg *Config) {
+				cfg.Skills[0].Key = KeyBinding{Name: "Ctrl", VK: 0x11}
+				cfg.Skills[0].Enabled = true
+			},
+			wantError: "must not be a system key",
+		},
+		{
+			name: "skill key is Alt",
+			mutate: func(cfg *Config) {
+				cfg.Skills[0].Key = KeyBinding{Name: "Alt", VK: 0x12}
+				cfg.Skills[0].Enabled = true
+			},
+			wantError: "must not be a system key",
+		},
+		{
+			name: "clicker key is Left Win",
+			mutate: func(cfg *Config) {
+				cfg.Clicker.Key = KeyBinding{Name: "Left Win", VK: 0x5B}
+			},
+			wantError: "must not be a system key",
+		},
+		{
+			name: "clicker key is Esc",
+			mutate: func(cfg *Config) {
+				cfg.Clicker.Key = KeyBinding{Name: "Esc", VK: 0x1B}
+			},
+			wantError: "must not be a system key",
 		},
 	}
 
@@ -262,5 +380,103 @@ func TestValidateRejectsInvalidConfig(t *testing.T) {
 				t.Fatalf("Validate() error = %v, want %q", err, tt.wantError)
 			}
 		})
+	}
+}
+
+func TestHotkeysPermitKeysBlockedForOutput(t *testing.T) {
+	// Hotkeys (start/stop/pause) use validateKey, not validateOutputKey, so
+	// system keys like Esc and Shift are allowed as user-controlled triggers.
+	tests := []struct {
+		name   string
+		mutate func(*Config)
+	}{
+		{
+			name: "start key can be Esc",
+			mutate: func(cfg *Config) {
+				cfg.Start = KeyBinding{Name: "Esc", VK: 0x1B}
+			},
+		},
+		{
+			name: "stop key can be Shift",
+			mutate: func(cfg *Config) {
+				cfg.Stop = KeyBinding{Name: "Shift", VK: 0x10}
+			},
+		},
+		{
+			name: "pause key can be Alt",
+			mutate: func(cfg *Config) {
+				cfg.Pause = KeyBinding{Name: "Alt", VK: 0x12}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Default()
+			tt.mutate(&cfg)
+			if err := cfg.Validate(); err != nil {
+				t.Fatalf("Validate() error = %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestKeyDisplayName(t *testing.T) {
+	tests := []struct {
+		name string
+		vk   int
+		want string
+	}{
+		{name: "digit", vk: '7', want: "7"},
+		{name: "letter", vk: 'K', want: "K"},
+		{name: "f1", vk: 0x70, want: "F1"},
+		{name: "f24", vk: 0x87, want: "F24"},
+		{name: "numpad", vk: 0x69, want: "Numpad 9"},
+		{name: "mouse left", vk: 0x01, want: "Mouse Left"},
+		{name: "mouse right", vk: 0x02, want: "Mouse Right"},
+		{name: "enter", vk: 0x0D, want: "Enter"},
+		{name: "space", vk: 0x20, want: "Space"},
+		{name: "unknown", vk: 255, want: "VK_255"},
+		{name: "negative", vk: -1, want: "VK_-1"},
+		{name: "over 255", vk: 256, want: "VK_256"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := KeyDisplayName(tt.vk); got != tt.want {
+				t.Fatalf("KeyDisplayName(%d) = %q, want %q", tt.vk, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNormalizeCanonicalizesKeyNames(t *testing.T) {
+	cfg := Config{
+		Start: KeyBinding{Name: "Spoofed", VK: 0x0D},
+		Stop:  KeyBinding{Name: "F12", VK: 0x7B},
+		Pause: KeyBinding{Name: "", VK: 0x41},
+		Menu: MenuKeys{
+			Inventory: KeyBinding{Name: "Wrong", VK: 0x43},
+		},
+		Skills: []Skill{
+			{Name: "S1", Key: KeyBinding{Name: "Fake", VK: 0x31}, IntervalMS: DefaultIntervalMS, Enabled: false},
+		},
+	}
+	cfg.Normalize()
+
+	if cfg.Start.Name != "Enter" {
+		t.Fatalf("start name = %q, want %q", cfg.Start.Name, "Enter")
+	}
+	if cfg.Stop.Name != "F12" {
+		t.Fatalf("stop name = %q, want %q", cfg.Stop.Name, "F12")
+	}
+	if cfg.Pause.Name != "A" {
+		t.Fatalf("pause name = %q, want %q", cfg.Pause.Name, "A")
+	}
+	if cfg.Menu.Inventory.Name != "C" {
+		t.Fatalf("inventory name = %q, want %q", cfg.Menu.Inventory.Name, "C")
+	}
+	if cfg.Skills[0].Key.Name != "1" {
+		t.Fatalf("skill key name = %q, want %q", cfg.Skills[0].Key.Name, "1")
 	}
 }

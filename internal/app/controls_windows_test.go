@@ -3,6 +3,7 @@
 package app
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/dongju93/diablo-helper/internal/config"
@@ -49,9 +50,41 @@ func TestBulkIntervalForSkillAppliesGapByRow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := bulkIntervalForSkill(tt.baseInterval, tt.skillGap, tt.index)
+			got, err := bulkIntervalForSkill(tt.baseInterval, tt.skillGap, tt.index)
+			if err != nil {
+				t.Fatalf("bulkIntervalForSkill() error = %v", err)
+			}
 			if got != tt.want {
 				t.Fatalf("bulkIntervalForSkill() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBulkIntervalForSkillRejectsInvalidResults(t *testing.T) {
+	tests := []struct {
+		name         string
+		baseInterval int
+		skillGap     int
+		index        int
+		wantError    string
+	}{
+		{name: "base below minimum", baseInterval: config.MinimumIntervalMS - 1, skillGap: 0, index: 0, wantError: "최소"},
+		{name: "base above maximum", baseInterval: config.MaximumIntervalMS + 1, skillGap: 0, index: 0, wantError: "최대"},
+		{name: "gap below zero", baseInterval: config.MinimumIntervalMS, skillGap: -1, index: 0, wantError: "0ms 이상"},
+		{name: "gap above maximum", baseInterval: config.MinimumIntervalMS, skillGap: config.MaximumSkillGapMS + 1, index: 0, wantError: "최대"},
+		{name: "negative index", baseInterval: config.MinimumIntervalMS, skillGap: 0, index: -1, wantError: "기술 번호"},
+		{name: "result above maximum", baseInterval: config.MaximumIntervalMS, skillGap: 1, index: 1, wantError: "최대"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := bulkIntervalForSkill(tt.baseInterval, tt.skillGap, tt.index)
+			if err == nil {
+				t.Fatal("bulkIntervalForSkill() error = nil, want error")
+			}
+			if !strings.Contains(err.Error(), tt.wantError) {
+				t.Fatalf("bulkIntervalForSkill() error = %v, want %q", err, tt.wantError)
 			}
 		})
 	}

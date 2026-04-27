@@ -10,7 +10,7 @@ import (
 )
 
 func TestSkillRunnerStartStopState(t *testing.T) {
-	runner := newSkillRunner(func(uint16) {})
+	runner := newSkillRunner(func(uint16) error { return nil })
 	cfg := config.Default()
 	cfg.Skills[0] = config.Skill{
 		Name:       "Enabled",
@@ -54,7 +54,7 @@ func TestSkillRunnerStartStopState(t *testing.T) {
 }
 
 func TestSkillRunnerDoesNotStartWithoutRunnableSkills(t *testing.T) {
-	runner := newSkillRunner(func(uint16) {})
+	runner := newSkillRunner(func(uint16) error { return nil })
 	cfg := config.Default()
 
 	if runner.Start(cfg) {
@@ -71,6 +71,16 @@ func TestSkillRunnerDoesNotStartWithoutRunnableSkills(t *testing.T) {
 	}
 	if runner.Start(cfg) {
 		t.Fatal("Start() = true for enabled unassigned skill, want false")
+	}
+
+	cfg.Skills[0] = config.Skill{
+		Name:       "Interval too large",
+		Key:        config.KeyBinding{Name: "1", VK: int('1')},
+		IntervalMS: config.MaximumIntervalMS + 1,
+		Enabled:    true,
+	}
+	if runner.Start(cfg) {
+		t.Fatal("Start() = true for too-large interval, want false")
 	}
 }
 
@@ -105,8 +115,9 @@ func TestRunnableSkillsFiltersEnabledAssignedSkills(t *testing.T) {
 
 func TestSkillRunnerSendsEnabledAssignedSkillsOnly(t *testing.T) {
 	sent := make(chan uint16, 20)
-	runner := newSkillRunner(func(vk uint16) {
+	runner := newSkillRunner(func(vk uint16) error {
 		sent <- vk
+		return nil
 	})
 	cfg := config.Default()
 	cfg.Skills[0] = config.Skill{
@@ -152,8 +163,9 @@ func TestSkillRunnerSendsEnabledAssignedSkillsOnly(t *testing.T) {
 
 func TestSkillRunnerPauseSuppressesAndResumes(t *testing.T) {
 	sent := make(chan uint16, 20)
-	runner := newSkillRunner(func(vk uint16) {
+	runner := newSkillRunner(func(vk uint16) error {
 		sent <- vk
+		return nil
 	})
 	cfg := config.Default()
 	cfg.Skills[0] = config.Skill{
@@ -184,7 +196,7 @@ func TestSkillRunnerPauseSuppressesAndResumes(t *testing.T) {
 }
 
 func TestClickerRunnerStartStopState(t *testing.T) {
-	runner := newClickerRunner(func(uint16) {})
+	runner := newClickerRunner(func(uint16) error { return nil })
 	clicker := config.Clicker{
 		Key:        config.KeyBinding{Name: "Mouse Left", VK: vkLButton},
 		IntervalMS: config.MinimumIntervalMS,
@@ -211,7 +223,7 @@ func TestClickerRunnerStartStopState(t *testing.T) {
 }
 
 func TestClickerRunnerDoesNotStartWithoutRunnableKey(t *testing.T) {
-	runner := newClickerRunner(func(uint16) {})
+	runner := newClickerRunner(func(uint16) error { return nil })
 
 	if runner.Start(config.Clicker{IntervalMS: config.MinimumIntervalMS}) {
 		t.Fatal("Start() = true for unassigned clicker key, want false")
@@ -219,12 +231,16 @@ func TestClickerRunnerDoesNotStartWithoutRunnableKey(t *testing.T) {
 	if runner.Start(config.Clicker{Key: config.KeyBinding{Name: "Mouse Left", VK: vkLButton}, IntervalMS: config.MinimumIntervalMS - 1}) {
 		t.Fatal("Start() = true for too-small interval, want false")
 	}
+	if runner.Start(config.Clicker{Key: config.KeyBinding{Name: "Mouse Left", VK: vkLButton}, IntervalMS: config.MaximumIntervalMS + 1}) {
+		t.Fatal("Start() = true for too-large interval, want false")
+	}
 }
 
 func TestClickerRunnerSendsConfiguredKey(t *testing.T) {
 	sent := make(chan uint16, 20)
-	runner := newClickerRunner(func(vk uint16) {
+	runner := newClickerRunner(func(vk uint16) error {
 		sent <- vk
+		return nil
 	})
 	clicker := config.Clicker{
 		Key:        config.KeyBinding{Name: "Mouse Left", VK: vkLButton},

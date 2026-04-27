@@ -3,6 +3,7 @@
 package app
 
 import (
+	"fmt"
 	"syscall"
 	"unicode/utf16"
 	"unsafe"
@@ -14,6 +15,10 @@ func utf16Ptr(value string) *uint16 {
 		panic(err)
 	}
 	return ptr
+}
+
+func utf16PtrSafe(value string) (*uint16, error) {
+	return syscall.UTF16PtrFromString(value)
 }
 
 func utf16Slice(value string) []uint16 {
@@ -55,8 +60,13 @@ func getDlgItem(hwnd uintptr, id int) uintptr {
 	return ret
 }
 
-func setWindowText(hwnd uintptr, text string) {
-	procSetWindowTextW.Call(hwnd, uintptr(unsafe.Pointer(utf16Ptr(text))))
+func setWindowText(hwnd uintptr, text string) error {
+	ptr, err := utf16PtrSafe(text)
+	if err != nil {
+		return err
+	}
+	procSetWindowTextW.Call(hwnd, uintptr(unsafe.Pointer(ptr)))
+	return nil
 }
 
 func setWindowTheme(hwnd uintptr, theme string) {
@@ -83,20 +93,32 @@ func setWindowVisuals(hwnd uintptr) {
 	)
 }
 
-func getWindowText(hwnd uintptr) string {
+func getWindowText(hwnd uintptr) (string, error) {
 	length, _, _ := procGetWindowTextLenW.Call(hwnd)
+	if int(length) > maxWindowTextLen {
+		return "", fmt.Errorf("window text length %d exceeds maximum %d", int(length), maxWindowTextLen)
+	}
 	buffer := make([]uint16, int(length)+1)
 	procGetWindowTextW.Call(hwnd, uintptr(unsafe.Pointer(&buffer[0])), uintptr(len(buffer)))
-	return syscall.UTF16ToString(buffer)
+	return syscall.UTF16ToString(buffer), nil
 }
 
-func messageBox(hwnd uintptr, title string, text string, flags uintptr) {
+func messageBox(hwnd uintptr, title string, text string, flags uintptr) error {
+	textPtr, err := utf16PtrSafe(text)
+	if err != nil {
+		return err
+	}
+	titlePtr, err := utf16PtrSafe(title)
+	if err != nil {
+		return err
+	}
 	procMessageBoxW.Call(
 		hwnd,
-		uintptr(unsafe.Pointer(utf16Ptr(text))),
-		uintptr(unsafe.Pointer(utf16Ptr(title))),
+		uintptr(unsafe.Pointer(textPtr)),
+		uintptr(unsafe.Pointer(titlePtr)),
 		flags,
 	)
+	return nil
 }
 
 func checked(hwnd uintptr) bool {

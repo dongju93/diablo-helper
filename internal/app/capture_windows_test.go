@@ -3,6 +3,7 @@
 package app
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -16,8 +17,8 @@ func TestBindingText(t *testing.T) {
 		want    string
 	}{
 		{name: "unassigned", binding: config.KeyBinding{}, want: "미지정"},
-		{name: "uses saved name", binding: config.KeyBinding{Name: "Custom", VK: int('A')}, want: "Custom"},
-		{name: "falls back to display name", binding: config.KeyBinding{VK: int('A')}, want: "A"},
+		{name: "uses canonical name ignoring stored name", binding: config.KeyBinding{Name: "Spoofed", VK: int('A')}, want: "A"},
+		{name: "canonical name from VK", binding: config.KeyBinding{VK: int('A')}, want: "A"},
 	}
 
 	for _, tt := range tests {
@@ -41,6 +42,7 @@ func TestParseInterval(t *testing.T) {
 		{name: "empty", value: "", wantError: "필수"},
 		{name: "not a number", value: "fast", wantError: "숫자"},
 		{name: "below minimum", value: "9", wantError: "최소"},
+		{name: "above maximum", value: strconv.Itoa(config.MaximumIntervalMS + 1), wantError: "최대"},
 	}
 
 	for _, tt := range tests {
@@ -78,6 +80,7 @@ func TestParseSkillGap(t *testing.T) {
 		{name: "trims whitespace", value: " 40 \t", want: 40},
 		{name: "not a number", value: "slow", wantError: "숫자"},
 		{name: "below zero", value: "-1", wantError: "0ms 이상"},
+		{name: "above maximum", value: strconv.Itoa(config.MaximumSkillGapMS + 1), wantError: "최대"},
 	}
 
 	for _, tt := range tests {

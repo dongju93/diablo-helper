@@ -111,7 +111,7 @@ func (a *application) handleKeyEvent(vk uint16, down bool) bool {
 
 func (a *application) assignCapturedKey(vk uint16) {
 	target := a.capture
-	binding := config.KeyBinding{Name: keyDisplayName(vk), VK: int(vk)}
+	binding := config.KeyBinding{Name: config.KeyDisplayName(int(vk)), VK: int(vk)}
 	switch target.kind {
 	case captureStart:
 		a.cfg.Start = binding
@@ -212,10 +212,7 @@ func bindingText(binding config.KeyBinding) string {
 	if !binding.Assigned() {
 		return "미지정"
 	}
-	if binding.Name != "" {
-		return binding.Name
-	}
-	return keyDisplayName(uint16(binding.VK))
+	return config.KeyDisplayName(binding.VK)
 }
 
 func parseInterval(value string) (int, error) {
@@ -223,12 +220,21 @@ func parseInterval(value string) (int, error) {
 	if trimmed == "" {
 		return 0, fmt.Errorf("실행 간격은 필수입니다")
 	}
+	if len(trimmed) > maxEditTextLen {
+		return 0, fmt.Errorf("실행 간격 입력이 너무 깁니다")
+	}
 	interval, err := strconv.Atoi(trimmed)
 	if err != nil {
 		return 0, fmt.Errorf("실행 간격은 숫자여야 합니다")
 	}
 	if interval < config.MinimumIntervalMS {
 		return 0, fmt.Errorf("실행 간격은 최소 %dms 이상이어야 합니다", config.MinimumIntervalMS)
+	}
+	if interval > config.MaximumIntervalMS {
+		return 0, fmt.Errorf("실행 간격은 최대 %dms 이하여야 합니다", config.MaximumIntervalMS)
+	}
+	if !config.MillisecondsFitDuration(interval) {
+		return 0, fmt.Errorf("실행 간격이 너무 큽니다")
 	}
 	return interval, nil
 }
@@ -238,12 +244,21 @@ func parseSkillGap(value string) (int, error) {
 	if trimmed == "" {
 		return config.DefaultSkillGapMS, nil
 	}
+	if len(trimmed) > maxEditTextLen {
+		return 0, fmt.Errorf("키별 간격 입력이 너무 깁니다")
+	}
 	gap, err := strconv.Atoi(trimmed)
 	if err != nil {
 		return 0, fmt.Errorf("키별 간격은 숫자여야 합니다")
 	}
 	if gap < 0 {
 		return 0, fmt.Errorf("키별 간격은 0ms 이상이어야 합니다")
+	}
+	if gap > config.MaximumSkillGapMS {
+		return 0, fmt.Errorf("키별 간격은 최대 %dms 이하여야 합니다", config.MaximumSkillGapMS)
+	}
+	if !config.MillisecondsFitDuration(gap) {
+		return 0, fmt.Errorf("키별 간격이 너무 큽니다")
 	}
 	return gap, nil
 }
