@@ -34,14 +34,14 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.Pause != (KeyBinding{Name: "Mouse Right", VK: 0x02}) {
 		t.Fatalf("pause = %+v, want Mouse Right", cfg.Pause)
 	}
-	if cfg.Menu.Inventory != (KeyBinding{Name: "C", VK: 0x43}) {
-		t.Fatalf("inventory = %+v, want C", cfg.Menu.Inventory)
+	if cfg.Menu.Character != (KeyBinding{Name: "C", VK: 0x43}) {
+		t.Fatalf("character = %+v, want C", cfg.Menu.Character)
 	}
-	if cfg.Menu.WorldMap != (KeyBinding{Name: "M", VK: 0x4D}) {
-		t.Fatalf("world map = %+v, want M", cfg.Menu.WorldMap)
+	if cfg.Menu.SkillAssign != (KeyBinding{Name: "S", VK: 0x53}) {
+		t.Fatalf("skill assign = %+v, want S", cfg.Menu.SkillAssign)
 	}
-	if cfg.Menu.Whisper != (KeyBinding{Name: "R", VK: 0x52}) {
-		t.Fatalf("whisper = %+v, want R", cfg.Menu.Whisper)
+	if cfg.Menu.Shop != (KeyBinding{Name: "P", VK: 0x50}) {
+		t.Fatalf("shop = %+v, want P", cfg.Menu.Shop)
 	}
 	if cfg.SkillGapMS != DefaultSkillGapMS {
 		t.Fatalf("skill gap = %d, want %d", cfg.SkillGapMS, DefaultSkillGapMS)
@@ -81,7 +81,7 @@ func TestNormalizeRepairsConfigShapeAndValues(t *testing.T) {
 		Stop:  KeyBinding{Name: "No Code", VK: 0},
 		Pause: KeyBinding{Name: "Bad Pause", VK: -1},
 		Menu: MenuKeys{
-			Inventory: KeyBinding{Name: "Bad Menu", VK: 999},
+			Character: KeyBinding{Name: "Bad Menu", VK: 999},
 		},
 		SkillGapMS: -1,
 		Clicker: Clicker{
@@ -126,8 +126,8 @@ func TestNormalizeRepairsConfigShapeAndValues(t *testing.T) {
 	if cfg.Pause != (KeyBinding{}) {
 		t.Fatalf("pause = %+v, want cleared", cfg.Pause)
 	}
-	if cfg.Menu.Inventory != (KeyBinding{}) {
-		t.Fatalf("inventory = %+v, want cleared", cfg.Menu.Inventory)
+	if cfg.Menu.Character != (KeyBinding{}) {
+		t.Fatalf("character = %+v, want cleared", cfg.Menu.Character)
 	}
 	if cfg.SkillGapMS != DefaultSkillGapMS {
 		t.Fatalf("skill gap = %d, want %d", cfg.SkillGapMS, DefaultSkillGapMS)
@@ -144,14 +144,16 @@ func TestMenuBindingsOrderLabelsAndValues(t *testing.T) {
 	cfg := Default()
 	got := cfg.MenuBindings()
 	want := []MenuBinding{
-		{ID: "inventory", Label: "Inventory", Binding: cfg.Menu.Inventory},
-		{ID: "skills", Label: "Skills", Binding: cfg.Menu.Skills},
-		{ID: "follower", Label: "Follower", Binding: cfg.Menu.Follower},
+		{ID: "character", Label: "Character", Binding: cfg.Menu.Character},
+		{ID: "skill_assign", Label: "Skill Assign", Binding: cfg.Menu.SkillAssign},
+		{ID: "talents", Label: "Talents", Binding: cfg.Menu.Talents},
 		{ID: "map", Label: "Map", Binding: cfg.Menu.Map},
-		{ID: "world_map", Label: "World Map", Binding: cfg.Menu.WorldMap},
+		{ID: "journal", Label: "Journal", Binding: cfg.Menu.Journal},
+		{ID: "social", Label: "Social", Binding: cfg.Menu.Social},
+		{ID: "clan", Label: "Clan", Binding: cfg.Menu.Clan},
 		{ID: "town_portal", Label: "Town Portal", Binding: cfg.Menu.TownPortal},
-		{ID: "chat", Label: "Chat", Binding: cfg.Menu.Chat},
-		{ID: "whisper", Label: "Whisper", Binding: cfg.Menu.Whisper},
+		{ID: "collection", Label: "Collection", Binding: cfg.Menu.Collection},
+		{ID: "shop", Label: "Shop", Binding: cfg.Menu.Shop},
 	}
 
 	if len(got) != len(want) {
@@ -456,7 +458,7 @@ func TestNormalizeCanonicalizesKeyNames(t *testing.T) {
 		Stop:  KeyBinding{Name: "F12", VK: 0x7B},
 		Pause: KeyBinding{Name: "", VK: 0x41},
 		Menu: MenuKeys{
-			Inventory: KeyBinding{Name: "Wrong", VK: 0x43},
+			Character: KeyBinding{Name: "Wrong", VK: 0x43},
 		},
 		Skills: []Skill{
 			{Name: "S1", Key: KeyBinding{Name: "Fake", VK: 0x31}, IntervalMS: DefaultIntervalMS, Enabled: false},
@@ -473,8 +475,8 @@ func TestNormalizeCanonicalizesKeyNames(t *testing.T) {
 	if cfg.Pause.Name != "A" {
 		t.Fatalf("pause name = %q, want %q", cfg.Pause.Name, "A")
 	}
-	if cfg.Menu.Inventory.Name != "C" {
-		t.Fatalf("inventory name = %q, want %q", cfg.Menu.Inventory.Name, "C")
+	if cfg.Menu.Character.Name != "C" {
+		t.Fatalf("character name = %q, want %q", cfg.Menu.Character.Name, "C")
 	}
 	if cfg.Skills[0].Key.Name != "1" {
 		t.Fatalf("skill key name = %q, want %q", cfg.Skills[0].Key.Name, "1")

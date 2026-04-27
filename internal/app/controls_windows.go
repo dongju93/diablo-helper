@@ -25,14 +25,16 @@ const (
 	idApplyBulk    = 111
 	idBulkSkillGap = 112
 
-	idMenuInventory  = 120
-	idMenuSkills     = 121
-	idMenuFollower   = 122
-	idMenuMap        = 123
-	idMenuTownPortal = 124
-	idMenuChat       = 125
-	idMenuWorldMap   = 126
-	idMenuWhisper    = 127
+	idMenuCharacter   = 120
+	idMenuSkillAssign = 121
+	idMenuTalents     = 122
+	idMenuMap         = 123
+	idMenuJournal     = 124
+	idMenuSocial      = 125
+	idMenuClan        = 126
+	idMenuTownPortal  = 127
+	idMenuCollection  = 128
+	idMenuShop        = 129
 
 	idSkillEnabledBase  = 200
 	idSkillKeyBase      = 300
@@ -58,14 +60,14 @@ const (
 	clickerHotkeyY     = 282
 	clickerSettingY    = 322
 	menuPanelY         = 394
-	menuPanelH         = 386
+	menuPanelH         = 466
 	menuTitleY         = 410
 	menuFirstY         = 442
-	pausePanelY        = 606
+	pausePanelY        = 686
 	pausePanelH        = 84
-	pauseTitleY        = 622
-	pauseRowY          = 642
-	statusBarY         = 800
+	pauseTitleY        = 702
+	pauseRowY          = 722
+	statusBarY         = 880
 )
 
 type controlRefs struct {
@@ -131,14 +133,16 @@ type menuControl struct {
 
 var (
 	menuControls = []menuControl{
-		{id: "inventory", label: "소지품", control: idMenuInventory},
-		{id: "skills", label: "기술", control: idMenuSkills},
-		{id: "follower", label: "추종자", control: idMenuFollower},
+		{id: "character", label: "캐릭터", control: idMenuCharacter},
+		{id: "skill_assign", label: "스킬 배치", control: idMenuSkillAssign},
+		{id: "talents", label: "능력치", control: idMenuTalents},
 		{id: "map", label: "지도", control: idMenuMap},
-		{id: "world_map", label: "세계지도", control: idMenuWorldMap},
+		{id: "journal", label: "일지", control: idMenuJournal},
+		{id: "social", label: "소셜", control: idMenuSocial},
+		{id: "clan", label: "클랜", control: idMenuClan},
 		{id: "town_portal", label: "차원문", control: idMenuTownPortal},
-		{id: "chat", label: "채팅", control: idMenuChat},
-		{id: "whisper", label: "귓말", control: idMenuWhisper},
+		{id: "collection", label: "컬렉션", control: idMenuCollection},
+		{id: "shop", label: "상점", control: idMenuShop},
 	}
 )
 

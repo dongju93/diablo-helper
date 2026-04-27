@@ -22,7 +22,7 @@ func TestApplicationControlClassification(t *testing.T) {
 		t.Fatal("idLoad should not be primary")
 	}
 
-	for _, id := range []int{idStartKey, idStopKey, idPauseKey, idClickerStartKey, idClickerStopKey, idClickerKey, idSkillKeyBase, idSkillKeyBase + config.MaxSkills - 1, idMenuInventory, idMenuWhisper} {
+	for _, id := range []int{idStartKey, idStopKey, idPauseKey, idClickerStartKey, idClickerStopKey, idClickerKey, idSkillKeyBase, idSkillKeyBase + config.MaxSkills - 1, idMenuCharacter, idMenuShop} {
 		if !a.isBindingButton(id) {
 			t.Fatalf("id %d should be a binding button", id)
 		}
@@ -103,7 +103,7 @@ func TestHandleCommandStartsKeyCapture(t *testing.T) {
 		{name: "clicker stop", id: idClickerStopKey, want: captureTarget{kind: captureClickerStop}},
 		{name: "clicker key", id: idClickerKey, want: captureTarget{kind: captureClickerKey}},
 		{name: "skill", id: idSkillKeyBase + 2, want: captureTarget{kind: captureSkill, index: 2}},
-		{name: "menu", id: idMenuWorldMap, want: captureTarget{kind: captureMenu, menuID: "world_map"}},
+		{name: "menu", id: idMenuTownPortal, want: captureTarget{kind: captureMenu, menuID: "town_portal"}},
 	}
 
 	for _, tt := range tests {
