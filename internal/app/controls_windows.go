@@ -349,6 +349,7 @@ func (a *application) createCheckbox(parent uintptr, id int, text string, x int,
 func (a *application) createEdit(parent uintptr, id int, text string, x int, y int, width int, height int) uintptr {
 	hwnd := a.createControl(parent, "EDIT", text, wsChild|wsVisible|wsTabStop|esNumber|esAutoHScroll, x, y, width, height, id)
 	sendMessage(hwnd, emSetMargins, ecLeftMargin|ecRightMargin, makeLong(0, 0))
+	sendMessage(hwnd, emLimitText, maxEditTextLen, 0)
 	return hwnd
 }
 
@@ -437,12 +438,22 @@ func (a *application) updateControlsFromConfig() {
 }
 
 func (a *application) applyBulkInterval() {
-	interval, err := parseInterval(getWindowText(a.controls.bulkInterval))
+	bulkText, err := getWindowText(a.controls.bulkInterval)
 	if err != nil {
 		messageBox(a.hwnd, "잘못된 간격", err.Error(), mbOK|mbIconError)
 		return
 	}
-	skillGap, err := parseSkillGap(getWindowText(a.controls.bulkSkillGap))
+	interval, err := parseInterval(bulkText)
+	if err != nil {
+		messageBox(a.hwnd, "잘못된 간격", err.Error(), mbOK|mbIconError)
+		return
+	}
+	gapText, err := getWindowText(a.controls.bulkSkillGap)
+	if err != nil {
+		messageBox(a.hwnd, "잘못된 키별 간격", err.Error(), mbOK|mbIconError)
+		return
+	}
+	skillGap, err := parseSkillGap(gapText)
 	if err != nil {
 		messageBox(a.hwnd, "잘못된 키별 간격", err.Error(), mbOK|mbIconError)
 		return
@@ -605,18 +616,30 @@ func (a *application) stopAllRunners(status string) {
 
 func (a *application) syncConfigFromControls() error {
 	a.cfg.Normalize()
-	skillGap, err := parseSkillGap(getWindowText(a.controls.bulkSkillGap))
+	gapText, err := getWindowText(a.controls.bulkSkillGap)
+	if err != nil {
+		return fmt.Errorf("키별 간격: %w", err)
+	}
+	skillGap, err := parseSkillGap(gapText)
 	if err != nil {
 		return fmt.Errorf("키별 간격: %w", err)
 	}
 	a.cfg.SkillGapMS = skillGap
-	clickerInterval, err := parseInterval(getWindowText(a.controls.clickerInterval))
+	clickerText, err := getWindowText(a.controls.clickerInterval)
+	if err != nil {
+		return fmt.Errorf("클릭 반복: %w", err)
+	}
+	clickerInterval, err := parseInterval(clickerText)
 	if err != nil {
 		return fmt.Errorf("클릭 반복: %w", err)
 	}
 	a.cfg.Clicker.IntervalMS = clickerInterval
 	for i := range config.MaxSkills {
-		interval, err := parseInterval(getWindowText(a.controls.skillInterval[i]))
+		skillText, err := getWindowText(a.controls.skillInterval[i])
+		if err != nil {
+			return fmt.Errorf("기술 %d: %w", i+1, err)
+		}
+		interval, err := parseInterval(skillText)
 		if err != nil {
 			return fmt.Errorf("기술 %d: %w", i+1, err)
 		}

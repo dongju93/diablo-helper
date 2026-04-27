@@ -3,6 +3,7 @@
 package app
 
 import (
+	"fmt"
 	"syscall"
 	"unicode/utf16"
 	"unsafe"
@@ -92,11 +93,14 @@ func setWindowVisuals(hwnd uintptr) {
 	)
 }
 
-func getWindowText(hwnd uintptr) string {
+func getWindowText(hwnd uintptr) (string, error) {
 	length, _, _ := procGetWindowTextLenW.Call(hwnd)
+	if int(length) > maxWindowTextLen {
+		return "", fmt.Errorf("window text length %d exceeds maximum %d", int(length), maxWindowTextLen)
+	}
 	buffer := make([]uint16, int(length)+1)
 	procGetWindowTextW.Call(hwnd, uintptr(unsafe.Pointer(&buffer[0])), uintptr(len(buffer)))
-	return syscall.UTF16ToString(buffer)
+	return syscall.UTF16ToString(buffer), nil
 }
 
 func messageBox(hwnd uintptr, title string, text string, flags uintptr) error {

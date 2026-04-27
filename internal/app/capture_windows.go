@@ -220,6 +220,9 @@ func parseInterval(value string) (int, error) {
 	if trimmed == "" {
 		return 0, fmt.Errorf("실행 간격은 필수입니다")
 	}
+	if len(trimmed) > maxEditTextLen {
+		return 0, fmt.Errorf("실행 간격 입력이 너무 깁니다")
+	}
 	interval, err := strconv.Atoi(trimmed)
 	if err != nil {
 		return 0, fmt.Errorf("실행 간격은 숫자여야 합니다")
@@ -240,6 +243,9 @@ func parseSkillGap(value string) (int, error) {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
 		return config.DefaultSkillGapMS, nil
+	}
+	if len(trimmed) > maxEditTextLen {
+		return 0, fmt.Errorf("키별 간격 입력이 너무 깁니다")
 	}
 	gap, err := strconv.Atoi(trimmed)
 	if err != nil {

@@ -294,7 +294,7 @@ func (a *application) drawButton(item *drawItemStruct) {
 	}
 	a.initUIResources()
 
-	text := getWindowText(item.HwndItem)
+	text, _ := getWindowText(item.HwndItem)
 	id := int(item.CtlID)
 	selected := item.ItemState&odsSelected != 0
 	disabled := item.ItemState&odsDisabled != 0
