@@ -36,9 +36,9 @@ func wndProc(hwnd uintptr, msg uint32, wParam uintptr, lParam unsafe.Pointer) ui
 	case wmEraseBkgnd:
 		return 1
 	case wmCtlColorStatic:
-		return appInstance.colorStatic(wParam)
+		return appInstance.colorStatic(wParam, uintptr(unsafe.Pointer(lParam)))
 	case wmCtlColorBtn:
-		return appInstance.colorStatic(wParam)
+		return appInstance.colorStatic(wParam, uintptr(unsafe.Pointer(lParam)))
 	case wmCtlColorEdit:
 		return appInstance.colorEdit(wParam)
 	case wmDrawItem:

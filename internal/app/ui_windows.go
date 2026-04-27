@@ -22,6 +22,9 @@ var (
 	uiAccentSoft    = rgb(232, 241, 252)
 	uiSuccess       = rgb(16, 124, 16)
 	uiWarning       = rgb(159, 98, 0)
+	uiStatusRunning = rgb(16, 124, 16) // 초록 – 동작 중
+	uiStatusPaused  = rgb(180, 130, 0) // 노랑 – 일시정지
+	uiStatusStopped = rgb(196, 43, 28) // 빨강 – 정지
 )
 
 func rgb(red byte, green byte, blue byte) uintptr {
@@ -147,16 +150,15 @@ func (a *application) paint(hwnd uintptr) {
 
 	// Panels
 	a.drawPanel(hdc, lo.leftX, lo.y(92), lo.leftW, lo.h(126))
-	a.drawPanel(hdc, lo.leftX, lo.y(clickerPanelY), lo.leftW, lo.h(clickerPanelH))
 	a.drawPanel(hdc, lo.leftX, lo.y(menuPanelY), lo.leftW, lo.h(menuPanelH))
 	a.drawPanel(hdc, lo.rx, lo.y(92), lo.rw, lo.h(498))
+	a.drawPanel(hdc, lo.rx, lo.y(clickerPanelY), lo.rw, lo.h(clickerPanelH))
 	a.drawPanel(hdc, lo.rx, lo.y(pausePanelY), lo.rw, lo.h(pausePanelH))
 	a.drawPanel(hdc, lo.leftX, lo.y(statusBarY), lo.statusBarW, lo.h(40))
 	a.drawAccentMark(hdc, lo.x(28), lo.y(26), lo.w(4), lo.h(24))
 
 	// Dividers – left column
 	a.drawDivider(hdc, lo.x(layoutLX+20), lo.y(174), lo.w(layoutLW-40))
-	a.drawDivider(hdc, lo.x(layoutLX+20), lo.y(clickerHotkeyY+38), lo.w(layoutLW-40))
 	for y := menuFirstY + 38; y <= menuFirstY+38+(len(menuControls)-2)*40; y += 40 {
 		a.drawDivider(hdc, lo.x(layoutLX+20), lo.y(y), lo.w(layoutLW-40))
 	}
@@ -166,6 +168,7 @@ func (a *application) paint(hwnd uintptr) {
 	for y := skillFirstRowY + 38; y <= skillFirstRowY+38+(config.MaxSkills-1)*skillRowGap; y += skillRowGap {
 		a.drawDivider(hdc, lo.rx+lo.w(20), lo.y(y), lo.rw-lo.w(40))
 	}
+	a.drawDivider(hdc, lo.rx+lo.w(20), lo.y(clickerHotkeyY+38), lo.rw-lo.w(40))
 
 	// Input frames
 	a.drawInputFrame(hdc, lo.bulkEditX-lo.w(8), lo.y(bulkIntervalEditY-6), lo.w(86), lo.h(32))
@@ -173,15 +176,15 @@ func (a *application) paint(hwnd uintptr) {
 	for y := skillFirstRowY; y < skillFirstRowY+config.MaxSkills*skillRowGap; y += skillRowGap {
 		a.drawInputFrame(hdc, lo.skillIntervalX-lo.w(8), lo.y(y+1), lo.w(82), lo.h(32))
 	}
-	a.drawInputFrame(hdc, lo.x(layoutLX+226), lo.y(clickerSettingY+1), lo.w(86), lo.h(32))
+	a.drawInputFrame(hdc, lo.clickerIntEditX-lo.w(8), lo.y(clickerSettingY+1), lo.w(86), lo.h(32))
 
 	a.drawStatusDot(hdc, lo.statusDotX, lo.y(statusBarY+19), lo.s(10))
 
 	drawText(hdc, "Diablo Helper", a.titleFont, uiText, lo.x(40), lo.y(18), lo.w(300), lo.h(40), dtSingleLine|dtNoPrefix)
 	drawText(hdc, "시작/종료 키", a.sectionFont, uiText, lo.x(layoutLX+20), lo.y(108), lo.w(210), lo.h(28), dtSingleLine|dtNoPrefix)
-	drawText(hdc, "클릭 반복", a.sectionFont, uiText, lo.x(layoutLX+20), lo.y(clickerTitleY), lo.w(210), lo.h(28), dtSingleLine|dtNoPrefix)
 	drawText(hdc, "게임 메뉴 키", a.sectionFont, uiText, lo.x(layoutLX+20), lo.y(menuTitleY), lo.w(210), lo.h(28), dtSingleLine|dtNoPrefix)
 	drawText(hdc, "기술 키", a.sectionFont, uiText, lo.rx+lo.w(20), lo.y(108), lo.w(160), lo.h(28), dtSingleLine|dtNoPrefix)
+	drawText(hdc, "클릭 반복", a.sectionFont, uiText, lo.rx+lo.w(20), lo.y(clickerTitleY), lo.w(210), lo.h(28), dtSingleLine|dtNoPrefix)
 	drawText(hdc, "일시정지 키", a.sectionFont, uiText, lo.rx+lo.w(20), lo.y(pauseTitleY), lo.w(180), lo.h(28), dtSingleLine|dtNoPrefix)
 }
 
@@ -274,11 +277,29 @@ func drawText(hdc uintptr, text string, font uintptr, color uintptr, x int, y in
 	procSelectObject.Call(hdc, oldFont)
 }
 
-func (a *application) colorStatic(hdc uintptr) uintptr {
+func (a *application) colorStatic(hdc uintptr, hwndCtl uintptr) uintptr {
 	a.initUIResources()
 	procSetBkMode.Call(hdc, transparent)
-	procSetTextColor.Call(hdc, uiText)
+	if hwndCtl != 0 && hwndCtl == a.controls.status {
+		color := a.statusTextColor()
+		procSetTextColor.Call(hdc, color)
+	} else {
+		procSetTextColor.Call(hdc, uiText)
+	}
 	return a.panelBrush
+}
+
+// statusTextColor returns the colour that should be used for the status text
+// based on the current runner/clicker state.
+func (a *application) statusTextColor() uintptr {
+	switch {
+	case a.runner.Paused():
+		return uiStatusPaused
+	case a.runner.Running() || a.clicker.Running():
+		return uiStatusRunning
+	default:
+		return uiStatusStopped
+	}
 }
 
 func (a *application) colorEdit(hdc uintptr) uintptr {
@@ -301,6 +322,14 @@ func (a *application) drawButton(item *drawItemStruct) {
 	focused := item.ItemState&odsFocus != 0
 	hovered := item.ItemState&odsHotLight != 0
 	capturing := a.captureControlID(a.capture) == id
+
+	// Toggle switch (pill track + sliding knob, right=ON blue)
+	if a.isToggleButton(id) {
+		idx := id - idSkillEnabledBase
+		on := idx >= 0 && idx < len(a.skillEnabled) && a.skillEnabled[idx]
+		a.drawToggleSwitch(item.HDC, item.RcItem, on, hovered, selected)
+		return
+	}
 
 	fill := uiPanelAlt
 	border := uiBorderStrong
@@ -376,6 +405,81 @@ func (a *application) fillRoundedButton(hdc uintptr, rc rect, fill uintptr, bord
 	procSelectObject.Call(hdc, oldBrush)
 	deleteGDIObject(pen)
 	deleteGDIObject(brush)
+}
+
+// drawToggleSwitch renders a pill-shaped toggle switch.
+// The track fills the full control rect. The knob sits on the left (OFF) or
+// right (ON) side of the track with a small margin.
+func (a *application) drawToggleSwitch(hdc uintptr, rc rect, on bool, hovered bool, pressed bool) {
+	// Clear background with panel colour so the control blends in.
+	procFillRect.Call(hdc, uintptr(unsafe.Pointer(&rc)), a.panelBrush)
+
+	// Track colours
+	var trackColor uintptr
+	if on {
+		trackColor = uiAccent
+		if hovered {
+			trackColor = uiAccentHover
+		}
+		if pressed {
+			trackColor = uiAccentPressed
+		}
+	} else {
+		trackColor = uiBorderStrong
+		if hovered {
+			trackColor = rgb(170, 170, 170)
+		}
+		if pressed {
+			trackColor = rgb(150, 150, 150)
+		}
+	}
+
+	// Draw the pill track (fully rounded ends).
+	trackH := rc.Bottom - rc.Top
+	trackW := rc.Right - rc.Left
+	corner := trackH // corner radius = full height → pill shape
+	trackBrush := createBrush(trackColor)
+	trackPen := createPen(trackColor, 1)
+	oldBrush, _, _ := procSelectObject.Call(hdc, trackBrush)
+	oldPen, _, _ := procSelectObject.Call(hdc, trackPen)
+	procRoundRect.Call(
+		hdc,
+		uintptr(rc.Left), uintptr(rc.Top),
+		uintptr(rc.Right), uintptr(rc.Bottom),
+		uintptr(corner), uintptr(corner),
+	)
+	procSelectObject.Call(hdc, oldPen)
+	procSelectObject.Call(hdc, oldBrush)
+	deleteGDIObject(trackPen)
+	deleteGDIObject(trackBrush)
+
+	// Draw the knob (white circle) inside the track.
+	margin := int32(3)
+	knobSize := trackH - 2*margin // diameter
+	var knobLeft int32
+	if on {
+		knobLeft = rc.Left + trackW - margin - knobSize
+	} else {
+		knobLeft = rc.Left + margin
+	}
+	knobTop := rc.Top + margin
+	knobRight := knobLeft + knobSize
+	knobBottom := knobTop + knobSize
+
+	knobColor := rgb(255, 255, 255)
+	knobBrush := createBrush(knobColor)
+	knobPen := createPen(knobColor, 1)
+	oldBrush, _, _ = procSelectObject.Call(hdc, knobBrush)
+	oldPen, _, _ = procSelectObject.Call(hdc, knobPen)
+	procEllipse.Call(
+		hdc,
+		uintptr(knobLeft), uintptr(knobTop),
+		uintptr(knobRight), uintptr(knobBottom),
+	)
+	procSelectObject.Call(hdc, oldPen)
+	procSelectObject.Call(hdc, oldBrush)
+	deleteGDIObject(knobPen)
+	deleteGDIObject(knobBrush)
 }
 
 func drawTextInRect(hdc uintptr, text string, font uintptr, color uintptr, rc rect, flags uintptr) {

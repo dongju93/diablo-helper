@@ -129,7 +129,7 @@ func TestCaptureTargetAndControlID(t *testing.T) {
 		{name: "skill", target: captureTarget{kind: captureSkill, index: 3}, want: idSkillKeyBase + 3},
 		{name: "skill below range", target: captureTarget{kind: captureSkill, index: -1}, want: 0},
 		{name: "skill above range", target: captureTarget{kind: captureSkill, index: config.MaxSkills}, want: 0},
-		{name: "menu", target: captureTarget{kind: captureMenu, menuID: "world_map"}, want: idMenuWorldMap},
+		{name: "menu", target: captureTarget{kind: captureMenu, menuID: "town_portal"}, want: idMenuTownPortal},
 		{name: "unknown menu", target: captureTarget{kind: captureMenu, menuID: "missing"}, want: 0},
 		{name: "none", target: captureTarget{}, want: 0},
 	}
@@ -147,9 +147,9 @@ func TestSetMenuBindingAndMenuKeyMatches(t *testing.T) {
 	a := newApplication()
 	a.cfg = config.Default()
 
-	a.cfg.Menu.SetKeyByID("world_map", config.KeyBinding{Name: "F7", VK: vkF1 + 6})
-	if a.cfg.Menu.WorldMap != (config.KeyBinding{Name: "F7", VK: vkF1 + 6}) {
-		t.Fatalf("world map = %+v, want F7", a.cfg.Menu.WorldMap)
+	a.cfg.Menu.SetKeyByID("clan", config.KeyBinding{Name: "F7", VK: vkF1 + 6})
+	if a.cfg.Menu.Clan != (config.KeyBinding{Name: "F7", VK: vkF1 + 6}) {
+		t.Fatalf("clan = %+v, want F7", a.cfg.Menu.Clan)
 	}
 	if !a.menuKeyMatches(vkF1 + 6) {
 		t.Fatal("menuKeyMatches(F7) = false, want true")
@@ -191,12 +191,12 @@ func TestHandleKeyEventAssignsCapturedKeys(t *testing.T) {
 	}
 	a.handleKeyEvent('1', false)
 
-	a.startCapture(captureTarget{kind: captureMenu, menuID: "whisper"})
+	a.startCapture(captureTarget{kind: captureMenu, menuID: "social"})
 	if !a.handleKeyEvent(vkF1, true) {
 		t.Fatal("captured menu key was not consumed")
 	}
-	if a.cfg.Menu.Whisper != (config.KeyBinding{Name: "F1", VK: vkF1}) {
-		t.Fatalf("whisper = %+v, want F1", a.cfg.Menu.Whisper)
+	if a.cfg.Menu.Social != (config.KeyBinding{Name: "F1", VK: vkF1}) {
+		t.Fatalf("social = %+v, want F1", a.cfg.Menu.Social)
 	}
 
 	a.startCapture(captureTarget{kind: captureClickerKey})
@@ -315,7 +315,7 @@ func TestHandleKeyEventStopsRunnerForStopAndMenuKeys(t *testing.T) {
 			name: "menu key",
 			vk:   'C',
 			configure: func(cfg *config.Config) {
-				cfg.Menu.Inventory = config.KeyBinding{Name: "C", VK: int('C')}
+				cfg.Menu.Character = config.KeyBinding{Name: "C", VK: int('C')}
 			},
 		},
 	}
@@ -356,7 +356,7 @@ func TestHandleKeyEventStopsClickerForClickerStopAndMenuKeys(t *testing.T) {
 			name: "menu key",
 			vk:   'C',
 			configure: func(cfg *config.Config) {
-				cfg.Menu.Inventory = config.KeyBinding{Name: "C", VK: int('C')}
+				cfg.Menu.Character = config.KeyBinding{Name: "C", VK: int('C')}
 			},
 		},
 	}

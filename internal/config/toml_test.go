@@ -17,8 +17,8 @@ func TestMarshalParseRoundTrip(t *testing.T) {
 	cfg.Clicker.Stop = KeyBinding{Name: "F8", VK: 0x77}
 	cfg.Clicker.Key = KeyBinding{Name: "Mouse Left", VK: MouseLeftVK}
 	cfg.Clicker.IntervalMS = 75
-	cfg.Menu.WorldMap = KeyBinding{Name: "M", VK: 0x4D}
-	cfg.Menu.Whisper = KeyBinding{Name: "R", VK: 0x52}
+	cfg.Menu.Map = KeyBinding{Name: "Tab", VK: 0x09}
+	cfg.Menu.Collection = KeyBinding{Name: "Y", VK: 0x59}
 	cfg.Skills[0] = Skill{
 		Name:       "Primary",
 		Key:        KeyBinding{Name: "1", VK: 0x31},
@@ -45,11 +45,11 @@ func TestMarshalParseRoundTrip(t *testing.T) {
 	if parsed.Start != cfg.Start {
 		t.Fatalf("start binding = %+v, want %+v", parsed.Start, cfg.Start)
 	}
-	if parsed.Menu.WorldMap != cfg.Menu.WorldMap {
-		t.Fatalf("world map binding = %+v, want %+v", parsed.Menu.WorldMap, cfg.Menu.WorldMap)
+	if parsed.Menu.Map != cfg.Menu.Map {
+		t.Fatalf("map binding = %+v, want %+v", parsed.Menu.Map, cfg.Menu.Map)
 	}
-	if parsed.Menu.Whisper != cfg.Menu.Whisper {
-		t.Fatalf("whisper binding = %+v, want %+v", parsed.Menu.Whisper, cfg.Menu.Whisper)
+	if parsed.Menu.Collection != cfg.Menu.Collection {
+		t.Fatalf("collection binding = %+v, want %+v", parsed.Menu.Collection, cfg.Menu.Collection)
 	}
 	if parsed.SkillGapMS != cfg.SkillGapMS {
 		t.Fatalf("skill gap = %d, want %d", parsed.SkillGapMS, cfg.SkillGapMS)
