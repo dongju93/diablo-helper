@@ -9,6 +9,7 @@ import (
 )
 
 const (
+	MaxConfigFileBytes       = 64 * 1024
 	MaxSkills                = 8
 	MaxKeyNameLength         = 64
 	MaxSkillNameLength       = 64

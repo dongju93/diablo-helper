@@ -4,13 +4,28 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
 )
 
 func LoadFile(path string) (Config, error) {
-	data, err := os.ReadFile(path)
+	f, err := os.Open(path)
+	if err != nil {
+		return Config{}, err
+	}
+	defer f.Close()
+
+	fi, err := f.Stat()
+	if err != nil {
+		return Config{}, err
+	}
+	if fi.Size() > MaxConfigFileBytes {
+		return Config{}, fmt.Errorf("config file too large (%d bytes, max %d)", fi.Size(), MaxConfigFileBytes)
+	}
+
+	data, err := io.ReadAll(f)
 	if err != nil {
 		return Config{}, err
 	}
@@ -73,6 +88,9 @@ func ParseTOML(data []byte) (Config, error) {
 			continue
 		}
 		if line == "[[skills]]" {
+			if len(cfg.Skills) >= MaxSkills {
+				return Config{}, fmt.Errorf("line %d: too many [[skills]] sections (max %d)", lineNumber, MaxSkills)
+			}
 			cfg.Skills = append(cfg.Skills, Skill{
 				Name:       fmt.Sprintf("Skill %d", len(cfg.Skills)+1),
 				IntervalMS: DefaultIntervalMS,

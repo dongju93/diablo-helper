@@ -408,7 +408,7 @@ func TestParseTOMLRejectsMalformedInput(t *testing.T) {
 	}
 }
 
-func TestParseTOMLTruncatesExtraSkills(t *testing.T) {
+func TestParseTOMLRejectsExtraSkills(t *testing.T) {
 	var input strings.Builder
 	for i := 1; i <= MaxSkills+2; i++ {
 		fmt.Fprintf(&input, `
@@ -421,14 +421,11 @@ enabled = true
 `, i, i, 48+i, MinimumIntervalMS)
 	}
 
-	cfg, err := ParseTOML([]byte(input.String()))
-	if err != nil {
-		t.Fatalf("ParseTOML() error = %v", err)
+	_, err := ParseTOML([]byte(input.String()))
+	if err == nil {
+		t.Fatal("ParseTOML() error = nil, want error for too many [[skills]] sections")
 	}
-	if len(cfg.Skills) != MaxSkills {
-		t.Fatalf("skills length = %d, want %d", len(cfg.Skills), MaxSkills)
-	}
-	if cfg.Skills[MaxSkills-1].Name != "Skill 8" {
-		t.Fatalf("last skill name = %q, want Skill 8", cfg.Skills[MaxSkills-1].Name)
+	if !strings.Contains(err.Error(), "too many [[skills]]") {
+		t.Fatalf("ParseTOML() error = %v, want 'too many [[skills]]'", err)
 	}
 }
