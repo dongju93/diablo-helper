@@ -126,23 +126,13 @@ go install github.com/tc-hib/go-winres@latest
 Windows에서 빌드:
 
 ```powershell
-$version = "1.0.0"
-$commit = $(git rev-parse --short HEAD)
-$date = $(Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
-$gover = (go version) -replace 'go version go', '' -replace ' .*', ''
-go-winres make -p cmd\diablo-helper\winres\winres.json -o cmd\diablo-helper
-go build -ldflags "-H=windowsgui -X github.com/dongju93/diablo-helper/internal/meta.Version=$version -X github.com/dongju93/diablo-helper/internal/meta.Commit=$commit -X github.com/dongju93/diablo-helper/internal/meta.BuildDate=$date -X github.com/dongju93/diablo-helper/internal/meta.GoVersion=$gover" -o dist\diablo-helper.exe .\cmd\diablo-helper
+$commit=$(git rev-parse --short HEAD); $date=$(Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ"); $gover=(go version) -replace 'go version go','' -replace ' .*',''; go-winres make --in cmd\diablo-helper\winres\winres.json --out cmd\diablo-helper\rsrc; go build -ldflags "-H=windowsgui -X github.com/dongju93/diablo-helper/internal/meta.Commit=$commit -X github.com/dongju93/diablo-helper/internal/meta.BuildDate=$date -X github.com/dongju93/diablo-helper/internal/meta.GoVersion=$gover" -o dist\diablo-helper.exe .\cmd\diablo-helper
 ```
 
 macOS 또는 Linux에서 Windows 실행 파일로 크로스 빌드:
 
 ```sh
-VERSION="1.0.0"
-COMMIT=$(git rev-parse --short HEAD)
-DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-GOVER=$(go version | sed -E 's/^go version go([^ ]+).*/\1/')
-go-winres make -p cmd/diablo-helper/winres/winres.json -o cmd/diablo-helper
-GOOS=windows GOARCH=amd64 go build -ldflags "-H=windowsgui -X github.com/dongju93/diablo-helper/internal/meta.Version=$VERSION -X github.com/dongju93/diablo-helper/internal/meta.Commit=$COMMIT -X github.com/dongju93/diablo-helper/internal/meta.BuildDate=$DATE -X github.com/dongju93/diablo-helper/internal/meta.GoVersion=$GOVER" -o dist/diablo-helper.exe ./cmd/diablo-helper
+COMMIT=$(git rev-parse --short HEAD); DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ"); GOVER=$(go version | sed -E 's/^go version go([^ ]+).*/\1/'); go-winres make --in cmd/diablo-helper/winres/winres.json --out cmd/diablo-helper/rsrc; GOOS=windows GOARCH=amd64 go build -ldflags "-H=windowsgui -X github.com/dongju93/diablo-helper/internal/meta.Commit=$COMMIT -X github.com/dongju93/diablo-helper/internal/meta.BuildDate=$DATE -X github.com/dongju93/diablo-helper/internal/meta.GoVersion=$GOVER" -o dist/diablo-helper.exe ./cmd/diablo-helper
 ```
 
 ## 테스트
