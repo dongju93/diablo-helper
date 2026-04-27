@@ -211,15 +211,60 @@ func TestClickerRunnerStartStopState(t *testing.T) {
 	if runner.Start(clicker) {
 		t.Fatal("second Start() = true, want false")
 	}
+
+	runner.SetPaused(true)
+	if !runner.Paused() {
+		t.Fatal("Paused() = false, want true")
+	}
+
 	if !runner.Stop() {
 		t.Fatal("Stop() = false, want true")
 	}
 	if runner.Running() {
 		t.Fatal("Running() = true after Stop(), want false")
 	}
+	if runner.Paused() {
+		t.Fatal("Paused() = true after Stop(), want false")
+	}
 	if runner.Stop() {
 		t.Fatal("second Stop() = true, want false")
 	}
+
+	runner.SetPaused(true)
+	if runner.Paused() {
+		t.Fatal("Paused() = true while stopped, want false")
+	}
+}
+
+func TestClickerRunnerPauseSuppressesAndResumes(t *testing.T) {
+	sent := make(chan uint16, 20)
+	runner := newClickerRunner(func(vk uint16) error {
+		sent <- vk
+		return nil
+	})
+	clicker := config.Clicker{
+		Key:        config.KeyBinding{Name: "Mouse Left", VK: vkLButton},
+		IntervalMS: 20,
+	}
+
+	if !runner.Start(clicker) {
+		t.Fatal("Start() = false, want true")
+	}
+	defer runner.Stop()
+
+	expectKey(t, sent, vkLButton)
+	runner.SetPaused(true)
+	drainKeys(sent)
+
+	time.Sleep(60 * time.Millisecond)
+	select {
+	case vk := <-sent:
+		t.Fatalf("received key %d while clicker paused", vk)
+	default:
+	}
+
+	runner.SetPaused(false)
+	expectKey(t, sent, vkLButton)
 }
 
 func TestClickerRunnerDoesNotStartWithoutRunnableKey(t *testing.T) {

@@ -51,6 +51,7 @@ func (a *application) handleKeyEvent(vk uint16, down bool) bool {
 		delete(a.pressed, vk)
 		if sameKey(vk, a.cfg.Pause) {
 			a.runner.SetPaused(false)
+			a.clicker.SetPaused(false)
 			a.updateRuntimeStatus()
 		}
 		return false
@@ -86,8 +87,9 @@ func (a *application) handleKeyEvent(vk uint16, down bool) bool {
 		return false
 	}
 
-	if a.runner.Running() && sameKey(vk, a.cfg.Pause) {
+	if sameKey(vk, a.cfg.Pause) && (a.runner.Running() || a.clicker.Running()) {
 		a.runner.SetPaused(true)
+		a.clicker.SetPaused(true)
 		a.updateRuntimeStatus()
 		return false
 	}

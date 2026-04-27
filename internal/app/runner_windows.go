@@ -119,6 +119,7 @@ type clickerRunner struct {
 	mu      sync.Mutex
 	cancel  context.CancelFunc
 	running atomic.Bool
+	paused  atomic.Bool
 	sendKey func(vk uint16) error
 }
 
@@ -140,6 +141,7 @@ func (r *clickerRunner) Start(clicker config.Clicker) bool {
 	ctx, cancel := context.WithCancel(context.Background())
 	r.cancel = cancel
 	r.running.Store(true)
+	r.paused.Store(false)
 
 	go r.run(ctx, clicker)
 	return true
@@ -154,7 +156,20 @@ func (r *clickerRunner) Stop() bool {
 	r.cancel()
 	r.cancel = nil
 	r.running.Store(false)
+	r.paused.Store(false)
 	return true
+}
+
+func (r *clickerRunner) SetPaused(paused bool) {
+	if !r.running.Load() {
+		r.paused.Store(false)
+		return
+	}
+	r.paused.Store(paused)
+}
+
+func (r *clickerRunner) Paused() bool {
+	return r.running.Load() && r.paused.Load()
 }
 
 func (r *clickerRunner) Running() bool {
@@ -174,9 +189,11 @@ func (r *clickerRunner) run(ctx context.Context, clicker config.Clicker) {
 		case <-ctx.Done():
 			return
 		case <-timer.C:
-			if err := r.sendKey(uint16(clicker.Key.VK)); err != nil {
-				r.Stop()
-				return
+			if !r.paused.Load() {
+				if err := r.sendKey(uint16(clicker.Key.VK)); err != nil {
+					r.Stop()
+					return
+				}
 			}
 			timer.Reset(interval)
 		}

@@ -357,6 +357,60 @@ func TestHandleKeyEventPauseWhenPauseKeyEqualsClickerStartKey(t *testing.T) {
 
 // TestHandleKeyEventPauseDoesNotTriggerForUnassignedPauseKey verifies that
 // pressing any key does not pause the runner when no pause key is configured.
+// TestHandleKeyEventPauseClickerOnlyWhileHeld verifies that the clicker is
+// paused while the pause key is held and resumes when released, even when the
+// skill runner is not running.
+func TestHandleKeyEventPauseClickerOnlyWhileHeld(t *testing.T) {
+	a := newApplication()
+	a.cfg = config.Default()
+	if !a.clicker.Start(a.cfg.Clicker) {
+		t.Fatal("clicker did not start")
+	}
+	defer a.clicker.Stop()
+
+	a.handleKeyEvent(vkRButton, true)
+	if !a.clicker.Paused() {
+		t.Fatal("clicker paused = false after pause key down, want true")
+	}
+
+	a.handleKeyEvent(vkRButton, false)
+	if a.clicker.Paused() {
+		t.Fatal("clicker paused = true after pause key up, want false")
+	}
+}
+
+// TestHandleKeyEventPauseBothRunnersWhileHeld verifies that both the skill
+// runner and clicker are paused simultaneously when the pause key is held.
+func TestHandleKeyEventPauseBothRunnersWhileHeld(t *testing.T) {
+	a := newApplication()
+	a.cfg = config.Default()
+	enableRunnableTestSkill(&a.cfg)
+	if !a.runner.Start(a.cfg) {
+		t.Fatal("runner did not start")
+	}
+	defer a.runner.Stop()
+	if !a.clicker.Start(a.cfg.Clicker) {
+		t.Fatal("clicker did not start")
+	}
+	defer a.clicker.Stop()
+
+	a.handleKeyEvent(vkRButton, true)
+	if !a.runner.Paused() {
+		t.Fatal("runner paused = false after pause key down, want true")
+	}
+	if !a.clicker.Paused() {
+		t.Fatal("clicker paused = false after pause key down, want true")
+	}
+
+	a.handleKeyEvent(vkRButton, false)
+	if a.runner.Paused() {
+		t.Fatal("runner paused = true after pause key up, want false")
+	}
+	if a.clicker.Paused() {
+		t.Fatal("clicker paused = true after pause key up, want false")
+	}
+}
+
 func TestHandleKeyEventPauseDoesNotTriggerForUnassignedPauseKey(t *testing.T) {
 	a := newApplication()
 	a.cfg = config.Default()
