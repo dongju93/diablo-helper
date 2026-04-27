@@ -22,6 +22,9 @@ var (
 	uiAccentSoft    = rgb(232, 241, 252)
 	uiSuccess       = rgb(16, 124, 16)
 	uiWarning       = rgb(159, 98, 0)
+	uiStatusRunning = rgb(16, 124, 16) // 초록 – 동작 중
+	uiStatusPaused  = rgb(180, 130, 0) // 노랑 – 일시정지
+	uiStatusStopped = rgb(196, 43, 28) // 빨강 – 정지
 )
 
 func rgb(red byte, green byte, blue byte) uintptr {
@@ -274,11 +277,29 @@ func drawText(hdc uintptr, text string, font uintptr, color uintptr, x int, y in
 	procSelectObject.Call(hdc, oldFont)
 }
 
-func (a *application) colorStatic(hdc uintptr) uintptr {
+func (a *application) colorStatic(hdc uintptr, hwndCtl uintptr) uintptr {
 	a.initUIResources()
 	procSetBkMode.Call(hdc, transparent)
-	procSetTextColor.Call(hdc, uiText)
+	if hwndCtl != 0 && hwndCtl == a.controls.status {
+		color := a.statusTextColor()
+		procSetTextColor.Call(hdc, color)
+	} else {
+		procSetTextColor.Call(hdc, uiText)
+	}
 	return a.panelBrush
+}
+
+// statusTextColor returns the colour that should be used for the status text
+// based on the current runner/clicker state.
+func (a *application) statusTextColor() uintptr {
+	switch {
+	case a.runner.Paused():
+		return uiStatusPaused
+	case a.runner.Running() || a.clicker.Running():
+		return uiStatusRunning
+	default:
+		return uiStatusStopped
+	}
 }
 
 func (a *application) colorEdit(hdc uintptr) uintptr {

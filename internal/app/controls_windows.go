@@ -276,7 +276,7 @@ func (a *application) createControls(hwnd uintptr) {
 
 	// Status bar
 	a.controls.statusLabel = a.createStatic(hwnd, "상태", lo.x(layoutLX+24), lo.y(statusBarY+11), lo.w(55), lo.h(24))
-	a.controls.status = a.createStatic(hwnd, "정지.", lo.statusTextX, lo.y(statusBarY+11), lo.statusTextW, lo.h(24))
+	a.controls.status = a.createStatic(hwnd, "■ 정지.", lo.statusTextX, lo.y(statusBarY+11), lo.statusTextW, lo.h(24))
 
 	a.updateControlsFromConfig()
 }
@@ -670,17 +670,17 @@ func (a *application) syncConfigFromControls() error {
 func (a *application) updateRuntimeStatus() {
 	switch {
 	case a.runner.Paused() && a.clicker.Running():
-		a.setStatus("기술 입력은 일시정지, 클릭 반복 실행 중.")
+		a.setStatus("⏸ 기술 입력은 일시정지, 클릭 반복 실행 중.")
 	case a.runner.Paused():
-		a.setStatus("일시정지 키를 누르고 있어 기술 입력을 중지했습니다.")
+		a.setStatus("⏸ 일시정지 키를 누르고 있어 기술 입력을 중지했습니다.")
 	case a.runner.Running() && a.clicker.Running():
-		a.setStatus("기술 반복과 클릭 반복 실행 중.")
+		a.setStatus("▶ 기술 반복과 클릭 반복 실행 중.")
 	case a.runner.Running():
-		a.setStatus("기술 반복 실행 중.")
+		a.setStatus("▶ 기술 반복 실행 중.")
 	case a.clicker.Running():
-		a.setStatus("클릭 반복 실행 중.")
+		a.setStatus("▶ 클릭 반복 실행 중.")
 	default:
-		a.setStatus("정지.")
+		a.setStatus("■ 정지.")
 	}
 }
 
