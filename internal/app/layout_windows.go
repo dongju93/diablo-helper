@@ -46,6 +46,19 @@ const (
 	skillKeyHdrOffL  = 196
 	skillIntHdrShift = 10 // skillIntHdrX = skillIntervalX - skillIntHdrShift
 
+	// Clicker (right column, rx-anchored)
+	clickerStartLabelOffL = 24
+	clickerStartBtnOffL   = 72
+	clickerStopLabelOffL  = 186
+	clickerStopBtnOffL    = 234
+	clickerStopBtnW       = 100
+	clickerKeyLabelOffL   = 24
+	clickerKeyBtnOffL     = 72
+	clickerIntLabelOffL   = 186
+	clickerIntEditOffL    = 234
+	clickerIntEditW       = 62
+	clickerMsLabelOffL    = 306
+
 	// Pause
 	pauseLabelOffL = 30
 	pauseBtnOffL   = 152
@@ -78,6 +91,11 @@ type uiLayout struct {
 	skillChkX, skillNumX                                   int
 	skillBtnX, skillBtnW                                   int
 	skillIntervalX, skillMsX                               int
+
+	clickerStartLabelX, clickerStartBtnX               int
+	clickerStopLabelX, clickerStopBtnX                 int
+	clickerKeyLabelX, clickerKeyBtnX                   int
+	clickerIntLabelX, clickerIntEditX, clickerMsLabelX int
 
 	pauseLabelX, pauseBtnX, pauseBtnW int
 
@@ -119,6 +137,16 @@ func computeLayout(cw, ch int) uiLayout {
 	skillChkX := rx + scaled(skillChkOffL, sx)
 	skillNumX := rx + scaled(skillNumOffL, sx)
 
+	clickerStartLabelX := rx + scaled(clickerStartLabelOffL, sx)
+	clickerStartBtnX := rx + scaled(clickerStartBtnOffL, sx)
+	clickerStopLabelX := rx + scaled(clickerStopLabelOffL, sx)
+	clickerStopBtnX := rx + scaled(clickerStopBtnOffL, sx)
+	clickerKeyLabelX := rx + scaled(clickerKeyLabelOffL, sx)
+	clickerKeyBtnX := rx + scaled(clickerKeyBtnOffL, sx)
+	clickerIntLabelX := rx + scaled(clickerIntLabelOffL, sx)
+	clickerIntEditX := rx + scaled(clickerIntEditOffL, sx)
+	clickerMsLabelX := rx + scaled(clickerMsLabelOffL, sx)
+
 	pauseLabelX := rx + scaled(pauseLabelOffL, sx)
 	pauseBtnX := rx + scaled(pauseBtnOffL, sx)
 	pauseBtnW := maxInt(1, (rx+rw-scaled(pauseBtnMarR, sx))-pauseBtnX)
@@ -140,6 +168,10 @@ func computeLayout(cw, ch int) uiLayout {
 		skillChkX: skillChkX, skillNumX: skillNumX,
 		skillBtnX: skillBtnX, skillBtnW: skillBtnW,
 		skillIntervalX: skillIntervalX, skillMsX: skillMsX,
+		clickerStartLabelX: clickerStartLabelX, clickerStartBtnX: clickerStartBtnX,
+		clickerStopLabelX: clickerStopLabelX, clickerStopBtnX: clickerStopBtnX,
+		clickerKeyLabelX: clickerKeyLabelX, clickerKeyBtnX: clickerKeyBtnX,
+		clickerIntLabelX: clickerIntLabelX, clickerIntEditX: clickerIntEditX, clickerMsLabelX: clickerMsLabelX,
 		pauseLabelX: pauseLabelX, pauseBtnX: pauseBtnX, pauseBtnW: pauseBtnW,
 		statusBarW: statusBarW, statusDotX: statusDotX,
 		statusTextX: statusTextX, statusTextW: statusTextW,

@@ -54,20 +54,20 @@ const (
 	skillHeaderY       = 204
 	skillFirstRowY     = 234
 	skillRowGap        = 39
-	clickerPanelY      = 234
-	clickerPanelH      = 144
-	clickerTitleY      = 250
-	clickerHotkeyY     = 282
-	clickerSettingY    = 322
-	menuPanelY         = 394
+	menuPanelY         = 234
 	menuPanelH         = 466
-	menuTitleY         = 410
-	menuFirstY         = 442
-	pausePanelY        = 686
+	menuTitleY         = 250
+	menuFirstY         = 282
+	clickerPanelY      = 600
+	clickerPanelH      = 144
+	clickerTitleY      = 616
+	clickerHotkeyY     = 648
+	clickerSettingY    = 688
+	pausePanelY        = 760
 	pausePanelH        = 84
-	pauseTitleY        = 702
-	pauseRowY          = 722
-	statusBarY         = 880
+	pauseTitleY        = 776
+	pauseRowY          = 796
+	statusBarY         = 860
 )
 
 type controlRefs struct {
@@ -263,16 +263,16 @@ func (a *application) createControls(hwnd uintptr) {
 	a.controls.pauseLabel = a.createStatic(hwnd, "키", lo.pauseLabelX, lo.y(pauseRowY+6), lo.w(45), lo.h(24))
 	a.controls.pauseButton = a.createButton(hwnd, idPauseKey, "", lo.pauseBtnX, lo.y(pauseRowY), lo.pauseBtnW, lo.h(34))
 
-	// Left column – single-key clicker section
-	a.controls.clickerStartLabel = a.createStatic(hwnd, "시작", lo.x(layoutLX+24), lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
-	a.controls.clickerStartButton = a.createButton(hwnd, idClickerStartKey, "", lo.x(layoutLX+72), lo.y(clickerHotkeyY), lo.w(104), lo.h(34))
-	a.controls.clickerStopLabel = a.createStatic(hwnd, "종료", lo.x(layoutLX+186), lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
-	a.controls.clickerStopButton = a.createButton(hwnd, idClickerStopKey, "", lo.x(layoutLX+234), lo.y(clickerHotkeyY), lo.w(100), lo.h(34))
-	a.controls.clickerKeyLabel = a.createStatic(hwnd, "입력", lo.x(layoutLX+24), lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
-	a.controls.clickerKeyButton = a.createButton(hwnd, idClickerKey, "", lo.x(layoutLX+72), lo.y(clickerSettingY), lo.w(104), lo.h(34))
-	a.controls.clickerIntervalLabel = a.createStatic(hwnd, "간격", lo.x(layoutLX+186), lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
-	a.controls.clickerInterval = a.createEdit(hwnd, idClickerInterval, strconv.Itoa(config.DefaultClickerIntervalMS), lo.x(layoutLX+234), lo.y(clickerSettingY+7), lo.w(62), lo.h(22))
-	a.controls.clickerMsLabel = a.createStatic(hwnd, "ms", lo.x(layoutLX+306), lo.y(clickerSettingY+6), lo.w(32), lo.h(24))
+	// Right column – single-key clicker section
+	a.controls.clickerStartLabel = a.createStatic(hwnd, "시작", lo.clickerStartLabelX, lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
+	a.controls.clickerStartButton = a.createButton(hwnd, idClickerStartKey, "", lo.clickerStartBtnX, lo.y(clickerHotkeyY), lo.w(104), lo.h(34))
+	a.controls.clickerStopLabel = a.createStatic(hwnd, "종료", lo.clickerStopLabelX, lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
+	a.controls.clickerStopButton = a.createButton(hwnd, idClickerStopKey, "", lo.clickerStopBtnX, lo.y(clickerHotkeyY), lo.w(clickerStopBtnW), lo.h(34))
+	a.controls.clickerKeyLabel = a.createStatic(hwnd, "입력", lo.clickerKeyLabelX, lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
+	a.controls.clickerKeyButton = a.createButton(hwnd, idClickerKey, "", lo.clickerKeyBtnX, lo.y(clickerSettingY), lo.w(104), lo.h(34))
+	a.controls.clickerIntervalLabel = a.createStatic(hwnd, "간격", lo.clickerIntLabelX, lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
+	a.controls.clickerInterval = a.createEdit(hwnd, idClickerInterval, strconv.Itoa(config.DefaultClickerIntervalMS), lo.clickerIntEditX, lo.y(clickerSettingY+7), lo.w(clickerIntEditW), lo.h(22))
+	a.controls.clickerMsLabel = a.createStatic(hwnd, "ms", lo.clickerMsLabelX, lo.y(clickerSettingY+6), lo.w(32), lo.h(24))
 
 	// Status bar
 	a.controls.statusLabel = a.createStatic(hwnd, "상태", lo.x(layoutLX+24), lo.y(statusBarY+11), lo.w(55), lo.h(24))
@@ -326,15 +326,15 @@ func (a *application) repositionControls() {
 	moveControl(a.controls.pauseLabel, lo.pauseLabelX, lo.y(pauseRowY+6), lo.w(45), lo.h(24))
 	moveControl(a.controls.pauseButton, lo.pauseBtnX, lo.y(pauseRowY), lo.pauseBtnW, lo.h(34))
 
-	moveControl(a.controls.clickerStartLabel, lo.x(layoutLX+24), lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
-	moveControl(a.controls.clickerStartButton, lo.x(layoutLX+72), lo.y(clickerHotkeyY), lo.w(104), lo.h(34))
-	moveControl(a.controls.clickerStopLabel, lo.x(layoutLX+186), lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
-	moveControl(a.controls.clickerStopButton, lo.x(layoutLX+234), lo.y(clickerHotkeyY), lo.w(100), lo.h(34))
-	moveControl(a.controls.clickerKeyLabel, lo.x(layoutLX+24), lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
-	moveControl(a.controls.clickerKeyButton, lo.x(layoutLX+72), lo.y(clickerSettingY), lo.w(104), lo.h(34))
-	moveControl(a.controls.clickerIntervalLabel, lo.x(layoutLX+186), lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
-	moveControl(a.controls.clickerInterval, lo.x(layoutLX+234), lo.y(clickerSettingY+7), lo.w(62), lo.h(22))
-	moveControl(a.controls.clickerMsLabel, lo.x(layoutLX+306), lo.y(clickerSettingY+6), lo.w(32), lo.h(24))
+	moveControl(a.controls.clickerStartLabel, lo.clickerStartLabelX, lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
+	moveControl(a.controls.clickerStartButton, lo.clickerStartBtnX, lo.y(clickerHotkeyY), lo.w(104), lo.h(34))
+	moveControl(a.controls.clickerStopLabel, lo.clickerStopLabelX, lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
+	moveControl(a.controls.clickerStopButton, lo.clickerStopBtnX, lo.y(clickerHotkeyY), lo.w(clickerStopBtnW), lo.h(34))
+	moveControl(a.controls.clickerKeyLabel, lo.clickerKeyLabelX, lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
+	moveControl(a.controls.clickerKeyButton, lo.clickerKeyBtnX, lo.y(clickerSettingY), lo.w(104), lo.h(34))
+	moveControl(a.controls.clickerIntervalLabel, lo.clickerIntLabelX, lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
+	moveControl(a.controls.clickerInterval, lo.clickerIntEditX, lo.y(clickerSettingY+7), lo.w(clickerIntEditW), lo.h(22))
+	moveControl(a.controls.clickerMsLabel, lo.clickerMsLabelX, lo.y(clickerSettingY+6), lo.w(32), lo.h(24))
 
 	moveControl(a.controls.statusLabel, lo.x(layoutLX+24), lo.y(statusBarY+11), lo.w(55), lo.h(24))
 	moveControl(a.controls.status, lo.statusTextX, lo.y(statusBarY+11), lo.statusTextW, lo.h(24))
