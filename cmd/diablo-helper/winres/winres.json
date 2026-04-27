@@ -9,7 +9,7 @@
       "0409": {
         "identity": {
           "name": "diablo-helper",
-          "version": "0.2.0"
+          "version": "0.2.1"
         },
         "description": "Diablo key input helper",
         "minimum-os": "win7",
@@ -33,8 +33,8 @@
     "#1": {
       "0000": {
         "fixed": {
-          "file_version": "0.2.0.0",
-          "product_version": "0.2.0.0"
+          "file_version": "0.2.1.0",
+          "product_version": "0.2.1.0"
         },
         "info": {
           "0409": {
@@ -42,8 +42,8 @@
             "FileDescription": "Diablo Helper - Key Input Assistant",
             "ProductName": "Diablo Helper",
             "OriginalFilename": "diablo-helper.exe",
-            "ProductVersion": "0.2.0",
-            "FileVersion": "0.2.0",
+            "ProductVersion": "0.2.1",
+            "FileVersion": "0.2.1",
             "LegalCopyright": "Copyright (c) dongju93",
             "InternalName": "diablo-helper"
           }

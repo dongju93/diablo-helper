@@ -113,7 +113,7 @@ enabled = true
 - 작성자: `dongju93`
 - 저장소: `https://github.com/dongju93/diablo-helper`
 - 창 제목은 `Diablo Helper v<Version>` 형식입니다.
-- 소스 코드 기본값은 `Version=0.2.0`, `Commit=none`, `BuildDate=unknown`, `GoVersion=1.26.2`이며, 릴리스 빌드에서는 `ldflags`로 덮어쓸 수 있습니다.
+- 소스 코드 기본값은 `Version=0.2.1`, `Commit=none`, `BuildDate=unknown`, `GoVersion=1.26.2`이며, 릴리스 빌드에서는 `ldflags`로 덮어쓸 수 있습니다.
 
 ## 빌드
 
