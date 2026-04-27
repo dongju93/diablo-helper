@@ -298,6 +298,104 @@ func TestHandleKeyEventPauseOnlyWhileHeld(t *testing.T) {
 	}
 }
 
+// TestHandleKeyEventPauseWhenPauseKeyEqualsStartKey verifies that when the
+// pause key is configured to the same key as the start key, pressing that key
+// while the runner is already running pauses the runner. This is the real-world
+// case where the "started" early-return must not swallow the pause action.
+func TestHandleKeyEventPauseWhenPauseKeyEqualsStartKey(t *testing.T) {
+	a := newApplication()
+	a.cfg = config.Default()
+	enableRunnableTestSkill(&a.cfg)
+	// Assign the same key to both Start and Pause.
+	sharedKey := config.KeyBinding{Name: "F5", VK: vkF1 + 4}
+	a.cfg.Start = sharedKey
+	a.cfg.Pause = sharedKey
+
+	if !a.runner.Start(a.cfg) {
+		t.Fatal("runner did not start")
+	}
+	defer a.runner.Stop()
+
+	// Runner is already running. Pressing the shared key must pause, not start.
+	a.handleKeyEvent(vkF1+4, true)
+	if !a.runner.Paused() {
+		t.Fatal("runner paused = false after pressing shared start/pause key while running, want true")
+	}
+
+	a.handleKeyEvent(vkF1+4, false)
+	if a.runner.Paused() {
+		t.Fatal("runner paused = true after key up, want false")
+	}
+}
+
+// TestHandleKeyEventPauseWhenPauseKeyEqualsClickerStartKey verifies that when
+// the pause key equals the clicker start key, pressing it while running still
+// pauses the skill runner.
+func TestHandleKeyEventPauseWhenPauseKeyEqualsClickerStartKey(t *testing.T) {
+	a := newApplication()
+	a.cfg = config.Default()
+	enableRunnableTestSkill(&a.cfg)
+	sharedKey := config.KeyBinding{Name: "F6", VK: vkF1 + 5}
+	a.cfg.Clicker.Start = sharedKey
+	a.cfg.Pause = sharedKey
+
+	if !a.runner.Start(a.cfg) {
+		t.Fatal("runner did not start")
+	}
+	defer a.runner.Stop()
+
+	a.handleKeyEvent(vkF1+5, true)
+	if !a.runner.Paused() {
+		t.Fatal("runner paused = false after pressing shared clicker-start/pause key while running, want true")
+	}
+
+	a.handleKeyEvent(vkF1+5, false)
+	if a.runner.Paused() {
+		t.Fatal("runner paused = true after key up, want false")
+	}
+}
+
+// TestHandleKeyEventPauseDoesNotTriggerForUnassignedPauseKey verifies that
+// pressing any key does not pause the runner when no pause key is configured.
+func TestHandleKeyEventPauseDoesNotTriggerForUnassignedPauseKey(t *testing.T) {
+	a := newApplication()
+	a.cfg = config.Default()
+	enableRunnableTestSkill(&a.cfg)
+	a.cfg.Pause = config.KeyBinding{} // explicitly clear pause binding
+
+	if !a.runner.Start(a.cfg) {
+		t.Fatal("runner did not start")
+	}
+	defer a.runner.Stop()
+
+	a.handleKeyEvent(vkRButton, true)
+	if a.runner.Paused() {
+		t.Fatal("runner paused = true with unassigned pause key, want false")
+	}
+	a.handleKeyEvent(vkRButton, false)
+}
+
+// TestHandleKeyEventPauseNotTriggeredByDifferentKey verifies that pressing a
+// key that is not the configured pause key does not pause the runner.
+func TestHandleKeyEventPauseNotTriggeredByDifferentKey(t *testing.T) {
+	a := newApplication()
+	a.cfg = config.Default()
+	enableRunnableTestSkill(&a.cfg)
+	// Pause is Mouse Right (vkRButton). Press a different key.
+	a.cfg.Pause = config.KeyBinding{Name: "Mouse Right", VK: vkRButton}
+
+	if !a.runner.Start(a.cfg) {
+		t.Fatal("runner did not start")
+	}
+	defer a.runner.Stop()
+
+	a.handleKeyEvent(vkF1, true)
+	if a.runner.Paused() {
+		t.Fatal("runner paused = true after pressing non-pause key, want false")
+	}
+	a.handleKeyEvent(vkF1, false)
+}
+
 func TestHandleKeyEventStopsRunnerForStopAndMenuKeys(t *testing.T) {
 	tests := []struct {
 		name      string
