@@ -25,14 +25,16 @@ const (
 	idApplyBulk    = 111
 	idBulkSkillGap = 112
 
-	idMenuInventory  = 120
-	idMenuSkills     = 121
-	idMenuFollower   = 122
-	idMenuMap        = 123
-	idMenuTownPortal = 124
-	idMenuChat       = 125
-	idMenuWorldMap   = 126
-	idMenuWhisper    = 127
+	idMenuCharacter   = 120
+	idMenuSkillAssign = 121
+	idMenuTalents     = 122
+	idMenuMap         = 123
+	idMenuJournal     = 124
+	idMenuSocial      = 125
+	idMenuClan        = 126
+	idMenuTownPortal  = 127
+	idMenuCollection  = 128
+	idMenuShop        = 129
 
 	idSkillEnabledBase  = 200
 	idSkillKeyBase      = 300
@@ -52,20 +54,20 @@ const (
 	skillHeaderY       = 204
 	skillFirstRowY     = 234
 	skillRowGap        = 39
-	clickerPanelY      = 234
+	menuPanelY         = 234
+	menuPanelH         = 466
+	menuTitleY         = 250
+	menuFirstY         = 282
+	clickerPanelY      = 600
 	clickerPanelH      = 144
-	clickerTitleY      = 250
-	clickerHotkeyY     = 282
-	clickerSettingY    = 322
-	menuPanelY         = 394
-	menuPanelH         = 386
-	menuTitleY         = 410
-	menuFirstY         = 442
-	pausePanelY        = 606
+	clickerTitleY      = 616
+	clickerHotkeyY     = 648
+	clickerSettingY    = 688
+	pausePanelY        = 760
 	pausePanelH        = 84
-	pauseTitleY        = 622
-	pauseRowY          = 642
-	statusBarY         = 800
+	pauseTitleY        = 776
+	pauseRowY          = 796
+	statusBarY         = 860
 )
 
 type controlRefs struct {
@@ -131,19 +133,25 @@ type menuControl struct {
 
 var (
 	menuControls = []menuControl{
-		{id: "inventory", label: "소지품", control: idMenuInventory},
-		{id: "skills", label: "기술", control: idMenuSkills},
-		{id: "follower", label: "추종자", control: idMenuFollower},
+		{id: "character", label: "캐릭터", control: idMenuCharacter},
+		{id: "skill_assign", label: "스킬 배치", control: idMenuSkillAssign},
+		{id: "talents", label: "능력치", control: idMenuTalents},
 		{id: "map", label: "지도", control: idMenuMap},
-		{id: "world_map", label: "세계지도", control: idMenuWorldMap},
+		{id: "journal", label: "일지", control: idMenuJournal},
+		{id: "social", label: "소셜", control: idMenuSocial},
+		{id: "clan", label: "클랜", control: idMenuClan},
 		{id: "town_portal", label: "차원문", control: idMenuTownPortal},
-		{id: "chat", label: "채팅", control: idMenuChat},
-		{id: "whisper", label: "귓말", control: idMenuWhisper},
+		{id: "collection", label: "컬렉션", control: idMenuCollection},
+		{id: "shop", label: "상점", control: idMenuShop},
 	}
 )
 
 func (a *application) isPrimaryButton(id int) bool {
 	return id == idSave || id == idApplyBulk
+}
+
+func (a *application) isToggleButton(id int) bool {
+	return id >= idSkillEnabledBase && id < idSkillEnabledBase+config.MaxSkills
 }
 
 func (a *application) isBindingButton(id int) bool {
@@ -235,7 +243,7 @@ func (a *application) createControls(hwnd uintptr) {
 	a.controls.applyBulk = a.createButton(hwnd, idApplyBulk, "일괄 적용", lo.bulkApplyX, lo.y(bulkApplyY), lo.w(bulkApplyW), lo.h(bulkApplyH))
 
 	// Right column – skill grid headers
-	a.controls.skillUseHdr = a.createStatic(hwnd, "사용", lo.skillUseHdrX, lo.y(skillHeaderY), lo.w(45), lo.h(24))
+	a.controls.skillUseHdr = a.createStatic(hwnd, "사용", lo.skillUseHdrX, lo.y(skillHeaderY), lo.w(55), lo.h(24))
 	a.controls.skillNumHdr = a.createStatic(hwnd, "기술", lo.skillNumHdrX, lo.y(skillHeaderY), lo.w(55), lo.h(24))
 	a.controls.skillKeyHdr = a.createStatic(hwnd, "키", lo.skillKeyHdrX, lo.y(skillHeaderY), lo.w(35), lo.h(24))
 	a.controls.skillIntHdr = a.createStatic(hwnd, "실행 간격", lo.skillIntHdrX, lo.y(skillHeaderY), lo.w(80), lo.h(24))
@@ -243,7 +251,7 @@ func (a *application) createControls(hwnd uintptr) {
 	// Right column – skill rows
 	y := skillFirstRowY
 	for i := range config.MaxSkills {
-		a.controls.skillEnabled[i] = a.createCheckbox(hwnd, idSkillEnabledBase+i, "", lo.skillChkX, lo.y(y+6), lo.w(22), lo.h(22))
+		a.controls.skillEnabled[i] = a.createButton(hwnd, idSkillEnabledBase+i, "", lo.skillChkX, lo.y(y+4), lo.w(52), lo.h(26))
 		a.controls.skillNums[i] = a.createStatic(hwnd, strconv.Itoa(i+1), lo.skillNumX, lo.y(y+7), lo.w(skillNumW), lo.h(22))
 		a.controls.skillButtons[i] = a.createButton(hwnd, idSkillKeyBase+i, "", lo.skillBtnX, lo.y(y), lo.skillBtnW, lo.h(34))
 		a.controls.skillInterval[i] = a.createEdit(hwnd, idSkillIntervalBase+i, "", lo.skillIntervalX, lo.y(y+7), lo.w(skillEditW), lo.h(22))
@@ -255,20 +263,20 @@ func (a *application) createControls(hwnd uintptr) {
 	a.controls.pauseLabel = a.createStatic(hwnd, "키", lo.pauseLabelX, lo.y(pauseRowY+6), lo.w(45), lo.h(24))
 	a.controls.pauseButton = a.createButton(hwnd, idPauseKey, "", lo.pauseBtnX, lo.y(pauseRowY), lo.pauseBtnW, lo.h(34))
 
-	// Left column – single-key clicker section
-	a.controls.clickerStartLabel = a.createStatic(hwnd, "시작", lo.x(layoutLX+24), lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
-	a.controls.clickerStartButton = a.createButton(hwnd, idClickerStartKey, "", lo.x(layoutLX+72), lo.y(clickerHotkeyY), lo.w(104), lo.h(34))
-	a.controls.clickerStopLabel = a.createStatic(hwnd, "종료", lo.x(layoutLX+186), lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
-	a.controls.clickerStopButton = a.createButton(hwnd, idClickerStopKey, "", lo.x(layoutLX+234), lo.y(clickerHotkeyY), lo.w(100), lo.h(34))
-	a.controls.clickerKeyLabel = a.createStatic(hwnd, "입력", lo.x(layoutLX+24), lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
-	a.controls.clickerKeyButton = a.createButton(hwnd, idClickerKey, "", lo.x(layoutLX+72), lo.y(clickerSettingY), lo.w(104), lo.h(34))
-	a.controls.clickerIntervalLabel = a.createStatic(hwnd, "간격", lo.x(layoutLX+186), lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
-	a.controls.clickerInterval = a.createEdit(hwnd, idClickerInterval, strconv.Itoa(config.DefaultClickerIntervalMS), lo.x(layoutLX+234), lo.y(clickerSettingY+7), lo.w(62), lo.h(22))
-	a.controls.clickerMsLabel = a.createStatic(hwnd, "ms", lo.x(layoutLX+306), lo.y(clickerSettingY+6), lo.w(32), lo.h(24))
+	// Right column – single-key clicker section
+	a.controls.clickerStartLabel = a.createStatic(hwnd, "시작", lo.clickerStartLabelX, lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
+	a.controls.clickerStartButton = a.createButton(hwnd, idClickerStartKey, "", lo.clickerStartBtnX, lo.y(clickerHotkeyY), lo.w(104), lo.h(34))
+	a.controls.clickerStopLabel = a.createStatic(hwnd, "종료", lo.clickerStopLabelX, lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
+	a.controls.clickerStopButton = a.createButton(hwnd, idClickerStopKey, "", lo.clickerStopBtnX, lo.y(clickerHotkeyY), lo.w(clickerStopBtnW), lo.h(34))
+	a.controls.clickerKeyLabel = a.createStatic(hwnd, "입력", lo.clickerKeyLabelX, lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
+	a.controls.clickerKeyButton = a.createButton(hwnd, idClickerKey, "", lo.clickerKeyBtnX, lo.y(clickerSettingY), lo.w(104), lo.h(34))
+	a.controls.clickerIntervalLabel = a.createStatic(hwnd, "간격", lo.clickerIntLabelX, lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
+	a.controls.clickerInterval = a.createEdit(hwnd, idClickerInterval, strconv.Itoa(config.DefaultClickerIntervalMS), lo.clickerIntEditX, lo.y(clickerSettingY+7), lo.w(clickerIntEditW), lo.h(22))
+	a.controls.clickerMsLabel = a.createStatic(hwnd, "ms", lo.clickerMsLabelX, lo.y(clickerSettingY+6), lo.w(32), lo.h(24))
 
 	// Status bar
 	a.controls.statusLabel = a.createStatic(hwnd, "상태", lo.x(layoutLX+24), lo.y(statusBarY+11), lo.w(55), lo.h(24))
-	a.controls.status = a.createStatic(hwnd, "정지.", lo.statusTextX, lo.y(statusBarY+11), lo.statusTextW, lo.h(24))
+	a.controls.status = a.createStatic(hwnd, "■ 정지.", lo.statusTextX, lo.y(statusBarY+11), lo.statusTextW, lo.h(24))
 
 	a.updateControlsFromConfig()
 }
@@ -300,14 +308,14 @@ func (a *application) repositionControls() {
 	moveControl(a.controls.bulkGapMsLabel, lo.bulkMsX, lo.y(bulkSkillGapLabelY), lo.w(bulkMsW), lo.h(24))
 	moveControl(a.controls.applyBulk, lo.bulkApplyX, lo.y(bulkApplyY), lo.w(bulkApplyW), lo.h(bulkApplyH))
 
-	moveControl(a.controls.skillUseHdr, lo.skillUseHdrX, lo.y(skillHeaderY), lo.w(45), lo.h(24))
+	moveControl(a.controls.skillUseHdr, lo.skillUseHdrX, lo.y(skillHeaderY), lo.w(55), lo.h(24))
 	moveControl(a.controls.skillNumHdr, lo.skillNumHdrX, lo.y(skillHeaderY), lo.w(55), lo.h(24))
 	moveControl(a.controls.skillKeyHdr, lo.skillKeyHdrX, lo.y(skillHeaderY), lo.w(35), lo.h(24))
 	moveControl(a.controls.skillIntHdr, lo.skillIntHdrX, lo.y(skillHeaderY), lo.w(80), lo.h(24))
 
 	y := skillFirstRowY
 	for i := range config.MaxSkills {
-		moveControl(a.controls.skillEnabled[i], lo.skillChkX, lo.y(y+6), lo.w(22), lo.h(22))
+		moveControl(a.controls.skillEnabled[i], lo.skillChkX, lo.y(y+4), lo.w(52), lo.h(26))
 		moveControl(a.controls.skillNums[i], lo.skillNumX, lo.y(y+7), lo.w(skillNumW), lo.h(22))
 		moveControl(a.controls.skillButtons[i], lo.skillBtnX, lo.y(y), lo.skillBtnW, lo.h(34))
 		moveControl(a.controls.skillInterval[i], lo.skillIntervalX, lo.y(y+7), lo.w(skillEditW), lo.h(22))
@@ -318,15 +326,15 @@ func (a *application) repositionControls() {
 	moveControl(a.controls.pauseLabel, lo.pauseLabelX, lo.y(pauseRowY+6), lo.w(45), lo.h(24))
 	moveControl(a.controls.pauseButton, lo.pauseBtnX, lo.y(pauseRowY), lo.pauseBtnW, lo.h(34))
 
-	moveControl(a.controls.clickerStartLabel, lo.x(layoutLX+24), lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
-	moveControl(a.controls.clickerStartButton, lo.x(layoutLX+72), lo.y(clickerHotkeyY), lo.w(104), lo.h(34))
-	moveControl(a.controls.clickerStopLabel, lo.x(layoutLX+186), lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
-	moveControl(a.controls.clickerStopButton, lo.x(layoutLX+234), lo.y(clickerHotkeyY), lo.w(100), lo.h(34))
-	moveControl(a.controls.clickerKeyLabel, lo.x(layoutLX+24), lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
-	moveControl(a.controls.clickerKeyButton, lo.x(layoutLX+72), lo.y(clickerSettingY), lo.w(104), lo.h(34))
-	moveControl(a.controls.clickerIntervalLabel, lo.x(layoutLX+186), lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
-	moveControl(a.controls.clickerInterval, lo.x(layoutLX+234), lo.y(clickerSettingY+7), lo.w(62), lo.h(22))
-	moveControl(a.controls.clickerMsLabel, lo.x(layoutLX+306), lo.y(clickerSettingY+6), lo.w(32), lo.h(24))
+	moveControl(a.controls.clickerStartLabel, lo.clickerStartLabelX, lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
+	moveControl(a.controls.clickerStartButton, lo.clickerStartBtnX, lo.y(clickerHotkeyY), lo.w(104), lo.h(34))
+	moveControl(a.controls.clickerStopLabel, lo.clickerStopLabelX, lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
+	moveControl(a.controls.clickerStopButton, lo.clickerStopBtnX, lo.y(clickerHotkeyY), lo.w(clickerStopBtnW), lo.h(34))
+	moveControl(a.controls.clickerKeyLabel, lo.clickerKeyLabelX, lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
+	moveControl(a.controls.clickerKeyButton, lo.clickerKeyBtnX, lo.y(clickerSettingY), lo.w(104), lo.h(34))
+	moveControl(a.controls.clickerIntervalLabel, lo.clickerIntLabelX, lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
+	moveControl(a.controls.clickerInterval, lo.clickerIntEditX, lo.y(clickerSettingY+7), lo.w(clickerIntEditW), lo.h(22))
+	moveControl(a.controls.clickerMsLabel, lo.clickerMsLabelX, lo.y(clickerSettingY+6), lo.w(32), lo.h(24))
 
 	moveControl(a.controls.statusLabel, lo.x(layoutLX+24), lo.y(statusBarY+11), lo.w(55), lo.h(24))
 	moveControl(a.controls.status, lo.statusTextX, lo.y(statusBarY+11), lo.statusTextW, lo.h(24))
@@ -394,6 +402,12 @@ func (a *application) handleCommand(wParam uintptr) bool {
 		a.startCapture(captureTarget{kind: captureClickerStop})
 	case id == idClickerKey:
 		a.startCapture(captureTarget{kind: captureClickerKey})
+	case id >= idSkillEnabledBase && id < idSkillEnabledBase+config.MaxSkills:
+		idx := id - idSkillEnabledBase
+		a.skillEnabled[idx] = !a.skillEnabled[idx]
+		if hwnd := a.controls.skillEnabled[idx]; hwnd != 0 {
+			invalidateRect(hwnd, true)
+		}
 	case id >= idSkillKeyBase && id < idSkillKeyBase+config.MaxSkills:
 		a.startCapture(captureTarget{kind: captureSkill, index: id - idSkillKeyBase})
 	case id == idApplyBulk:
@@ -430,7 +444,10 @@ func (a *application) updateControlsFromConfig() {
 	}
 	setWindowText(a.controls.bulkSkillGap, strconv.Itoa(a.cfg.SkillGapMS))
 	for i := range config.MaxSkills {
-		setChecked(a.controls.skillEnabled[i], a.cfg.Skills[i].Enabled)
+		a.skillEnabled[i] = a.cfg.Skills[i].Enabled
+		if hwnd := a.controls.skillEnabled[i]; hwnd != 0 {
+			invalidateRect(hwnd, true)
+		}
 		setWindowText(a.controls.skillButtons[i], bindingText(a.cfg.Skills[i].Key))
 		setWindowText(a.controls.skillInterval[i], strconv.Itoa(a.cfg.Skills[i].IntervalMS))
 	}
@@ -670,7 +687,7 @@ func (a *application) syncConfigFromControls() error {
 			return fmt.Errorf("기술 %d: %w", i+1, err)
 		}
 		a.cfg.Skills[i].IntervalMS = interval
-		a.cfg.Skills[i].Enabled = checked(a.controls.skillEnabled[i])
+		a.cfg.Skills[i].Enabled = a.skillEnabled[i]
 	}
 	a.cfg.NormalizeForUI()
 	return a.cfg.Validate()
@@ -678,18 +695,24 @@ func (a *application) syncConfigFromControls() error {
 
 func (a *application) updateRuntimeStatus() {
 	switch {
+	case a.runner.Paused() && a.clicker.Paused():
+		a.setStatus("⏸ 기술 입력과 클릭 반복을 일시정지했습니다.")
 	case a.runner.Paused() && a.clicker.Running():
-		a.setStatus("기술 입력은 일시정지, 클릭 반복 실행 중.")
+		a.setStatus("⏸ 기술 입력은 일시정지, 클릭 반복 실행 중.")
+	case a.clicker.Paused() && a.runner.Running():
+		a.setStatus("⏸ 클릭 반복은 일시정지, 기술 반복 실행 중.")
 	case a.runner.Paused():
-		a.setStatus("일시정지 키를 누르고 있어 기술 입력을 중지했습니다.")
+		a.setStatus("⏸ 일시정지 키를 누르고 있어 기술 입력을 중지했습니다.")
+	case a.clicker.Paused():
+		a.setStatus("⏸ 일시정지 키를 누르고 있어 클릭 반복을 중지했습니다.")
 	case a.runner.Running() && a.clicker.Running():
-		a.setStatus("기술 반복과 클릭 반복 실행 중.")
+		a.setStatus("▶ 기술 반복과 클릭 반복 실행 중.")
 	case a.runner.Running():
-		a.setStatus("기술 반복 실행 중.")
+		a.setStatus("▶ 기술 반복 실행 중.")
 	case a.clicker.Running():
-		a.setStatus("클릭 반복 실행 중.")
+		a.setStatus("▶ 클릭 반복 실행 중.")
 	default:
-		a.setStatus("정지.")
+		a.setStatus("■ 정지.")
 	}
 }
 

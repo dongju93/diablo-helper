@@ -194,14 +194,16 @@ func MarshalTOML(cfg Config) ([]byte, error) {
 	writeKey(&buf, "clicker", cfg.Clicker.Key)
 	writeInt(&buf, "clicker_interval_ms", cfg.Clicker.IntervalMS)
 	buf.WriteByte('\n')
-	writeKey(&buf, "menu_inventory", cfg.Menu.Inventory)
-	writeKey(&buf, "menu_skills", cfg.Menu.Skills)
-	writeKey(&buf, "menu_follower", cfg.Menu.Follower)
+	writeKey(&buf, "menu_character", cfg.Menu.Character)
+	writeKey(&buf, "menu_skill_assign", cfg.Menu.SkillAssign)
+	writeKey(&buf, "menu_talents", cfg.Menu.Talents)
 	writeKey(&buf, "menu_map", cfg.Menu.Map)
-	writeKey(&buf, "menu_world_map", cfg.Menu.WorldMap)
+	writeKey(&buf, "menu_journal", cfg.Menu.Journal)
+	writeKey(&buf, "menu_social", cfg.Menu.Social)
+	writeKey(&buf, "menu_clan", cfg.Menu.Clan)
 	writeKey(&buf, "menu_town_portal", cfg.Menu.TownPortal)
-	writeKey(&buf, "menu_chat", cfg.Menu.Chat)
-	writeKey(&buf, "menu_whisper", cfg.Menu.Whisper)
+	writeKey(&buf, "menu_collection", cfg.Menu.Collection)
+	writeKey(&buf, "menu_shop", cfg.Menu.Shop)
 	for _, skill := range cfg.Skills {
 		buf.WriteString("\n[[skills]]\n")
 		writeString(&buf, "name", skill.Name)
@@ -304,38 +306,46 @@ func setTopLevelValue(cfg *Config, key string, value string) error {
 		return setInt(&cfg.Clicker.Key.VK, value)
 	case "clicker_interval_ms":
 		return setInt(&cfg.Clicker.IntervalMS, value)
-	case "menu_inventory_key_name":
-		return setKeyName(&cfg.Menu.Inventory.Name, key, value)
-	case "menu_inventory_key_vk":
-		return setInt(&cfg.Menu.Inventory.VK, value)
-	case "menu_skills_key_name":
-		return setKeyName(&cfg.Menu.Skills.Name, key, value)
-	case "menu_skills_key_vk":
-		return setInt(&cfg.Menu.Skills.VK, value)
-	case "menu_follower_key_name":
-		return setKeyName(&cfg.Menu.Follower.Name, key, value)
-	case "menu_follower_key_vk":
-		return setInt(&cfg.Menu.Follower.VK, value)
+	case "menu_character_key_name":
+		return setKeyName(&cfg.Menu.Character.Name, key, value)
+	case "menu_character_key_vk":
+		return setInt(&cfg.Menu.Character.VK, value)
+	case "menu_skill_assign_key_name":
+		return setKeyName(&cfg.Menu.SkillAssign.Name, key, value)
+	case "menu_skill_assign_key_vk":
+		return setInt(&cfg.Menu.SkillAssign.VK, value)
+	case "menu_talents_key_name":
+		return setKeyName(&cfg.Menu.Talents.Name, key, value)
+	case "menu_talents_key_vk":
+		return setInt(&cfg.Menu.Talents.VK, value)
 	case "menu_map_key_name":
 		return setKeyName(&cfg.Menu.Map.Name, key, value)
 	case "menu_map_key_vk":
 		return setInt(&cfg.Menu.Map.VK, value)
-	case "menu_world_map_key_name":
-		return setKeyName(&cfg.Menu.WorldMap.Name, key, value)
-	case "menu_world_map_key_vk":
-		return setInt(&cfg.Menu.WorldMap.VK, value)
+	case "menu_journal_key_name":
+		return setKeyName(&cfg.Menu.Journal.Name, key, value)
+	case "menu_journal_key_vk":
+		return setInt(&cfg.Menu.Journal.VK, value)
+	case "menu_social_key_name":
+		return setKeyName(&cfg.Menu.Social.Name, key, value)
+	case "menu_social_key_vk":
+		return setInt(&cfg.Menu.Social.VK, value)
+	case "menu_clan_key_name":
+		return setKeyName(&cfg.Menu.Clan.Name, key, value)
+	case "menu_clan_key_vk":
+		return setInt(&cfg.Menu.Clan.VK, value)
 	case "menu_town_portal_key_name":
 		return setKeyName(&cfg.Menu.TownPortal.Name, key, value)
 	case "menu_town_portal_key_vk":
 		return setInt(&cfg.Menu.TownPortal.VK, value)
-	case "menu_chat_key_name":
-		return setKeyName(&cfg.Menu.Chat.Name, key, value)
-	case "menu_chat_key_vk":
-		return setInt(&cfg.Menu.Chat.VK, value)
-	case "menu_whisper_key_name":
-		return setKeyName(&cfg.Menu.Whisper.Name, key, value)
-	case "menu_whisper_key_vk":
-		return setInt(&cfg.Menu.Whisper.VK, value)
+	case "menu_collection_key_name":
+		return setKeyName(&cfg.Menu.Collection.Name, key, value)
+	case "menu_collection_key_vk":
+		return setInt(&cfg.Menu.Collection.VK, value)
+	case "menu_shop_key_name":
+		return setKeyName(&cfg.Menu.Shop.Name, key, value)
+	case "menu_shop_key_vk":
+		return setInt(&cfg.Menu.Shop.VK, value)
 	default:
 		return fmt.Errorf("unknown key %q", key)
 	}

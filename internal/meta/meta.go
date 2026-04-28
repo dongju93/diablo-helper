@@ -1,7 +1,7 @@
 package meta
 
 var (
-	Version   = "0.2.0"
+	Version   = "0.2.1"
 	Commit    = "none"
 	BuildDate = "unknown"
 	Author    = "dongju93"

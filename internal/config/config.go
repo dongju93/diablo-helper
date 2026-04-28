@@ -57,14 +57,16 @@ type Skill struct {
 }
 
 type MenuKeys struct {
-	Inventory  KeyBinding
-	Skills     KeyBinding
-	Follower   KeyBinding
-	Map        KeyBinding
-	WorldMap   KeyBinding
-	TownPortal KeyBinding
-	Chat       KeyBinding
-	Whisper    KeyBinding
+	Character   KeyBinding
+	SkillAssign KeyBinding
+	Talents     KeyBinding
+	Map         KeyBinding
+	Journal     KeyBinding
+	Social      KeyBinding
+	Clan        KeyBinding
+	TownPortal  KeyBinding
+	Collection  KeyBinding
+	Shop        KeyBinding
 }
 
 type Clicker struct {
@@ -98,14 +100,16 @@ func Default() Config {
 			IntervalMS: DefaultClickerIntervalMS,
 		},
 		Menu: MenuKeys{
-			Inventory:  KeyBinding{Name: "C", VK: 0x43},
-			Skills:     KeyBinding{Name: "V", VK: 0x56},
-			Follower:   KeyBinding{Name: "F", VK: 0x46},
-			Map:        KeyBinding{Name: "Tab", VK: 0x09},
-			WorldMap:   KeyBinding{Name: "M", VK: 0x4D},
-			TownPortal: KeyBinding{Name: "T", VK: 0x54},
-			Chat:       KeyBinding{Name: "Enter", VK: 0x0D},
-			Whisper:    KeyBinding{Name: "R", VK: 0x52},
+			Character:   KeyBinding{Name: "C", VK: 0x43},
+			SkillAssign: KeyBinding{Name: "S", VK: 0x53},
+			Talents:     KeyBinding{Name: "A", VK: 0x41},
+			Map:         KeyBinding{Name: "Tab", VK: 0x09},
+			Journal:     KeyBinding{Name: "J", VK: 0x4A},
+			Social:      KeyBinding{Name: "O", VK: 0x4F},
+			Clan:        KeyBinding{Name: "N", VK: 0x4E},
+			TownPortal:  KeyBinding{Name: "T", VK: 0x54},
+			Collection:  KeyBinding{Name: "Y", VK: 0x59},
+			Shop:        KeyBinding{Name: "P", VK: 0x50},
 		},
 	}
 	cfg.NormalizeForUI()
@@ -114,22 +118,26 @@ func Default() Config {
 
 func (m *MenuKeys) SetKeyByID(id string, binding KeyBinding) bool {
 	switch id {
-	case "inventory":
-		m.Inventory = binding
-	case "skills":
-		m.Skills = binding
-	case "follower":
-		m.Follower = binding
+	case "character":
+		m.Character = binding
+	case "skill_assign":
+		m.SkillAssign = binding
+	case "talents":
+		m.Talents = binding
 	case "map":
 		m.Map = binding
-	case "world_map":
-		m.WorldMap = binding
+	case "journal":
+		m.Journal = binding
+	case "social":
+		m.Social = binding
+	case "clan":
+		m.Clan = binding
 	case "town_portal":
 		m.TownPortal = binding
-	case "chat":
-		m.Chat = binding
-	case "whisper":
-		m.Whisper = binding
+	case "collection":
+		m.Collection = binding
+	case "shop":
+		m.Shop = binding
 	default:
 		return false
 	}
@@ -137,14 +145,16 @@ func (m *MenuKeys) SetKeyByID(id string, binding KeyBinding) bool {
 }
 
 func (m *MenuKeys) forEachKey(fn func(*KeyBinding)) {
-	fn(&m.Inventory)
-	fn(&m.Skills)
-	fn(&m.Follower)
+	fn(&m.Character)
+	fn(&m.SkillAssign)
+	fn(&m.Talents)
 	fn(&m.Map)
-	fn(&m.WorldMap)
+	fn(&m.Journal)
+	fn(&m.Social)
+	fn(&m.Clan)
 	fn(&m.TownPortal)
-	fn(&m.Chat)
-	fn(&m.Whisper)
+	fn(&m.Collection)
+	fn(&m.Shop)
 }
 
 // NormalizeForUI repairs a partially edited config into the shape expected by
@@ -193,14 +203,16 @@ func (c *Config) Normalize() {
 
 func (c Config) MenuBindings() []MenuBinding {
 	return []MenuBinding{
-		{ID: "inventory", Label: "Inventory", Binding: c.Menu.Inventory},
-		{ID: "skills", Label: "Skills", Binding: c.Menu.Skills},
-		{ID: "follower", Label: "Follower", Binding: c.Menu.Follower},
+		{ID: "character", Label: "Character", Binding: c.Menu.Character},
+		{ID: "skill_assign", Label: "Skill Assign", Binding: c.Menu.SkillAssign},
+		{ID: "talents", Label: "Talents", Binding: c.Menu.Talents},
 		{ID: "map", Label: "Map", Binding: c.Menu.Map},
-		{ID: "world_map", Label: "World Map", Binding: c.Menu.WorldMap},
+		{ID: "journal", Label: "Journal", Binding: c.Menu.Journal},
+		{ID: "social", Label: "Social", Binding: c.Menu.Social},
+		{ID: "clan", Label: "Clan", Binding: c.Menu.Clan},
 		{ID: "town_portal", Label: "Town Portal", Binding: c.Menu.TownPortal},
-		{ID: "chat", Label: "Chat", Binding: c.Menu.Chat},
-		{ID: "whisper", Label: "Whisper", Binding: c.Menu.Whisper},
+		{ID: "collection", Label: "Collection", Binding: c.Menu.Collection},
+		{ID: "shop", Label: "Shop", Binding: c.Menu.Shop},
 	}
 }
 
@@ -267,14 +279,16 @@ func (c Config) Validate() error {
 		{name: "pause key", binding: c.Pause},
 		{name: "clicker start key", binding: c.Clicker.Start},
 		{name: "clicker stop key", binding: c.Clicker.Stop},
-		{name: "menu inventory key", binding: c.Menu.Inventory},
-		{name: "menu skills key", binding: c.Menu.Skills},
-		{name: "menu follower key", binding: c.Menu.Follower},
+		{name: "menu character key", binding: c.Menu.Character},
+		{name: "menu skill assign key", binding: c.Menu.SkillAssign},
+		{name: "menu talents key", binding: c.Menu.Talents},
 		{name: "menu map key", binding: c.Menu.Map},
-		{name: "menu world map key", binding: c.Menu.WorldMap},
+		{name: "menu journal key", binding: c.Menu.Journal},
+		{name: "menu social key", binding: c.Menu.Social},
+		{name: "menu clan key", binding: c.Menu.Clan},
 		{name: "menu town portal key", binding: c.Menu.TownPortal},
-		{name: "menu chat key", binding: c.Menu.Chat},
-		{name: "menu whisper key", binding: c.Menu.Whisper},
+		{name: "menu collection key", binding: c.Menu.Collection},
+		{name: "menu shop key", binding: c.Menu.Shop},
 	} {
 		if err := validateKey(item.name, item.binding); err != nil {
 			return err

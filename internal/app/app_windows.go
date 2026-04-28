@@ -38,6 +38,7 @@ type application struct {
 	pressed         map[uint16]bool
 	runner          *skillRunner
 	clicker         *clickerRunner
+	skillEnabled    [config.MaxSkills]bool
 }
 
 var (
