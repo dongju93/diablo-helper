@@ -22,7 +22,7 @@ func chooseConfigSavePath(hwnd uintptr, initialPath string) (string, bool, error
 func chooseConfigPath(hwnd uintptr, title string, initialPath string, save bool) (string, bool, error) {
 	initialName, initialDir := fileDialogInitialNameAndDir(initialPath)
 	fileBuffer := fileDialogBuffer(initialName)
-	filter := utf16Slice("TOML 설정 파일 (*.toml)\x00*.toml\x00모든 파일 (*.*)\x00*.*\x00")
+	filter := configFileDialogFilter()
 	titleText := utf16Slice(title)
 	defExt := utf16Slice("toml")
 
@@ -76,6 +76,10 @@ func chooseConfigPath(hwnd uintptr, title string, initialPath string, save bool)
 		return "", false, fmt.Errorf("file dialog returned an empty path")
 	}
 	return path, true, nil
+}
+
+func configFileDialogFilter() []uint16 {
+	return utf16Slice("TOML 설정 파일 (*.toml)\x00*.toml\x00")
 }
 
 func fileDialogInitialNameAndDir(initialPath string) (string, string) {

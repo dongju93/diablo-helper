@@ -104,21 +104,26 @@ func getWindowText(hwnd uintptr) (string, error) {
 }
 
 func messageBox(hwnd uintptr, title string, text string, flags uintptr) error {
+	_, err := messageBoxResult(hwnd, title, text, flags)
+	return err
+}
+
+func messageBoxResult(hwnd uintptr, title string, text string, flags uintptr) (uintptr, error) {
 	textPtr, err := utf16PtrSafe(text)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	titlePtr, err := utf16PtrSafe(title)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	procMessageBoxW.Call(
+	ret, _, _ := procMessageBoxW.Call(
 		hwnd,
 		uintptr(unsafe.Pointer(textPtr)),
 		uintptr(unsafe.Pointer(titlePtr)),
 		flags,
 	)
-	return nil
+	return ret, nil
 }
 
 func checked(hwnd uintptr) bool {

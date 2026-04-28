@@ -75,7 +75,7 @@ func TestDefaultConfig(t *testing.T) {
 	}
 }
 
-func TestNormalizeRepairsConfigShapeAndValues(t *testing.T) {
+func TestNormalizeForUIRepairsConfigShapeAndValues(t *testing.T) {
 	cfg := Config{
 		Start: KeyBinding{Name: "Bad Start", VK: 300},
 		Stop:  KeyBinding{Name: "No Code", VK: 0},
@@ -100,7 +100,7 @@ func TestNormalizeRepairsConfigShapeAndValues(t *testing.T) {
 		})
 	}
 
-	cfg.Normalize()
+	cfg.NormalizeForUI()
 
 	if len(cfg.Skills) != MaxSkills {
 		t.Fatalf("skills length = %d, want %d", len(cfg.Skills), MaxSkills)
@@ -452,7 +452,7 @@ func TestKeyDisplayName(t *testing.T) {
 	}
 }
 
-func TestNormalizeCanonicalizesKeyNames(t *testing.T) {
+func TestNormalizeForUICanonicalizesKeyNames(t *testing.T) {
 	cfg := Config{
 		Start: KeyBinding{Name: "Spoofed", VK: 0x0D},
 		Stop:  KeyBinding{Name: "F12", VK: 0x7B},
@@ -464,7 +464,7 @@ func TestNormalizeCanonicalizesKeyNames(t *testing.T) {
 			{Name: "S1", Key: KeyBinding{Name: "Fake", VK: 0x31}, IntervalMS: DefaultIntervalMS, Enabled: false},
 		},
 	}
-	cfg.Normalize()
+	cfg.NormalizeForUI()
 
 	if cfg.Start.Name != "Enter" {
 		t.Fatalf("start name = %q, want %q", cfg.Start.Name, "Enter")

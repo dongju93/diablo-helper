@@ -6,9 +6,15 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 )
+
+type SaveOptions struct {
+	AllowNonTOMLExtension bool
+}
 
 func LoadFile(path string) (Config, error) {
 	f, err := os.Open(path)
@@ -33,15 +39,146 @@ func LoadFile(path string) (Config, error) {
 }
 
 func SaveFile(path string, cfg Config) error {
+	return SaveFileWithOptions(path, cfg, SaveOptions{})
+}
+
+func SaveFileWithOptions(path string, cfg Config, opts SaveOptions) error {
 	data, err := MarshalTOML(cfg)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o600)
+	if err := validateSavePath(path, opts); err != nil {
+		return err
+	}
+	return writeFileAtomic(path, data, 0o600)
+}
+
+func HasTOMLExtension(path string) bool {
+	return strings.EqualFold(filepath.Ext(path), ".toml")
+}
+
+func validateSavePath(path string, opts SaveOptions) error {
+	if strings.TrimSpace(path) == "" {
+		return fmt.Errorf("config path is empty")
+	}
+	if !opts.AllowNonTOMLExtension && !HasTOMLExtension(path) {
+		return fmt.Errorf("config file extension must be .toml")
+	}
+	if err := rejectReparsePath(path); err != nil {
+		return err
+	}
+	return nil
+}
+
+func writeFileAtomic(path string, data []byte, perm os.FileMode) (err error) {
+	dir := filepath.Dir(path)
+	base := filepath.Base(path)
+	tmp, err := os.CreateTemp(dir, "."+base+".tmp-")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer func() {
+		if err != nil {
+			_ = os.Remove(tmpName)
+		}
+	}()
+
+	if err = tmp.Chmod(perm); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if _, err = tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err = tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err = tmp.Close(); err != nil {
+		return err
+	}
+	if err = rejectReparsePath(path); err != nil {
+		return err
+	}
+	if err = os.Rename(tmpName, path); err != nil {
+		return err
+	}
+	return syncDir(dir)
+}
+
+func syncDir(dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
+		return nil
+	}
+	defer d.Close()
+	_ = d.Sync()
+	return nil
+}
+
+func rejectReparsePath(path string) error {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+	if err := rejectReparsePathComponent(abs); err != nil {
+		return err
+	}
+	for dir := filepath.Dir(abs); dir != "."; dir = filepath.Dir(dir) {
+		if err := rejectReparsePathComponent(dir); err != nil {
+			return err
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+	}
+	return nil
+}
+
+func rejectReparsePathComponent(path string) error {
+	info, err := os.Lstat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if fileInfoIsReparsePoint(info) {
+		return fmt.Errorf("config path must not use a symlink or reparse point: %s", path)
+	}
+	return nil
+}
+
+func fileInfoIsReparsePoint(info os.FileInfo) bool {
+	if info.Mode()&os.ModeSymlink != 0 {
+		return true
+	}
+	sys := info.Sys()
+	if sys == nil {
+		return false
+	}
+	value := reflect.ValueOf(sys)
+	if value.Kind() == reflect.Pointer {
+		if value.IsNil() {
+			return false
+		}
+		value = value.Elem()
+	}
+	if value.Kind() != reflect.Struct {
+		return false
+	}
+	attributes := value.FieldByName("FileAttributes")
+	if !attributes.IsValid() || !attributes.CanUint() {
+		return false
+	}
+	return attributes.Uint()&0x400 != 0
 }
 
 func MarshalTOML(cfg Config) ([]byte, error) {
-	cfg.Normalize()
+	cfg.NormalizeForUI()
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -129,7 +266,10 @@ func ParseTOML(data []byte) (Config, error) {
 		return Config{}, err
 	}
 
-	cfg.Normalize()
+	if err := cfg.Validate(); err != nil {
+		return Config{}, err
+	}
+	cfg.NormalizeForUI()
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err
 	}
