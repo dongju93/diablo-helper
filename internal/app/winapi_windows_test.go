@@ -7,6 +7,7 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+	"unicode/utf16"
 	"unsafe"
 )
 
@@ -86,6 +87,20 @@ func TestFileDialogBuffer(t *testing.T) {
 	}
 	if buffer[len("custom.toml")] != 0 {
 		t.Fatal("buffer is not null-terminated after the initial name")
+	}
+}
+
+func TestFileDialogFilterAllowsOnlyTOML(t *testing.T) {
+	filter := configFileDialogFilter()
+	text := string(utf16.Decode(filter))
+	if !strings.Contains(text, "*.toml") {
+		t.Fatalf("filter = %q, want *.toml", text)
+	}
+	if strings.Contains(text, "*.*") {
+		t.Fatalf("filter = %q, want no all-files option", text)
+	}
+	if len(filter) < 2 || filter[len(filter)-1] != 0 || filter[len(filter)-2] != 0 {
+		t.Fatalf("filter is not double-null terminated: %#v", filter)
 	}
 }
 

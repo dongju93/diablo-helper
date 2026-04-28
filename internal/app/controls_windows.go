@@ -522,12 +522,38 @@ func (a *application) saveConfig() {
 		a.setStatus("저장을 취소했습니다.")
 		return
 	}
-	if err := config.SaveFile(path, a.cfg); err != nil {
+	saveOptions := config.SaveOptions{}
+	if !config.HasTOMLExtension(path) {
+		confirmed, err := a.confirmNonTOMLSave(path)
+		if err != nil {
+			messageBox(a.hwnd, "저장 확인 실패", err.Error(), mbOK|mbIconError)
+			return
+		}
+		if !confirmed {
+			a.setStatus("저장을 취소했습니다.")
+			return
+		}
+		saveOptions.AllowNonTOMLExtension = true
+	}
+	if err := config.SaveFileWithOptions(path, a.cfg, saveOptions); err != nil {
 		messageBox(a.hwnd, "저장 실패", err.Error(), mbOK|mbIconError)
 		return
 	}
 	a.configPath = path
 	a.setStatus("저장 완료: " + a.configPath)
+}
+
+func (a *application) confirmNonTOMLSave(path string) (bool, error) {
+	result, err := messageBoxResult(
+		a.hwnd,
+		"확장자 확인",
+		"선택한 파일은 .toml 설정 파일이 아닙니다.\n\n"+path+"\n\n이 경로에 저장하시겠습니까?",
+		mbYesNo|mbIconWarning,
+	)
+	if err != nil {
+		return false, err
+	}
+	return result == idYes, nil
 }
 
 func (a *application) loadConfig() {

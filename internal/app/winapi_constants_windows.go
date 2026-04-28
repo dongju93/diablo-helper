@@ -52,8 +52,10 @@ const (
 	llkhfInjected        = 0x00000010
 	llmhfInjected        = 0x00000001
 	mbOK                 = 0x00000000
+	mbYesNo              = 0x00000004
 	mbIconError          = 0x00000010
 	mbIconWarning        = 0x00000030
+	idYes                = 6
 	mouseEventLeftDown   = 0x0002
 	mouseEventLeftUp     = 0x0004
 	mouseEventRightDown  = 0x0008

@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -236,6 +237,67 @@ func TestSaveFileAndLoadFileRoundTrip(t *testing.T) {
 	}
 	if len(loaded.Skills) != MaxSkills {
 		t.Fatalf("skills length = %d, want %d", len(loaded.Skills), MaxSkills)
+	}
+}
+
+func TestSaveFileOverwritesExistingFile(t *testing.T) {
+	cfg := Default()
+	cfg.SkillGapMS = 123
+	path := filepath.Join(t.TempDir(), "default.toml")
+	if err := os.WriteFile(path, []byte("not toml"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	if err := SaveFile(path, cfg); err != nil {
+		t.Fatalf("SaveFile() error = %v", err)
+	}
+	loaded, err := LoadFile(path)
+	if err != nil {
+		t.Fatalf("LoadFile() error = %v", err)
+	}
+	if loaded.SkillGapMS != cfg.SkillGapMS {
+		t.Fatalf("skill gap = %d, want %d", loaded.SkillGapMS, cfg.SkillGapMS)
+	}
+}
+
+func TestSaveFileRejectsNonTOMLExtension(t *testing.T) {
+	err := SaveFile(filepath.Join(t.TempDir(), "default.txt"), Default())
+	if err == nil {
+		t.Fatal("SaveFile() error = nil, want extension error")
+	}
+	if !strings.Contains(err.Error(), ".toml") {
+		t.Fatalf("SaveFile() error = %v, want .toml", err)
+	}
+}
+
+func TestSaveFileWithOptionsAllowsNonTOMLExtension(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "default.txt")
+	err := SaveFileWithOptions(path, Default(), SaveOptions{AllowNonTOMLExtension: true})
+	if err != nil {
+		t.Fatalf("SaveFileWithOptions() error = %v", err)
+	}
+	if _, err := LoadFile(path); err != nil {
+		t.Fatalf("LoadFile() error = %v", err)
+	}
+}
+
+func TestSaveFileRejectsSymlinkPath(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "target.toml")
+	link := filepath.Join(dir, "link.toml")
+	if err := os.WriteFile(target, []byte("old"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("Symlink() unavailable: %v", err)
+	}
+
+	err := SaveFile(link, Default())
+	if err == nil {
+		t.Fatal("SaveFile() error = nil, want symlink error")
+	}
+	if !strings.Contains(err.Error(), "symlink") {
+		t.Fatalf("SaveFile() error = %v, want symlink", err)
 	}
 }
 
