@@ -178,7 +178,7 @@ func fileInfoIsReparsePoint(info os.FileInfo) bool {
 }
 
 func MarshalTOML(cfg Config) ([]byte, error) {
-	cfg.Normalize()
+	cfg.NormalizeForUI()
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -264,7 +264,10 @@ func ParseTOML(data []byte) (Config, error) {
 		return Config{}, err
 	}
 
-	cfg.Normalize()
+	if err := cfg.Validate(); err != nil {
+		return Config{}, err
+	}
+	cfg.NormalizeForUI()
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err
 	}

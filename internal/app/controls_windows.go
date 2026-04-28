@@ -415,7 +415,7 @@ func (a *application) handleCommand(wParam uintptr) bool {
 }
 
 func (a *application) updateControlsFromConfig() {
-	a.cfg.Normalize()
+	a.cfg.NormalizeForUI()
 	setWindowText(a.controls.startButton, bindingText(a.cfg.Start))
 	setWindowText(a.controls.stopButton, bindingText(a.cfg.Stop))
 	setWindowText(a.controls.pauseButton, bindingText(a.cfg.Pause))
@@ -641,7 +641,7 @@ func (a *application) stopAllRunners(status string) {
 }
 
 func (a *application) syncConfigFromControls() error {
-	a.cfg.Normalize()
+	a.cfg.NormalizeForUI()
 	gapText, err := getWindowText(a.controls.bulkSkillGap)
 	if err != nil {
 		return fmt.Errorf("키별 간격: %w", err)
@@ -672,7 +672,7 @@ func (a *application) syncConfigFromControls() error {
 		a.cfg.Skills[i].IntervalMS = interval
 		a.cfg.Skills[i].Enabled = checked(a.controls.skillEnabled[i])
 	}
-	a.cfg.Normalize()
+	a.cfg.NormalizeForUI()
 	return a.cfg.Validate()
 }
 

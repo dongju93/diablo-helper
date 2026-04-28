@@ -82,7 +82,7 @@ func (a *application) run() error {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		messageBox(0, "diablo-helper", "Failed to load "+defaultConfigFileName+". Defaults will be used.\n\n"+err.Error(), mbOK|mbIconError)
 	}
-	a.cfg.Normalize()
+	a.cfg.NormalizeForUI()
 
 	instance, _, err := procGetModuleHandleW.Call(0)
 	if instance == 0 {

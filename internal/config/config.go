@@ -108,7 +108,7 @@ func Default() Config {
 			Whisper:    KeyBinding{Name: "R", VK: 0x52},
 		},
 	}
-	cfg.Normalize()
+	cfg.NormalizeForUI()
 	return cfg
 }
 
@@ -147,7 +147,9 @@ func (m *MenuKeys) forEachKey(fn func(*KeyBinding)) {
 	fn(&m.Whisper)
 }
 
-func (c *Config) Normalize() {
+// NormalizeForUI repairs a partially edited config into the shape expected by
+// controls and save output. File loads validate raw input before calling this.
+func (c *Config) NormalizeForUI() {
 	if len(c.Skills) > MaxSkills {
 		c.Skills = c.Skills[:MaxSkills]
 	}
@@ -181,6 +183,12 @@ func (c *Config) Normalize() {
 	normalizeKey(&c.Clicker.Stop)
 	normalizeKey(&c.Clicker.Key)
 	c.Menu.forEachKey(normalizeKey)
+}
+
+// Normalize keeps the previous repair behavior for callers that intentionally
+// want canonical UI values.
+func (c *Config) Normalize() {
+	c.NormalizeForUI()
 }
 
 func (c Config) MenuBindings() []MenuBinding {

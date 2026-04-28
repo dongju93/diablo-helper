@@ -164,12 +164,12 @@ enabled = true
 	}
 }
 
-func TestParseTOMLNormalizesSkillCountAndIntervals(t *testing.T) {
+func TestParseTOMLPadsMissingSkills(t *testing.T) {
 	cfg, err := ParseTOML([]byte(`[[skills]]
 name = "Only"
 key_name = "1"
 key_vk = 49
-interval_ms = 0
+interval_ms = 10
 enabled = true
 `))
 	if err != nil {
@@ -178,8 +178,70 @@ enabled = true
 	if len(cfg.Skills) != MaxSkills {
 		t.Fatalf("skills length = %d, want %d", len(cfg.Skills), MaxSkills)
 	}
-	if cfg.Skills[0].IntervalMS != DefaultIntervalMS {
-		t.Fatalf("interval = %d, want %d", cfg.Skills[0].IntervalMS, DefaultIntervalMS)
+	if cfg.Skills[0].IntervalMS != MinimumIntervalMS {
+		t.Fatalf("interval = %d, want %d", cfg.Skills[0].IntervalMS, MinimumIntervalMS)
+	}
+}
+
+func TestParseTOMLRejectsValuesThatWouldNeedRepair(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantError string
+	}{
+		{
+			name:      "negative top-level vk",
+			input:     "start_key_vk = -1\n",
+			wantError: "between 0 and 255",
+		},
+		{
+			name:      "oversized top-level vk",
+			input:     "pause_key_vk = 256\n",
+			wantError: "between 0 and 255",
+		},
+		{
+			name: "negative skill vk",
+			input: `[[skills]]
+key_vk = -1
+`,
+			wantError: "between 0 and 255",
+		},
+		{
+			name:      "negative skill gap",
+			input:     "skill_gap_ms = -1\n",
+			wantError: "skill gap must be at least",
+		},
+		{
+			name:      "clicker interval below minimum",
+			input:     "clicker_interval_ms = 0\n",
+			wantError: "clicker interval must be at least",
+		},
+		{
+			name: "skill interval below minimum",
+			input: `[[skills]]
+interval_ms = 0
+`,
+			wantError: "skill 1 interval must be at least",
+		},
+		{
+			name: "key name spoofing",
+			input: `start_key_name = "F12"
+start_key_vk = 13
+`,
+			wantError: "name does not match virtual-key code",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseTOML([]byte(tt.input))
+			if err == nil {
+				t.Fatal("ParseTOML() error = nil, want error")
+			}
+			if !strings.Contains(err.Error(), tt.wantError) {
+				t.Fatalf("ParseTOML() error = %v, want %q", err, tt.wantError)
+			}
+		})
 	}
 }
 
@@ -373,12 +435,12 @@ func TestMarshalTOMLNormalizesOutput(t *testing.T) {
 
 func TestParseTOMLHandlesCommentsAndQuotedHashes(t *testing.T) {
 	cfg, err := ParseTOML([]byte(`
-pause_key_name = "Hash # Key"
+pause_key_name = "End"
 pause_key_vk = 35
 
 [[skills]]
 name = "Quote \" # inside"
-key_name = "1#not-comment"
+key_name = "1"
 key_vk = 49 # real comment
 interval_ms = 10
 enabled = true
