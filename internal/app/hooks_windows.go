@@ -70,31 +70,39 @@ func wndProc(hwnd uintptr, msg uint32, wParam uintptr, lParam unsafe.Pointer) ui
 }
 
 func lowLevelKeyboardProc(code int, wParam uintptr, lParam unsafe.Pointer) uintptr {
-	if code < 0 || appInstance == nil {
+	if code < 0 || appInstance == nil || lParam == nil {
 		return callNextHookEx(code, wParam, lParam)
 	}
+
+	keyDown := false
+	switch wParam {
+	case wmKeyDown, wmSysKeyDown:
+		keyDown = true
+	case wmKeyUp, wmSysKeyUp:
+	default:
+		return callNextHookEx(code, wParam, lParam)
+	}
+
 	event := (*keyboardHookStruct)(lParam)
 	if event.Flags&llkhfInjected != 0 {
 		return callNextHookEx(code, wParam, lParam)
 	}
 
-	switch wParam {
-	case wmKeyDown, wmSysKeyDown:
-		if appInstance.handleKeyEvent(uint16(event.VKCode), true) {
-			return 1
-		}
-	case wmKeyUp, wmSysKeyUp:
-		if appInstance.handleKeyEvent(uint16(event.VKCode), false) {
-			return 1
-		}
+	if appInstance.handleKeyEvent(uint16(event.VKCode), keyDown) {
+		return 1
 	}
 	return callNextHookEx(code, wParam, lParam)
 }
 
 func lowLevelMouseProc(code int, wParam uintptr, lParam unsafe.Pointer) uintptr {
-	if code < 0 || appInstance == nil {
+	if code < 0 || appInstance == nil || lParam == nil {
 		return callNextHookEx(code, wParam, lParam)
 	}
+
+	if !isMouseHookMessage(wParam) {
+		return callNextHookEx(code, wParam, lParam)
+	}
+
 	event := (*mouseHookStruct)(lParam)
 	if event.Flags&llmhfInjected != 0 {
 		return callNextHookEx(code, wParam, lParam)
@@ -108,6 +116,15 @@ func lowLevelMouseProc(code int, wParam uintptr, lParam unsafe.Pointer) uintptr 
 		return 1
 	}
 	return callNextHookEx(code, wParam, lParam)
+}
+
+func isMouseHookMessage(wParam uintptr) bool {
+	switch wParam {
+	case wmLButtonDown, wmLButtonUp, wmRButtonDown, wmRButtonUp,
+		wmMButtonDown, wmMButtonUp, wmXButtonDown, wmXButtonUp:
+		return true
+	}
+	return false
 }
 
 func mouseEventKey(wParam uintptr, event *mouseHookStruct) (uint16, bool, bool) {
