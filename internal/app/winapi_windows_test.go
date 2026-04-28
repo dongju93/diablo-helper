@@ -90,8 +90,22 @@ func TestFileDialogBuffer(t *testing.T) {
 	}
 }
 
-func TestFileDialogFilterAllowsOnlyTOML(t *testing.T) {
-	filter := configFileDialogFilter()
+func TestFileDialogOpenFilterIncludesAllFiles(t *testing.T) {
+	filter := configOpenFileDialogFilter()
+	text := string(utf16.Decode(filter))
+	if !strings.Contains(text, "*.toml") {
+		t.Fatalf("filter = %q, want *.toml", text)
+	}
+	if !strings.Contains(text, "*.*") {
+		t.Fatalf("filter = %q, want all-files option", text)
+	}
+	if len(filter) < 2 || filter[len(filter)-1] != 0 || filter[len(filter)-2] != 0 {
+		t.Fatalf("filter is not double-null terminated: %#v", filter)
+	}
+}
+
+func TestFileDialogSaveFilterAllowsOnlyTOML(t *testing.T) {
+	filter := configSaveFileDialogFilter()
 	text := string(utf16.Decode(filter))
 	if !strings.Contains(text, "*.toml") {
 		t.Fatalf("filter = %q, want *.toml", text)
