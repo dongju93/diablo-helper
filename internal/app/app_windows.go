@@ -51,6 +51,9 @@ var (
 const defaultConfigFileName = "default.toml"
 
 func Run() error {
+	if err := hardenDLLSearchPath(); err != nil {
+		return err
+	}
 	runtime.LockOSThread()
 
 	app := newApplication()

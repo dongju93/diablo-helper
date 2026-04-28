@@ -118,8 +118,15 @@ func TestFileDialogSaveFilterAllowsOnlyTOML(t *testing.T) {
 	}
 }
 
+func TestHardenDLLSearchPathSucceeds(t *testing.T) {
+	if err := hardenDLLSearchPath(); err != nil {
+		t.Fatalf("hardenDLLSearchPath() error = %v", err)
+	}
+}
+
 func TestWinAPIDLLsLoadFromSystem32(t *testing.T) {
 	dlls := map[*syscall.LazyDLL]string{
+		kernel32: "kernel32.dll",
 		user32:   "user32.dll",
 		gdi32:    "gdi32.dll",
 		dwmapi:   "dwmapi.dll",
