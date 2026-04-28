@@ -2,7 +2,10 @@
 
 package app
 
-import "unsafe"
+import (
+	"runtime"
+	"unsafe"
+)
 
 func wndProc(hwnd uintptr, msg uint32, wParam uintptr, lParam unsafe.Pointer) uintptr {
 	if appInstance == nil {
@@ -88,7 +91,10 @@ func lowLevelKeyboardProc(code int, wParam uintptr, lParam unsafe.Pointer) uintp
 		return callNextHookEx(code, wParam, lParam)
 	}
 
-	if appInstance.handleKeyEvent(uint16(event.VKCode), keyDown) {
+	vk := uint16(event.VKCode)
+	handled := appInstance.handleKeyEvent(vk, keyDown)
+	clearHookKeyState(&vk, &keyDown)
+	if handled {
 		return 1
 	}
 	return callNextHookEx(code, wParam, lParam)
@@ -110,12 +116,23 @@ func lowLevelMouseProc(code int, wParam uintptr, lParam unsafe.Pointer) uintptr 
 
 	vk, down, ok := mouseEventKey(wParam, event)
 	if !ok {
+		clearHookKeyState(&vk, &down)
 		return callNextHookEx(code, wParam, lParam)
 	}
-	if appInstance.handleKeyEvent(vk, down) {
+	handled := appInstance.handleKeyEvent(vk, down)
+	clearHookKeyState(&vk, &down)
+	if handled {
 		return 1
 	}
 	return callNextHookEx(code, wParam, lParam)
+}
+
+//go:noinline
+func clearHookKeyState(vk *uint16, down *bool) {
+	*vk = 0
+	*down = false
+	runtime.KeepAlive(vk)
+	runtime.KeepAlive(down)
 }
 
 func isMouseHookMessage(wParam uintptr) bool {

@@ -35,7 +35,7 @@ type application struct {
 	cfg             config.Config
 	controls        controlRefs
 	capture         captureTarget
-	pressed         map[uint16]bool
+	pressed         pressedKeys
 	runner          *skillRunner
 	clicker         *clickerRunner
 	skillEnabled    [config.MaxSkills]bool
@@ -65,9 +65,8 @@ func ShowFatalError(err error) {
 
 func newApplication() *application {
 	return &application{
-		cfg:     config.Default(),
-		pressed: make(map[uint16]bool),
-		runner:  newSkillRunner(sendVirtualKey),
+		cfg:    config.Default(),
+		runner: newSkillRunner(sendVirtualKey),
 		controls: controlRefs{
 			menuLabels:  make(map[string]uintptr),
 			menuButtons: make(map[string]uintptr),

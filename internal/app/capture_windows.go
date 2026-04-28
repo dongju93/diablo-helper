@@ -30,6 +30,39 @@ type captureTarget struct {
 	menuID string
 }
 
+// pressedKeys keeps repeat-suppression state as bits instead of heap map keys.
+type pressedKeys [4]uint64
+
+func (p *pressedKeys) set(vk uint16) {
+	if vk > 255 {
+		return
+	}
+	p[vk/64] |= uint64(1) << (vk % 64)
+}
+
+func (p *pressedKeys) clear(vk uint16) {
+	if vk > 255 {
+		return
+	}
+	p[vk/64] &^= uint64(1) << (vk % 64)
+}
+
+func (p *pressedKeys) has(vk uint16) bool {
+	if vk > 255 {
+		return false
+	}
+	return p[vk/64]&(uint64(1)<<(vk%64)) != 0
+}
+
+func (p *pressedKeys) any() bool {
+	for _, slot := range p {
+		if slot != 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func (t captureTarget) valid() bool {
 	return t.kind != captureNone
 }
@@ -43,12 +76,15 @@ func (a *application) startCapture(target captureTarget) {
 
 func (a *application) handleKeyEvent(vk uint16, down bool) bool {
 	if down {
-		if a.pressed[vk] {
+		if a.pressed.has(vk) {
 			return false
 		}
-		a.pressed[vk] = true
+		if !a.shouldTrackPressedKey(vk) {
+			return false
+		}
+		a.pressed.set(vk)
 	} else {
-		delete(a.pressed, vk)
+		a.pressed.clear(vk)
 		if sameKey(vk, a.cfg.Pause) {
 			a.runner.SetPaused(false)
 			a.clicker.SetPaused(false)
@@ -111,6 +147,29 @@ func (a *application) handleKeyEvent(vk uint16, down bool) bool {
 		a.stopAllRunners("게임 메뉴 키 입력으로 정지했습니다.")
 	}
 	return false
+}
+
+func (a *application) shouldTrackPressedKey(vk uint16) bool {
+	// Only keys that can change app state need repeat suppression.
+	if a.capture.valid() {
+		return true
+	}
+	if a.runner.Running() && sameKey(vk, a.cfg.Stop) {
+		return true
+	}
+	if a.clicker.Running() && sameKey(vk, a.cfg.Clicker.Stop) {
+		return true
+	}
+	if sameKey(vk, a.cfg.Pause) && (a.runner.Running() || a.clicker.Running()) {
+		return true
+	}
+	if sameKey(vk, a.cfg.Start) {
+		return true
+	}
+	if sameKey(vk, a.cfg.Clicker.Start) {
+		return true
+	}
+	return (a.runner.Running() || a.clicker.Running()) && a.menuKeyMatches(vk)
 }
 
 func (a *application) assignCapturedKey(vk uint16) {
