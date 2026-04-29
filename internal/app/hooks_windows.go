@@ -52,21 +52,12 @@ func wndProc(hwnd uintptr, msg uint32, wParam uintptr, lParam unsafe.Pointer) ui
 			return 0
 		}
 	case wmClose:
-		procDestroyWindow.Call(hwnd)
+		appInstance.winapi.destroyWindow(hwnd)
 		return 0
 	case wmDestroy:
-		if appInstance.hook != 0 {
-			procUnhookWindowsHook.Call(appInstance.hook)
-			appInstance.hook = 0
-		}
-		if appInstance.mouseHook != 0 {
-			procUnhookWindowsHook.Call(appInstance.mouseHook)
-			appInstance.mouseHook = 0
-		}
-		appInstance.runner.Stop()
-		appInstance.clicker.Stop()
-		appInstance.disposeUIResources()
-		procPostQuitMessage.Call(0)
+		app := appInstance
+		app.cleanup()
+		app.winapi.postQuitMessage(0)
 		return 0
 	}
 	return defWindowProc(hwnd, msg, wParam, lParam)
