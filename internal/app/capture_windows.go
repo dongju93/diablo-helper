@@ -150,26 +150,28 @@ func (a *application) handleKeyEvent(vk uint16, down bool) bool {
 }
 
 func (a *application) shouldTrackPressedKey(vk uint16) bool {
-	// Only keys that can change app state need repeat suppression.
+	// Track configured control keys even when they are idle right now. If the
+	// runner starts while one is still held, Windows auto-repeat must not turn
+	// that held key into a fresh stop/pause/menu press.
 	if a.capture.valid() {
-		return true
-	}
-	if a.runner.Running() && sameKey(vk, a.cfg.Stop) {
-		return true
-	}
-	if a.clicker.Running() && sameKey(vk, a.cfg.Clicker.Stop) {
-		return true
-	}
-	if sameKey(vk, a.cfg.Pause) && (a.runner.Running() || a.clicker.Running()) {
 		return true
 	}
 	if sameKey(vk, a.cfg.Start) {
 		return true
 	}
+	if sameKey(vk, a.cfg.Stop) {
+		return true
+	}
+	if sameKey(vk, a.cfg.Pause) {
+		return true
+	}
 	if sameKey(vk, a.cfg.Clicker.Start) {
 		return true
 	}
-	return (a.runner.Running() || a.clicker.Running()) && a.menuKeyMatches(vk)
+	if sameKey(vk, a.cfg.Clicker.Stop) {
+		return true
+	}
+	return a.menuKeyMatches(vk)
 }
 
 func (a *application) assignCapturedKey(vk uint16) {
