@@ -278,6 +278,41 @@ func TestHandleKeyEventSuppressesRepeatedKeyDownUntilKeyUp(t *testing.T) {
 	}
 }
 
+func TestHandleKeyEventDoesNotRememberUnconfiguredKeys(t *testing.T) {
+	a := newApplication()
+	a.cfg = config.Default()
+
+	if a.handleKeyEvent('Z', true) {
+		t.Fatal("unconfigured Z down should not be consumed")
+	}
+	if a.pressed.any() {
+		t.Fatal("unconfigured Z down was retained in pressed state")
+	}
+	if a.handleKeyEvent('C', true) {
+		t.Fatal("idle menu C down should not be consumed")
+	}
+	if a.pressed.any() {
+		t.Fatal("idle menu C down was retained in pressed state")
+	}
+}
+
+func TestHandleKeyEventTracksConfiguredKeysForRepeatSuppression(t *testing.T) {
+	a := newApplication()
+	a.startCapture(captureTarget{kind: capturePause})
+
+	if !a.handleKeyEvent(vkF1, true) {
+		t.Fatal("captured F1 down should be consumed")
+	}
+	if !a.pressed.has(vkF1) {
+		t.Fatal("captured F1 was not retained for repeat suppression")
+	}
+
+	a.handleKeyEvent(vkF1, false)
+	if a.pressed.has(vkF1) {
+		t.Fatal("captured F1 remained pressed after key up")
+	}
+}
+
 func TestHandleKeyEventPauseOnlyWhileHeld(t *testing.T) {
 	a := newApplication()
 	a.cfg = config.Default()
