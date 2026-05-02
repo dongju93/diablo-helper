@@ -53,10 +53,13 @@ var (
 const defaultConfigFileName = "default.toml"
 
 func Run() error {
+	runtime.LockOSThread()
+	if err := ensureWinAPI(); err != nil {
+		return err
+	}
 	if err := hardenDLLSearchPath(); err != nil {
 		return err
 	}
-	runtime.LockOSThread()
 
 	app := newApplication()
 	return app.run()
@@ -64,11 +67,50 @@ func Run() error {
 
 func ShowFatalError(err error) {
 	if err != nil {
-		messageBox(0, "diablo-helper", err.Error(), mbOK|mbIconError)
+		if initErr := ensureWinAPI(); initErr == nil {
+			_ = messageBox(0, "diablo-helper", err.Error(), mbOK|mbIconError)
+			return
+		}
+		_ = fallbackMessageBox("diablo-helper", err.Error(), mbOK|mbIconError)
 	}
 }
 
+func fallbackMessageBox(title string, text string, flags uintptr) error {
+	root := os.Getenv("SystemRoot")
+	if root == "" {
+		root = os.Getenv("windir")
+	}
+	if root == "" {
+		return fmt.Errorf("SystemRoot is not set")
+	}
+
+	textPtr, err := utf16PtrSafe(text)
+	if err != nil {
+		return err
+	}
+	titlePtr, err := utf16PtrSafe(title)
+	if err != nil {
+		return err
+	}
+	user32Path := filepath.Join(root, "System32", "user32.dll")
+	if !filepath.IsAbs(user32Path) {
+		return fmt.Errorf("SystemRoot does not resolve to an absolute path")
+	}
+	proc := syscall.NewLazyDLL(user32Path).NewProc("MessageBoxW")
+	ret, _, callErr := proc.Call(
+		0,
+		uintptr(unsafe.Pointer(textPtr)),
+		uintptr(unsafe.Pointer(titlePtr)),
+		flags,
+	)
+	if ret == 0 && callErr != syscall.Errno(0) {
+		return callErr
+	}
+	return nil
+}
+
 func newApplication() *application {
+	_ = ensureWinAPI()
 	return &application{
 		cfg:    config.Default(),
 		runner: newSkillRunner(sendVirtualKey),

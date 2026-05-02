@@ -146,6 +146,10 @@ func TestHardenDLLSearchPathReturnsMissingSetDefaultDllDirectories(t *testing.T)
 }
 
 func TestWinAPIDLLsLoadFromSystem32(t *testing.T) {
+	if err := ensureWinAPI(); err != nil {
+		t.Fatalf("ensureWinAPI() error = %v", err)
+	}
+
 	dlls := map[*syscall.LazyDLL]string{
 		kernel32: "kernel32.dll",
 		user32:   "user32.dll",
@@ -165,6 +169,20 @@ func TestWinAPIDLLsLoadFromSystem32(t *testing.T) {
 		if got := filepath.Dir(dll.Name); !strings.EqualFold(got, system32Dir) {
 			t.Fatalf("%s directory = %q, want %q", wantName, got, system32Dir)
 		}
+	}
+}
+
+func TestSystemDirectoryReturnsLookupError(t *testing.T) {
+	wantErr := syscall.Errno(5)
+
+	_, err := systemDirectoryWith(func([]uint16) (uintptr, error) {
+		return 0, wantErr
+	})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("systemDirectoryWith() error = %v, want %v", err, wantErr)
+	}
+	if !strings.Contains(err.Error(), "GetSystemDirectoryW failed") {
+		t.Fatalf("systemDirectoryWith() error = %v, want failure context", err)
 	}
 }
 

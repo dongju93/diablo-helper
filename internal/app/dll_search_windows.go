@@ -18,6 +18,9 @@ type dllSearchProc interface {
 }
 
 func hardenDLLSearchPath() error {
+	if err := ensureWinAPI(); err != nil {
+		return err
+	}
 	return hardenDLLSearchPathWithProcs(procSetDefaultDllDirectories, procSetDllDirectoryW)
 }
 
