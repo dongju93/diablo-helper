@@ -39,6 +39,8 @@ type application struct {
 	runner          *skillRunner
 	clicker         *clickerRunner
 	skillEnabled    [config.MaxSkills]bool
+	winapi          applicationWinAPI
+	cleanedUp       bool
 }
 
 var (
@@ -51,10 +53,13 @@ var (
 const defaultConfigFileName = "default.toml"
 
 func Run() error {
+	runtime.LockOSThread()
+	if err := ensureWinAPI(); err != nil {
+		return err
+	}
 	if err := hardenDLLSearchPath(); err != nil {
 		return err
 	}
-	runtime.LockOSThread()
 
 	app := newApplication()
 	return app.run()
@@ -62,11 +67,50 @@ func Run() error {
 
 func ShowFatalError(err error) {
 	if err != nil {
-		messageBox(0, "diablo-helper", err.Error(), mbOK|mbIconError)
+		if initErr := ensureWinAPI(); initErr == nil {
+			_ = messageBox(0, "diablo-helper", err.Error(), mbOK|mbIconError)
+			return
+		}
+		_ = fallbackMessageBox("diablo-helper", err.Error(), mbOK|mbIconError)
 	}
 }
 
+func fallbackMessageBox(title string, text string, flags uintptr) error {
+	root := os.Getenv("SystemRoot")
+	if root == "" {
+		root = os.Getenv("windir")
+	}
+	if root == "" {
+		return fmt.Errorf("SystemRoot is not set")
+	}
+
+	textPtr, err := utf16PtrSafe(text)
+	if err != nil {
+		return err
+	}
+	titlePtr, err := utf16PtrSafe(title)
+	if err != nil {
+		return err
+	}
+	user32Path := filepath.Join(root, "System32", "user32.dll")
+	if !filepath.IsAbs(user32Path) {
+		return fmt.Errorf("SystemRoot does not resolve to an absolute path")
+	}
+	proc := syscall.NewLazyDLL(user32Path).NewProc("MessageBoxW")
+	ret, _, callErr := proc.Call(
+		0,
+		uintptr(unsafe.Pointer(textPtr)),
+		uintptr(unsafe.Pointer(titlePtr)),
+		flags,
+	)
+	if ret == 0 && callErr != syscall.Errno(0) {
+		return callErr
+	}
+	return nil
+}
+
 func newApplication() *application {
+	_ = ensureWinAPI()
 	return &application{
 		cfg:    config.Default(),
 		runner: newSkillRunner(sendVirtualKey),
@@ -75,6 +119,7 @@ func newApplication() *application {
 			menuButtons: make(map[string]uintptr),
 		},
 		clicker: newClickerRunner(sendVirtualKey),
+		winapi:  defaultApplicationWinAPI(),
 	}
 }
 
@@ -87,7 +132,7 @@ func (a *application) run() error {
 	}
 	a.cfg.NormalizeForUI()
 
-	instance, _, err := procGetModuleHandleW.Call(0)
+	instance, err := a.winapi.getModuleHandle()
 	if instance == 0 {
 		return fmt.Errorf("GetModuleHandleW failed: %w", err)
 	}
@@ -98,10 +143,10 @@ func (a *application) run() error {
 	}
 
 	appInstance = a
-	hwnd, _, err := procCreateWindowExW.Call(
+	hwnd, err := a.winapi.createWindowEx(
 		wsExComposited,
-		uintptr(unsafe.Pointer(utf16Ptr("DiabloHelperWindow"))),
-		uintptr(unsafe.Pointer(utf16Ptr(meta.Title()))),
+		utf16Ptr("DiabloHelperWindow"),
+		utf16Ptr(meta.Title()),
 		wsOverlappedWindow,
 		cwUseDefault,
 		cwUseDefault,
@@ -116,42 +161,42 @@ func (a *application) run() error {
 		return fmt.Errorf("CreateWindowExW failed: %w", err)
 	}
 	a.hwnd = hwnd
-	setWindowVisuals(hwnd)
+	a.winapi.setWindowVisuals(hwnd)
 
-	hook, _, err := procSetWindowsHookExW.Call(whKeyboardLL, keyboardHookProc, a.instance, 0)
+	hook, err := a.winapi.setWindowsHookEx(whKeyboardLL, keyboardHookProc, a.instance, 0)
 	if hook == 0 {
 		return fmt.Errorf("SetWindowsHookExW failed: %w", err)
 	}
 	a.hook = hook
-	mouseHook, _, err := procSetWindowsHookExW.Call(whMouseLL, mouseHookProc, a.instance, 0)
+	defer a.cleanup()
+
+	mouseHook, err := a.winapi.setWindowsHookEx(whMouseLL, mouseHookProc, a.instance, 0)
 	if mouseHook == 0 {
-		procUnhookWindowsHook.Call(a.hook)
-		a.hook = 0
 		return fmt.Errorf("SetWindowsHookExW mouse hook failed: %w", err)
 	}
 	a.mouseHook = mouseHook
 
-	procShowWindow.Call(hwnd, swShow)
-	procUpdateWindow.Call(hwnd)
+	a.winapi.showWindow(hwnd, swShow)
+	a.winapi.updateWindow(hwnd)
 
 	var msg message
 	for {
-		ret, _, callErr := procGetMessageW.Call(uintptr(unsafe.Pointer(&msg)), 0, 0, 0)
-		switch int32(ret) {
+		ret, callErr := a.winapi.getMessage(&msg)
+		switch ret {
 		case -1:
 			return fmt.Errorf("GetMessageW failed: %w", callErr)
 		case 0:
 			return nil
 		default:
-			procTranslateMessage.Call(uintptr(unsafe.Pointer(&msg)))
-			procDispatchMessageW.Call(uintptr(unsafe.Pointer(&msg)))
+			a.winapi.translateMessage(&msg)
+			a.winapi.dispatchMessage(&msg)
 		}
 	}
 }
 
 func (a *application) registerWindowClass() error {
-	cursor, _, _ := procLoadCursorW.Call(0, idcArrow)
-	icon, _, _ := procLoadIconW.Call(a.instance, uintptr(1))
+	cursor := a.winapi.loadCursor(0, idcArrow)
+	icon := a.winapi.loadIcon(a.instance, uintptr(1))
 	className := utf16Ptr("DiabloHelperWindow")
 	wc := windowClassEx{
 		Size:       uint32(unsafe.Sizeof(windowClassEx{})),
@@ -163,11 +208,37 @@ func (a *application) registerWindowClass() error {
 		Background: colorWindow + 1,
 		ClassName:  className,
 	}
-	ret, _, err := procRegisterClassExW.Call(uintptr(unsafe.Pointer(&wc)))
+	ret, err := a.winapi.registerClassEx(&wc)
 	if ret == 0 {
 		return fmt.Errorf("RegisterClassExW failed: %w", err)
 	}
 	return nil
+}
+
+func (a *application) cleanup() {
+	if a.cleanedUp {
+		return
+	}
+	a.cleanedUp = true
+
+	if a.runner != nil {
+		a.runner.Stop()
+	}
+	if a.clicker != nil {
+		a.clicker.Stop()
+	}
+	if a.hook != 0 {
+		a.winapi.unhookWindowsHook(a.hook)
+		a.hook = 0
+	}
+	if a.mouseHook != 0 {
+		a.winapi.unhookWindowsHook(a.mouseHook)
+		a.mouseHook = 0
+	}
+	a.disposeUIResources()
+	if appInstance == a {
+		appInstance = nil
+	}
 }
 
 func defaultConfigPath() string {
@@ -176,4 +247,118 @@ func defaultConfigPath() string {
 		return defaultConfigFileName
 	}
 	return filepath.Join(filepath.Dir(executable), defaultConfigFileName)
+}
+
+type applicationWinAPI struct {
+	getModuleHandle   func() (uintptr, error)
+	loadCursor        func(instance uintptr, cursor uintptr) uintptr
+	loadIcon          func(instance uintptr, icon uintptr) uintptr
+	registerClassEx   func(wc *windowClassEx) (uintptr, error)
+	createWindowEx    createWindowExFunc
+	setWindowVisuals  func(hwnd uintptr)
+	setWindowsHookEx  func(idHook int, hookProc uintptr, instance uintptr, threadID uint32) (uintptr, error)
+	unhookWindowsHook func(hook uintptr)
+	showWindow        func(hwnd uintptr, command uintptr)
+	updateWindow      func(hwnd uintptr)
+	getMessage        func(msg *message) (int32, error)
+	translateMessage  func(msg *message)
+	dispatchMessage   func(msg *message)
+	destroyWindow     func(hwnd uintptr)
+	postQuitMessage   func(exitCode int)
+}
+
+type createWindowExFunc func(
+	exStyle uintptr,
+	className *uint16,
+	windowName *uint16,
+	style uintptr,
+	x uintptr,
+	y uintptr,
+	width uintptr,
+	height uintptr,
+	parent uintptr,
+	menu uintptr,
+	instance uintptr,
+	param uintptr,
+) (uintptr, error)
+
+func defaultApplicationWinAPI() applicationWinAPI {
+	return applicationWinAPI{
+		getModuleHandle: func() (uintptr, error) {
+			instance, _, err := procGetModuleHandleW.Call(0)
+			return instance, err
+		},
+		loadCursor: func(instance uintptr, cursor uintptr) uintptr {
+			ret, _, _ := procLoadCursorW.Call(instance, cursor)
+			return ret
+		},
+		loadIcon: func(instance uintptr, icon uintptr) uintptr {
+			ret, _, _ := procLoadIconW.Call(instance, icon)
+			return ret
+		},
+		registerClassEx: func(wc *windowClassEx) (uintptr, error) {
+			ret, _, err := procRegisterClassExW.Call(uintptr(unsafe.Pointer(wc)))
+			return ret, err
+		},
+		createWindowEx: func(
+			exStyle uintptr,
+			className *uint16,
+			windowName *uint16,
+			style uintptr,
+			x uintptr,
+			y uintptr,
+			width uintptr,
+			height uintptr,
+			parent uintptr,
+			menu uintptr,
+			instance uintptr,
+			param uintptr,
+		) (uintptr, error) {
+			hwnd, _, err := procCreateWindowExW.Call(
+				exStyle,
+				uintptr(unsafe.Pointer(className)),
+				uintptr(unsafe.Pointer(windowName)),
+				style,
+				x,
+				y,
+				width,
+				height,
+				parent,
+				menu,
+				instance,
+				param,
+			)
+			return hwnd, err
+		},
+		setWindowVisuals: setWindowVisuals,
+		setWindowsHookEx: func(idHook int, hookProc uintptr, instance uintptr, threadID uint32) (uintptr, error) {
+			hook, _, err := procSetWindowsHookExW.Call(uintptr(idHook), hookProc, instance, uintptr(threadID))
+			return hook, err
+		},
+		unhookWindowsHook: func(hook uintptr) {
+			procUnhookWindowsHook.Call(hook)
+		},
+		showWindow: func(hwnd uintptr, command uintptr) {
+			procShowWindow.Call(hwnd, command)
+		},
+		updateWindow: func(hwnd uintptr) {
+			procUpdateWindow.Call(hwnd)
+		},
+		getMessage: func(msg *message) (int32, error) {
+			ret, _, err := procGetMessageW.Call(uintptr(unsafe.Pointer(msg)), 0, 0, 0)
+			return int32(ret), err
+		},
+		translateMessage: func(msg *message) {
+			procTranslateMessage.Call(uintptr(unsafe.Pointer(msg)))
+		},
+		dispatchMessage: func(msg *message) {
+			procDispatchMessageW.Call(uintptr(unsafe.Pointer(msg)))
+		},
+		destroyWindow: func(hwnd uintptr) {
+			procDestroyWindow.Call(hwnd)
+		},
+		postQuitMessage: func(exitCode int) {
+			procPostQuitMessage.Call(uintptr(exitCode))
+		},
+	}
 }

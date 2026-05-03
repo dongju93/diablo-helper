@@ -3,6 +3,7 @@
 package app
 
 import (
+	"errors"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -124,7 +125,31 @@ func TestHardenDLLSearchPathSucceeds(t *testing.T) {
 	}
 }
 
+func TestHardenDLLSearchPathReturnsMissingSetDefaultDllDirectories(t *testing.T) {
+	findErr := syscall.Errno(127)
+	setDefault := &stubDLLSearchProc{findErr: findErr, callRet: 1}
+	setDllDirectory := &stubDLLSearchProc{callRet: 1}
+
+	err := hardenDLLSearchPathWithProcs(setDefault, setDllDirectory)
+	if !errors.Is(err, findErr) {
+		t.Fatalf("hardenDLLSearchPathWithProcs() error = %v, want %v", err, findErr)
+	}
+	if !strings.Contains(err.Error(), "SetDefaultDllDirectories unavailable") {
+		t.Fatalf("hardenDLLSearchPathWithProcs() error = %v, want unavailable context", err)
+	}
+	if setDefault.callCount != 0 {
+		t.Fatalf("SetDefaultDllDirectories Call count = %d, want 0", setDefault.callCount)
+	}
+	if setDllDirectory.findCount != 0 || setDllDirectory.callCount != 0 {
+		t.Fatalf("SetDllDirectoryW calls = (%d, %d), want (0, 0)", setDllDirectory.findCount, setDllDirectory.callCount)
+	}
+}
+
 func TestWinAPIDLLsLoadFromSystem32(t *testing.T) {
+	if err := ensureWinAPI(); err != nil {
+		t.Fatalf("ensureWinAPI() error = %v", err)
+	}
+
 	dlls := map[*syscall.LazyDLL]string{
 		kernel32: "kernel32.dll",
 		user32:   "user32.dll",
@@ -145,4 +170,38 @@ func TestWinAPIDLLsLoadFromSystem32(t *testing.T) {
 			t.Fatalf("%s directory = %q, want %q", wantName, got, system32Dir)
 		}
 	}
+}
+
+func TestSystemDirectoryReturnsLookupError(t *testing.T) {
+	wantErr := syscall.Errno(5)
+
+	_, err := systemDirectoryWith(func([]uint16) (uintptr, error) {
+		return 0, wantErr
+	})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("systemDirectoryWith() error = %v, want %v", err, wantErr)
+	}
+	if !strings.Contains(err.Error(), "GetSystemDirectoryW failed") {
+		t.Fatalf("systemDirectoryWith() error = %v, want failure context", err)
+	}
+}
+
+type stubDLLSearchProc struct {
+	findErr   error
+	callRet   uintptr
+	callErr   error
+	findCount int
+	callCount int
+	callArgs  []uintptr
+}
+
+func (p *stubDLLSearchProc) Find() error {
+	p.findCount++
+	return p.findErr
+}
+
+func (p *stubDLLSearchProc) Call(a ...uintptr) (uintptr, uintptr, error) {
+	p.callCount++
+	p.callArgs = append([]uintptr(nil), a...)
+	return p.callRet, 0, p.callErr
 }
