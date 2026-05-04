@@ -282,7 +282,19 @@ func adjustWindowRectForDPI(rc *rect, style uintptr, exStyle uintptr, dpi int) b
 }
 
 func moveControl(hwnd uintptr, x, y, width, height int) {
-	procMoveWindow.Call(hwnd, uintptr(x), uintptr(y), uintptr(width), uintptr(height), 1)
+	if hwnd == 0 {
+		return
+	}
+	procSetWindowPos.Call(
+		hwnd,
+		0,
+		uintptr(x),
+		uintptr(y),
+		uintptr(width),
+		uintptr(height),
+		swpNoZOrder|swpNoActivate|swpNoRedraw,
+	)
+	invalidateRect(hwnd, false)
 }
 
 func setWindowPos(hwnd uintptr, x, y, width, height int, flags uintptr) {

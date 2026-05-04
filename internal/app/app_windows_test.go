@@ -10,6 +10,12 @@ import (
 	"github.com/dongju93/diablo-helper/internal/config"
 )
 
+func TestMainWindowStyleAvoidsCompositedResizePath(t *testing.T) {
+	if mainWindowExStyle&wsExComposited != 0 {
+		t.Fatalf("mainWindowExStyle includes WS_EX_COMPOSITED: %#x", mainWindowExStyle)
+	}
+}
+
 func TestApplicationRunCleansUpAfterGetMessageError(t *testing.T) {
 	a := newApplication()
 	a.runner = newSkillRunner(func(uint16) error { return nil })

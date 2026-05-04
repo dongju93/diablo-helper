@@ -264,7 +264,6 @@ func (a *application) paint(hwnd uintptr) {
 	procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&client)))
 
 	lo := computeLayout(int(client.Right), int(client.Bottom), a.currentDPI(hwnd))
-	a.applyUIScale(lo.uiScale())
 	procFillRect.Call(hdc, uintptr(unsafe.Pointer(&client)), a.bgBrush)
 
 	// Panels

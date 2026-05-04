@@ -15,7 +15,7 @@ const (
 	wsExComposited = 0x02000000
 
 	mainWindowStyle   = wsOverlappedWindow
-	mainWindowExStyle = wsExComposited
+	mainWindowExStyle = 0
 
 	bsAutoCheckbox        = 0x00000003
 	bsOwnerDraw           = 0x0000000B
@@ -73,6 +73,7 @@ const (
 	smCxScreen              = 0
 	smCyScreen              = 1
 	swpNoZOrder             = 0x0004
+	swpNoRedraw             = 0x0008
 	swpNoActivate           = 0x0010
 	swShow                  = 5
 	whKeyboardLL            = 13

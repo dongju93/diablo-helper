@@ -339,7 +339,7 @@ func (a *application) repositionControls() {
 	moveControl(a.controls.statusLabel, lo.x(layoutLX+24), lo.y(statusBarY+11), lo.w(55), lo.h(24))
 	moveControl(a.controls.status, lo.statusTextX, lo.y(statusBarY+11), lo.statusTextW, lo.h(24))
 
-	invalidateRect(a.hwnd, true)
+	invalidateRect(a.hwnd, false)
 }
 
 func (a *application) createStatic(parent uintptr, text string, x int, y int, width int, height int) uintptr {
