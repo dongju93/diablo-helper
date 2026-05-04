@@ -25,12 +25,13 @@ func wndProc(hwnd uintptr, msg uint32, wParam uintptr, lParam unsafe.Pointer) ui
 	case wmGetMinMaxInfo:
 		if lParam != nil {
 			info := (*minMaxInfo)(lParam)
-			info.MinTrackSize.X = windowMinW
-			info.MinTrackSize.Y = windowMinH
-			info.MaxSize.X = windowMaxW
-			info.MaxSize.Y = windowMaxH
-			info.MaxTrackSize.X = windowMaxW
-			info.MaxTrackSize.Y = windowMaxH
+			bounds := appInstance.currentWindowBounds(hwnd)
+			info.MinTrackSize.X = bounds.minW
+			info.MinTrackSize.Y = bounds.minH
+			info.MaxSize.X = bounds.maxW
+			info.MaxSize.Y = bounds.maxH
+			info.MaxTrackSize.X = bounds.maxW
+			info.MaxTrackSize.Y = bounds.maxH
 		}
 		return 0
 	case wmPaint:

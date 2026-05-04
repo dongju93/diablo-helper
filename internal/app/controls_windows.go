@@ -211,10 +211,9 @@ func (a *application) invalidateCaptureControls(targets ...captureTarget) {
 }
 
 func (a *application) createControls(hwnd uintptr) {
-	a.initUIResources()
-
 	cw, ch := getClientSize(hwnd)
 	lo := computeLayout(cw, ch)
+	a.applyUIScale(lo.uiScale())
 
 	// Header buttons (right-anchored)
 	a.controls.loadButton = a.createButton(hwnd, idLoad, "불러오기", lo.loadX, lo.y(26), lo.w(headerBtnW), lo.h(34))
@@ -284,6 +283,7 @@ func (a *application) createControls(hwnd uintptr) {
 func (a *application) repositionControls() {
 	cw, ch := getClientSize(a.hwnd)
 	lo := computeLayout(cw, ch)
+	a.applyUIScale(lo.uiScale())
 
 	moveControl(a.controls.loadButton, lo.loadX, lo.y(26), lo.w(headerBtnW), lo.h(34))
 	moveControl(a.controls.saveButton, lo.saveX, lo.y(26), lo.w(headerBtnW), lo.h(34))

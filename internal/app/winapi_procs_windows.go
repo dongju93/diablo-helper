@@ -45,12 +45,15 @@ var (
 	procGetClientRect     *syscall.LazyProc
 	procGetDlgItem        *syscall.LazyProc
 	procGetMessageW       *syscall.LazyProc
+	procGetMonitorInfoW   *syscall.LazyProc
+	procGetSystemMetrics  *syscall.LazyProc
 	procGetWindowTextW    *syscall.LazyProc
 	procGetWindowTextLenW *syscall.LazyProc
 	procInvalidateRect    *syscall.LazyProc
 	procLoadCursorW       *syscall.LazyProc
 	procLoadIconW         *syscall.LazyProc
 	procMessageBoxW       *syscall.LazyProc
+	procMonitorFromWindow *syscall.LazyProc
 	procPostQuitMessage   *syscall.LazyProc
 	procRegisterClassExW  *syscall.LazyProc
 	procSendInput         *syscall.LazyProc
@@ -122,12 +125,15 @@ func loadWinAPIProcs() {
 	procGetClientRect = user32.NewProc("GetClientRect")
 	procGetDlgItem = user32.NewProc("GetDlgItem")
 	procGetMessageW = user32.NewProc("GetMessageW")
+	procGetMonitorInfoW = user32.NewProc("GetMonitorInfoW")
+	procGetSystemMetrics = user32.NewProc("GetSystemMetrics")
 	procGetWindowTextW = user32.NewProc("GetWindowTextW")
 	procGetWindowTextLenW = user32.NewProc("GetWindowTextLengthW")
 	procInvalidateRect = user32.NewProc("InvalidateRect")
 	procLoadCursorW = user32.NewProc("LoadCursorW")
 	procLoadIconW = user32.NewProc("LoadIconW")
 	procMessageBoxW = user32.NewProc("MessageBoxW")
+	procMonitorFromWindow = user32.NewProc("MonitorFromWindow")
 	procPostQuitMessage = user32.NewProc("PostQuitMessage")
 	procRegisterClassExW = user32.NewProc("RegisterClassExW")
 	procSendInput = user32.NewProc("SendInput")

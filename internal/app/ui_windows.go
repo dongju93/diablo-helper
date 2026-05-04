@@ -3,9 +3,17 @@
 package app
 
 import (
+	"math"
 	"unsafe"
 
 	"github.com/dongju93/diablo-helper/internal/config"
+)
+
+const (
+	uiFontBaseHeight        = -15
+	uiTitleFontBaseHeight   = -28
+	uiSectionFontBaseHeight = -16
+	uiFontMinScale          = 0.8
 )
 
 var (
@@ -36,14 +44,18 @@ func int32Arg(value int32) uintptr {
 }
 
 func (a *application) initUIResources() {
+	scale := a.fontScale
+	if scale <= 0 {
+		scale = 1
+	}
 	if a.font == 0 {
-		a.font = createUIFont("Malgun Gothic", -15, fwNormal)
+		a.font = createUIFont("Malgun Gothic", scaledFontHeight(uiFontBaseHeight, scale), fwNormal)
 	}
 	if a.titleFont == 0 {
-		a.titleFont = createUIFont("Segoe UI Variable Display", -28, fwSemiBold)
+		a.titleFont = createUIFont("Segoe UI Variable Display", scaledFontHeight(uiTitleFontBaseHeight, scale), fwSemiBold)
 	}
 	if a.sectionFont == 0 {
-		a.sectionFont = createUIFont("Malgun Gothic", -16, fwSemiBold)
+		a.sectionFont = createUIFont("Malgun Gothic", scaledFontHeight(uiSectionFontBaseHeight, scale), fwSemiBold)
 	}
 	if a.bgBrush == 0 {
 		a.bgBrush = createBrush(uiBackground)
@@ -69,6 +81,42 @@ func (a *application) initUIResources() {
 	if a.accentPen == 0 {
 		a.accentPen = createPen(uiAccent, 1)
 	}
+}
+
+func (a *application) applyUIScale(scale float64) {
+	if scale <= 0 {
+		scale = 1
+	}
+	scale = clampFloat(scale, uiFontMinScale, layoutMaxScale)
+	rebuildFonts := a.font == 0 ||
+		a.titleFont == 0 ||
+		a.sectionFont == 0 ||
+		scaledFontHeight(uiFontBaseHeight, a.fontScale) != scaledFontHeight(uiFontBaseHeight, scale) ||
+		scaledFontHeight(uiTitleFontBaseHeight, a.fontScale) != scaledFontHeight(uiTitleFontBaseHeight, scale) ||
+		scaledFontHeight(uiSectionFontBaseHeight, a.fontScale) != scaledFontHeight(uiSectionFontBaseHeight, scale)
+
+	a.fontScale = scale
+	if rebuildFonts {
+		a.disposeUIFontResources()
+	}
+	a.initUIResources()
+	if rebuildFonts {
+		a.updateControlFonts()
+	}
+}
+
+func scaledFontHeight(base int, scale float64) int32 {
+	if scale <= 0 {
+		scale = 1
+	}
+	height := int32(math.Round(math.Abs(float64(base)) * scale))
+	if height < 1 {
+		height = 1
+	}
+	if base < 0 {
+		return -height
+	}
+	return height
 }
 
 func createUIFont(face string, height int32, weight int) uintptr {
@@ -107,10 +155,17 @@ func deleteGDIObject(handle uintptr) {
 	}
 }
 
-func (a *application) disposeUIResources() {
+func (a *application) disposeUIFontResources() {
 	deleteGDIObject(a.font)
 	deleteGDIObject(a.titleFont)
 	deleteGDIObject(a.sectionFont)
+	a.font = 0
+	a.titleFont = 0
+	a.sectionFont = 0
+}
+
+func (a *application) disposeUIResources() {
+	a.disposeUIFontResources()
 	deleteGDIObject(a.bgBrush)
 	deleteGDIObject(a.panelBrush)
 	deleteGDIObject(a.editBrush)
@@ -119,9 +174,6 @@ func (a *application) disposeUIResources() {
 	deleteGDIObject(a.borderBrush)
 	deleteGDIObject(a.accentBrush)
 	deleteGDIObject(a.accentPen)
-	a.font = 0
-	a.titleFont = 0
-	a.sectionFont = 0
 	a.bgBrush = 0
 	a.panelBrush = 0
 	a.editBrush = 0
@@ -132,9 +184,74 @@ func (a *application) disposeUIResources() {
 	a.accentPen = 0
 }
 
-func (a *application) paint(hwnd uintptr) {
-	a.initUIResources()
+func (a *application) updateControlFonts() {
+	if a.font == 0 {
+		return
+	}
+	for _, hwnd := range []uintptr{
+		a.controls.startLabel,
+		a.controls.startButton,
+		a.controls.stopLabel,
+		a.controls.stopButton,
+		a.controls.pauseButton,
+		a.controls.loadButton,
+		a.controls.saveButton,
+		a.controls.bulkLabel,
+		a.controls.bulkInterval,
+		a.controls.bulkMsLabel,
+		a.controls.bulkSkillGapLbl,
+		a.controls.bulkSkillGap,
+		a.controls.bulkGapMsLabel,
+		a.controls.applyBulk,
+		a.controls.skillUseHdr,
+		a.controls.skillNumHdr,
+		a.controls.skillKeyHdr,
+		a.controls.skillIntHdr,
+		a.controls.pauseLabel,
+		a.controls.clickerStartLabel,
+		a.controls.clickerStartButton,
+		a.controls.clickerStopLabel,
+		a.controls.clickerStopButton,
+		a.controls.clickerKeyLabel,
+		a.controls.clickerKeyButton,
+		a.controls.clickerIntervalLabel,
+		a.controls.clickerInterval,
+		a.controls.clickerMsLabel,
+		a.controls.statusLabel,
+		a.controls.status,
+	} {
+		setControlFont(hwnd, a.font)
+	}
+	for _, hwnd := range a.controls.menuLabels {
+		setControlFont(hwnd, a.font)
+	}
+	for _, hwnd := range a.controls.menuButtons {
+		setControlFont(hwnd, a.font)
+	}
+	for _, hwnd := range a.controls.skillEnabled {
+		setControlFont(hwnd, a.font)
+	}
+	for _, hwnd := range a.controls.skillNums {
+		setControlFont(hwnd, a.font)
+	}
+	for _, hwnd := range a.controls.skillButtons {
+		setControlFont(hwnd, a.font)
+	}
+	for _, hwnd := range a.controls.skillInterval {
+		setControlFont(hwnd, a.font)
+	}
+	for _, hwnd := range a.controls.skillMsLbls {
+		setControlFont(hwnd, a.font)
+	}
+}
 
+func setControlFont(hwnd uintptr, font uintptr) {
+	if hwnd != 0 && font != 0 {
+		sendMessage(hwnd, wmSetFont, font, 1)
+	}
+}
+
+func (a *application) paint(hwnd uintptr) {
 	var ps paintStruct
 	hdc, _, _ := procBeginPaint.Call(hwnd, uintptr(unsafe.Pointer(&ps)))
 	if hdc == 0 {
@@ -144,9 +261,10 @@ func (a *application) paint(hwnd uintptr) {
 
 	var client rect
 	procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&client)))
-	procFillRect.Call(hdc, uintptr(unsafe.Pointer(&client)), a.bgBrush)
 
 	lo := computeLayout(int(client.Right), int(client.Bottom))
+	a.applyUIScale(lo.uiScale())
+	procFillRect.Call(hdc, uintptr(unsafe.Pointer(&client)), a.bgBrush)
 
 	// Panels
 	a.drawPanel(hdc, lo.leftX, lo.y(92), lo.leftW, lo.h(126))

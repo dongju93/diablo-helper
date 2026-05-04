@@ -31,6 +31,7 @@ type application struct {
 	borderBrush     uintptr
 	accentBrush     uintptr
 	accentPen       uintptr
+	fontScale       float64
 	configPath      string
 	cfg             config.Config
 	controls        controlRefs
@@ -143,6 +144,7 @@ func (a *application) run() error {
 	}
 
 	appInstance = a
+	bounds := a.currentWindowBounds(0)
 	hwnd, err := a.winapi.createWindowEx(
 		wsExComposited,
 		utf16Ptr("DiabloHelperWindow"),
@@ -150,8 +152,8 @@ func (a *application) run() error {
 		wsOverlappedWindow,
 		cwUseDefault,
 		cwUseDefault,
-		windowMaxW,
-		windowMaxH,
+		uintptr(bounds.maxW),
+		uintptr(bounds.maxH),
 		0,
 		0,
 		a.instance,
@@ -265,6 +267,7 @@ type applicationWinAPI struct {
 	dispatchMessage   func(msg *message)
 	destroyWindow     func(hwnd uintptr)
 	postQuitMessage   func(exitCode int)
+	monitorMetrics    func(hwnd uintptr) monitorMetrics
 }
 
 type createWindowExFunc func(
@@ -360,5 +363,14 @@ func defaultApplicationWinAPI() applicationWinAPI {
 		postQuitMessage: func(exitCode int) {
 			procPostQuitMessage.Call(uintptr(exitCode))
 		},
+		monitorMetrics: getMonitorMetrics,
 	}
+}
+
+func (a *application) currentWindowBounds(hwnd uintptr) windowBounds {
+	if a == nil || a.winapi.monitorMetrics == nil {
+		return computeWindowBounds(windowReferenceMonitorW, windowReferenceMonitorH, windowReferenceMonitorW, windowReferenceMonitorH)
+	}
+	metrics := a.winapi.monitorMetrics(hwnd)
+	return computeWindowBounds(metrics.monitorW, metrics.monitorH, metrics.workW, metrics.workH)
 }

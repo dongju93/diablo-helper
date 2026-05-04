@@ -144,6 +144,66 @@ func getClientSize(hwnd uintptr) (int, int) {
 	return int(cr.Right), int(cr.Bottom)
 }
 
+type monitorMetrics struct {
+	monitorW int
+	monitorH int
+	workW    int
+	workH    int
+}
+
+func getMonitorMetrics(hwnd uintptr) monitorMetrics {
+	metrics := fallbackMonitorMetrics()
+	flag := uintptr(monitorDefaultToNearest)
+	if hwnd == 0 {
+		flag = monitorDefaultToPrimary
+	}
+	monitor, _, _ := procMonitorFromWindow.Call(hwnd, flag)
+	if monitor == 0 {
+		return metrics
+	}
+
+	info := monitorInfo{Size: uint32(unsafe.Sizeof(monitorInfo{}))}
+	ret, _, _ := procGetMonitorInfoW.Call(monitor, uintptr(unsafe.Pointer(&info)))
+	if ret == 0 {
+		return metrics
+	}
+
+	monitorW := int(info.Monitor.Right - info.Monitor.Left)
+	monitorH := int(info.Monitor.Bottom - info.Monitor.Top)
+	workW := int(info.Work.Right - info.Work.Left)
+	workH := int(info.Work.Bottom - info.Work.Top)
+	if monitorW <= 0 || monitorH <= 0 {
+		return metrics
+	}
+	metrics.monitorW = monitorW
+	metrics.monitorH = monitorH
+	if workW > 0 && workH > 0 {
+		metrics.workW = workW
+		metrics.workH = workH
+	} else {
+		metrics.workW = monitorW
+		metrics.workH = monitorH
+	}
+	return metrics
+}
+
+func fallbackMonitorMetrics() monitorMetrics {
+	width, _, _ := procGetSystemMetrics.Call(smCxScreen)
+	height, _, _ := procGetSystemMetrics.Call(smCyScreen)
+	monitorW := int(width)
+	monitorH := int(height)
+	if monitorW <= 0 || monitorH <= 0 {
+		monitorW = windowReferenceMonitorW
+		monitorH = windowReferenceMonitorH
+	}
+	return monitorMetrics{
+		monitorW: monitorW,
+		monitorH: monitorH,
+		workW:    monitorW,
+		workH:    monitorH,
+	}
+}
+
 func moveControl(hwnd uintptr, x, y, width, height int) {
 	procMoveWindow.Call(hwnd, uintptr(x), uintptr(y), uintptr(width), uintptr(height), 1)
 }

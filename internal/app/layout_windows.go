@@ -10,9 +10,15 @@ const (
 	windowMinW = 760
 	windowMinH = 780
 
+	windowReferenceMonitorW  = 2560
+	windowReferenceMonitorH  = 1440
+	windowResolutionMinScale = 0.95
+	windowResolutionMaxScale = 1.6
+
 	layoutDesignW  = 964
 	layoutDesignH  = 920
-	layoutMinScale = 0.7
+	layoutMinScale = 0.58
+	layoutMaxScale = windowResolutionMaxScale
 
 	layoutLX  = 24
 	layoutLW  = 348
@@ -104,6 +110,52 @@ type uiLayout struct {
 	statusTextX, statusTextW int
 }
 
+type windowBounds struct {
+	minW int32
+	minH int32
+	maxW int32
+	maxH int32
+}
+
+func computeWindowBounds(monitorW, monitorH int, workW, workH int) windowBounds {
+	scale := monitorResolutionScale(monitorW, monitorH)
+	minW := scaledWindowBound(windowMinW, scale)
+	minH := scaledWindowBound(windowMinH, scale)
+	maxW := scaledWindowBound(windowMaxW, scale)
+	maxH := scaledWindowBound(windowMaxH, scale)
+
+	if workW > 0 {
+		maxW = minInt(maxW, workW)
+	}
+	if workH > 0 {
+		maxH = minInt(maxH, workH)
+	}
+	minW = minInt(minW, maxW)
+	minH = minInt(minH, maxH)
+
+	return windowBounds{
+		minW: int32(maxInt(1, minW)),
+		minH: int32(maxInt(1, minH)),
+		maxW: int32(maxInt(1, maxW)),
+		maxH: int32(maxInt(1, maxH)),
+	}
+}
+
+func monitorResolutionScale(monitorW, monitorH int) float64 {
+	if monitorW <= 0 || monitorH <= 0 {
+		return 1
+	}
+	scale := math.Min(
+		float64(monitorW)/float64(windowReferenceMonitorW),
+		float64(monitorH)/float64(windowReferenceMonitorH),
+	)
+	return clampFloat(scale, windowResolutionMinScale, windowResolutionMaxScale)
+}
+
+func scaledWindowBound(value int, scale float64) int {
+	return maxInt(1, int(math.Round(float64(value)*scale)))
+}
+
 func computeLayout(cw, ch int) uiLayout {
 	sx := layoutScale(cw, layoutDesignW)
 	sy := layoutScale(ch, layoutDesignH)
@@ -183,8 +235,8 @@ func layoutScale(size, design int) float64 {
 		return 1
 	}
 	scale := float64(size) / float64(design)
-	if scale > 1 {
-		return 1
+	if scale > layoutMaxScale {
+		return layoutMaxScale
 	}
 	if scale < layoutMinScale {
 		return layoutMinScale
@@ -229,9 +281,33 @@ func (lo uiLayout) s(value int) int {
 	return scaled(value, lo.sy)
 }
 
+func (lo uiLayout) uiScale() float64 {
+	if lo.sx < lo.sy {
+		return lo.sx
+	}
+	return lo.sy
+}
+
 func maxInt(a, b int) int {
 	if a > b {
 		return a
 	}
 	return b
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func clampFloat(value float64, minValue float64, maxValue float64) float64 {
+	if value < minValue {
+		return minValue
+	}
+	if value > maxValue {
+		return maxValue
+	}
+	return value
 }
