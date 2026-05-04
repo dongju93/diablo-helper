@@ -26,13 +26,18 @@ func wndProc(hwnd uintptr, msg uint32, wParam uintptr, lParam unsafe.Pointer) ui
 		if lParam != nil {
 			info := (*minMaxInfo)(lParam)
 			bounds := appInstance.currentWindowBounds(hwnd)
+			info.MaxPosition.X = bounds.maxPositionX
+			info.MaxPosition.Y = bounds.maxPositionY
+			info.MaxSize.X = bounds.maximizedW
+			info.MaxSize.Y = bounds.maximizedH
 			info.MinTrackSize.X = bounds.minW
 			info.MinTrackSize.Y = bounds.minH
-			info.MaxSize.X = bounds.maxW
-			info.MaxSize.Y = bounds.maxH
 			info.MaxTrackSize.X = bounds.maxW
 			info.MaxTrackSize.Y = bounds.maxH
 		}
+		return 0
+	case wmDpiChanged:
+		appInstance.handleDPIChanged(hwnd, wParam, lParam)
 		return 0
 	case wmPaint:
 		appInstance.paint(hwnd)

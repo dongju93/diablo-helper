@@ -5,6 +5,8 @@ package app
 import "math"
 
 const (
+	defaultDPI = 96
+
 	windowMaxW = 980
 	windowMaxH = 960
 	windowMinW = 760
@@ -111,34 +113,77 @@ type uiLayout struct {
 }
 
 type windowBounds struct {
-	minW int32
-	minH int32
-	maxW int32
-	maxH int32
+	minW         int32
+	minH         int32
+	maxW         int32
+	maxH         int32
+	maxPositionX int32
+	maxPositionY int32
+	maximizedW   int32
+	maximizedH   int32
 }
 
-func computeWindowBounds(monitorW, monitorH int, workW, workH int) windowBounds {
-	scale := monitorResolutionScale(monitorW, monitorH)
-	minW := scaledWindowBound(windowMinW, scale)
-	minH := scaledWindowBound(windowMinH, scale)
-	maxW := scaledWindowBound(windowMaxW, scale)
-	maxH := scaledWindowBound(windowMaxH, scale)
+type windowFrame struct {
+	width  int
+	height int
+}
 
-	if workW > 0 {
-		maxW = minInt(maxW, workW)
+func computeWindowBounds(metrics monitorMetrics, frame windowFrame) windowBounds {
+	dpi := normalizedDPI(metrics.dpi)
+	scale := monitorVisualScale(metrics.monitorW, metrics.monitorH, dpi)
+	minClientW := scaledWindowBound(windowMinW, scale)
+	minClientH := scaledWindowBound(windowMinH, scale)
+	maxClientW := scaledWindowBound(windowMaxW, scale)
+	maxClientH := scaledWindowBound(windowMaxH, scale)
+
+	frameW := maxInt(0, frame.width)
+	frameH := maxInt(0, frame.height)
+	if metrics.workW > frameW {
+		maxClientW = minInt(maxClientW, metrics.workW-frameW)
 	}
-	if workH > 0 {
-		maxH = minInt(maxH, workH)
+	if metrics.workH > frameH {
+		maxClientH = minInt(maxClientH, metrics.workH-frameH)
 	}
-	minW = minInt(minW, maxW)
-	minH = minInt(minH, maxH)
+	maxClientW = maxInt(minClientW, maxClientW)
+	maxClientH = maxInt(minClientH, maxClientH)
+
+	minW := minClientW + frameW
+	minH := minClientH + frameH
+	maxW := maxClientW + frameW
+	maxH := maxClientH + frameH
+
+	maximizedW := metrics.workW
+	maximizedH := metrics.workH
+	if maximizedW <= 0 {
+		maximizedW = metrics.monitorW
+	}
+	if maximizedH <= 0 {
+		maximizedH = metrics.monitorH
+	}
+	if maximizedW <= 0 {
+		maximizedW = maxW
+	}
+	if maximizedH <= 0 {
+		maximizedH = maxH
+	}
 
 	return windowBounds{
-		minW: int32(maxInt(1, minW)),
-		minH: int32(maxInt(1, minH)),
-		maxW: int32(maxInt(1, maxW)),
-		maxH: int32(maxInt(1, maxH)),
+		minW:         int32(maxInt(1, minW)),
+		minH:         int32(maxInt(1, minH)),
+		maxW:         int32(maxInt(1, maxW)),
+		maxH:         int32(maxInt(1, maxH)),
+		maxPositionX: int32(metrics.workX - metrics.monitorX),
+		maxPositionY: int32(metrics.workY - metrics.monitorY),
+		maximizedW:   int32(maxInt(1, maximizedW)),
+		maximizedH:   int32(maxInt(1, maximizedH)),
 	}
+}
+
+func monitorVisualScale(monitorW, monitorH int, dpi int) float64 {
+	scale := dpiScale(dpi)
+	logicalW := logicalPixels(monitorW, dpi)
+	logicalH := logicalPixels(monitorH, dpi)
+	return monitorResolutionScale(logicalW, logicalH) * scale
 }
 
 func monitorResolutionScale(monitorW, monitorH int) float64 {
@@ -152,13 +197,34 @@ func monitorResolutionScale(monitorW, monitorH int) float64 {
 	return clampFloat(scale, windowResolutionMinScale, windowResolutionMaxScale)
 }
 
+func normalizedDPI(dpi int) int {
+	if dpi <= 0 {
+		return defaultDPI
+	}
+	return dpi
+}
+
+func dpiScale(dpi int) float64 {
+	return float64(normalizedDPI(dpi)) / float64(defaultDPI)
+}
+
+func logicalPixels(physical int, dpi int) int {
+	if physical <= 0 {
+		return physical
+	}
+	return maxInt(1, int(math.Round(float64(physical)/dpiScale(dpi))))
+}
+
 func scaledWindowBound(value int, scale float64) int {
 	return maxInt(1, int(math.Round(float64(value)*scale)))
 }
 
-func computeLayout(cw, ch int) uiLayout {
-	sx := layoutScale(cw, layoutDesignW)
-	sy := layoutScale(ch, layoutDesignH)
+func computeLayout(cw, ch int, dpi int) uiLayout {
+	scale := dpiScale(dpi)
+	logicalW := logicalPixels(cw, dpi)
+	logicalH := logicalPixels(ch, dpi)
+	sx := layoutScale(logicalW, layoutDesignW) * scale
+	sy := layoutScale(logicalH, layoutDesignH) * scale
 
 	leftX := scaled(layoutLX, sx)
 	leftW := scaled(layoutLW, sx)

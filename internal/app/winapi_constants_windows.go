@@ -14,6 +14,9 @@ const (
 
 	wsExComposited = 0x02000000
 
+	mainWindowStyle   = wsOverlappedWindow
+	mainWindowExStyle = wsExComposited
+
 	bsAutoCheckbox        = 0x00000003
 	bsOwnerDraw           = 0x0000000B
 	bstChecked            = 1
@@ -66,8 +69,11 @@ const (
 	mouseEventMiddleUp      = 0x0040
 	mouseEventXDown         = 0x0080
 	mouseEventXUp           = 0x0100
+	logPixelsX              = 88
 	smCxScreen              = 0
 	smCyScreen              = 1
+	swpNoZOrder             = 0x0004
+	swpNoActivate           = 0x0010
 	swShow                  = 5
 	whKeyboardLL            = 13
 	whMouseLL               = 14
@@ -76,6 +82,7 @@ const (
 	wmPaint                 = 0x000F
 	wmSize                  = 0x0005
 	wmGetMinMaxInfo         = 0x0024
+	wmDpiChanged            = 0x02E0
 	wmClose                 = 0x0010
 	wmEraseBkgnd            = 0x0014
 	wmDrawItem              = 0x002B

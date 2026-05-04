@@ -32,6 +32,7 @@ type application struct {
 	accentBrush     uintptr
 	accentPen       uintptr
 	fontScale       float64
+	dpi             int
 	configPath      string
 	cfg             config.Config
 	controls        controlRefs
@@ -146,10 +147,10 @@ func (a *application) run() error {
 	appInstance = a
 	bounds := a.currentWindowBounds(0)
 	hwnd, err := a.winapi.createWindowEx(
-		wsExComposited,
+		mainWindowExStyle,
 		utf16Ptr("DiabloHelperWindow"),
 		utf16Ptr(meta.Title()),
-		wsOverlappedWindow,
+		mainWindowStyle,
 		cwUseDefault,
 		cwUseDefault,
 		uintptr(bounds.maxW),
@@ -241,6 +242,43 @@ func (a *application) cleanup() {
 	if appInstance == a {
 		appInstance = nil
 	}
+}
+
+func (a *application) handleDPIChanged(hwnd uintptr, wParam uintptr, lParam unsafe.Pointer) {
+	if a == nil {
+		return
+	}
+	dpi := dpiFromWParam(wParam)
+	if dpi <= 0 {
+		dpi = getWindowDPI(hwnd)
+	}
+	a.dpi = dpi
+
+	if lParam != nil {
+		suggested := (*rect)(lParam)
+		setWindowPos(
+			hwnd,
+			int(suggested.Left),
+			int(suggested.Top),
+			int(suggested.Right-suggested.Left),
+			int(suggested.Bottom-suggested.Top),
+			swpNoZOrder|swpNoActivate,
+		)
+	}
+	if a.controls.status != 0 {
+		a.repositionControls()
+	}
+	if hwnd != 0 {
+		invalidateRect(hwnd, true)
+	}
+}
+
+func dpiFromWParam(wParam uintptr) int {
+	dpi := lowWord(wParam)
+	if dpi == 0 {
+		dpi = highWord(wParam)
+	}
+	return dpi
 }
 
 func defaultConfigPath() string {
@@ -369,8 +407,31 @@ func defaultApplicationWinAPI() applicationWinAPI {
 
 func (a *application) currentWindowBounds(hwnd uintptr) windowBounds {
 	if a == nil || a.winapi.monitorMetrics == nil {
-		return computeWindowBounds(windowReferenceMonitorW, windowReferenceMonitorH, windowReferenceMonitorW, windowReferenceMonitorH)
+		metrics := monitorMetrics{
+			monitorW: windowReferenceMonitorW,
+			monitorH: windowReferenceMonitorH,
+			workW:    windowReferenceMonitorW,
+			workH:    windowReferenceMonitorH,
+			dpi:      defaultDPI,
+		}
+		return computeWindowBounds(metrics, windowFrame{})
 	}
 	metrics := a.winapi.monitorMetrics(hwnd)
-	return computeWindowBounds(metrics.monitorW, metrics.monitorH, metrics.workW, metrics.workH)
+	if a.dpi > 0 {
+		metrics.dpi = a.dpi
+	} else {
+		a.dpi = normalizedDPI(metrics.dpi)
+	}
+	return computeWindowBounds(metrics, windowFrameForDPI(metrics.dpi))
+}
+
+func (a *application) currentDPI(hwnd uintptr) int {
+	if a != nil && a.dpi > 0 {
+		return a.dpi
+	}
+	dpi := getWindowDPI(hwnd)
+	if a != nil {
+		a.dpi = dpi
+	}
+	return dpi
 }

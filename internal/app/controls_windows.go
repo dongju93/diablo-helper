@@ -212,7 +212,7 @@ func (a *application) invalidateCaptureControls(targets ...captureTarget) {
 
 func (a *application) createControls(hwnd uintptr) {
 	cw, ch := getClientSize(hwnd)
-	lo := computeLayout(cw, ch)
+	lo := computeLayout(cw, ch, a.currentDPI(hwnd))
 	a.applyUIScale(lo.uiScale())
 
 	// Header buttons (right-anchored)
@@ -282,7 +282,7 @@ func (a *application) createControls(hwnd uintptr) {
 
 func (a *application) repositionControls() {
 	cw, ch := getClientSize(a.hwnd)
-	lo := computeLayout(cw, ch)
+	lo := computeLayout(cw, ch, a.currentDPI(a.hwnd))
 	a.applyUIScale(lo.uiScale())
 
 	moveControl(a.controls.loadButton, lo.loadX, lo.y(26), lo.w(headerBtnW), lo.h(34))

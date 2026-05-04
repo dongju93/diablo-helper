@@ -14,6 +14,7 @@ const (
 	uiTitleFontBaseHeight   = -28
 	uiSectionFontBaseHeight = -16
 	uiFontMinScale          = 0.8
+	uiFontMaxScale          = 4.0
 )
 
 var (
@@ -87,7 +88,7 @@ func (a *application) applyUIScale(scale float64) {
 	if scale <= 0 {
 		scale = 1
 	}
-	scale = clampFloat(scale, uiFontMinScale, layoutMaxScale)
+	scale = clampFloat(scale, uiFontMinScale, uiFontMaxScale)
 	rebuildFonts := a.font == 0 ||
 		a.titleFont == 0 ||
 		a.sectionFont == 0 ||
@@ -262,7 +263,7 @@ func (a *application) paint(hwnd uintptr) {
 	var client rect
 	procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&client)))
 
-	lo := computeLayout(int(client.Right), int(client.Bottom))
+	lo := computeLayout(int(client.Right), int(client.Bottom), a.currentDPI(hwnd))
 	a.applyUIScale(lo.uiScale())
 	procFillRect.Call(hdc, uintptr(unsafe.Pointer(&client)), a.bgBrush)
 
@@ -310,9 +311,10 @@ func (a *application) drawPanel(hdc uintptr, x int, y int, width int, height int
 	if width <= 0 || height <= 0 {
 		return
 	}
+	corner := maxInt(8, height/8)
 	oldBrush, _, _ := procSelectObject.Call(hdc, a.panelBrush)
 	oldPen, _, _ := procSelectObject.Call(hdc, a.borderPen)
-	procRoundRect.Call(hdc, uintptr(x), uintptr(y), uintptr(x+width), uintptr(y+height), 16, 16)
+	procRoundRect.Call(hdc, uintptr(x), uintptr(y), uintptr(x+width), uintptr(y+height), uintptr(corner), uintptr(corner))
 	procSelectObject.Call(hdc, oldPen)
 	procSelectObject.Call(hdc, oldBrush)
 }
@@ -321,9 +323,10 @@ func (a *application) drawInputFrame(hdc uintptr, x int, y int, width int, heigh
 	if width <= 0 || height <= 0 {
 		return
 	}
+	corner := maxInt(4, height/4)
 	oldBrush, _, _ := procSelectObject.Call(hdc, a.panelBrush)
 	oldPen, _, _ := procSelectObject.Call(hdc, a.borderStrongPen)
-	procRoundRect.Call(hdc, uintptr(x), uintptr(y), uintptr(x+width), uintptr(y+height), 8, 8)
+	procRoundRect.Call(hdc, uintptr(x), uintptr(y), uintptr(x+width), uintptr(y+height), uintptr(corner), uintptr(corner))
 	procSelectObject.Call(hdc, oldPen)
 	procSelectObject.Call(hdc, oldBrush)
 }
@@ -340,9 +343,10 @@ func (a *application) drawAccentMark(hdc uintptr, x int, y int, width int, heigh
 	if width <= 0 || height <= 0 {
 		return
 	}
+	corner := maxInt(2, height/6)
 	oldBrush, _, _ := procSelectObject.Call(hdc, a.accentBrush)
 	oldPen, _, _ := procSelectObject.Call(hdc, a.accentPen)
-	procRoundRect.Call(hdc, uintptr(x), uintptr(y), uintptr(x+width), uintptr(y+height), 4, 4)
+	procRoundRect.Call(hdc, uintptr(x), uintptr(y), uintptr(x+width), uintptr(y+height), uintptr(corner), uintptr(corner))
 	procSelectObject.Call(hdc, oldPen)
 	procSelectObject.Call(hdc, oldBrush)
 }
@@ -510,14 +514,16 @@ func (a *application) fillRoundedButton(hdc uintptr, rc rect, fill uintptr, bord
 	pen := createPen(border, borderWidth)
 	oldBrush, _, _ := procSelectObject.Call(hdc, brush)
 	oldPen, _, _ := procSelectObject.Call(hdc, pen)
+	height := int(rc.Bottom - rc.Top)
+	corner := maxInt(6, height/3)
 	procRoundRect.Call(
 		hdc,
 		uintptr(rc.Left),
 		uintptr(rc.Top),
 		uintptr(rc.Right),
 		uintptr(rc.Bottom),
-		10,
-		10,
+		uintptr(corner),
+		uintptr(corner),
 	)
 	procSelectObject.Call(hdc, oldPen)
 	procSelectObject.Call(hdc, oldBrush)
@@ -572,7 +578,7 @@ func (a *application) drawToggleSwitch(hdc uintptr, rc rect, on bool, hovered bo
 	deleteGDIObject(trackBrush)
 
 	// Draw the knob (white circle) inside the track.
-	margin := int32(3)
+	margin := maxInt32(2, trackH/8)
 	knobSize := trackH - 2*margin // diameter
 	var knobLeft int32
 	if on {
@@ -601,7 +607,18 @@ func (a *application) drawToggleSwitch(hdc uintptr, rc rect, on bool, hovered bo
 }
 
 func drawTextInRect(hdc uintptr, text string, font uintptr, color uintptr, rc rect, flags uintptr) {
-	rc.Left += 10
-	rc.Right -= 10
+	pad := int32(maxInt(6, int(rc.Bottom-rc.Top)/4))
+	rc.Left += pad
+	rc.Right -= pad
+	if rc.Right <= rc.Left || rc.Bottom <= rc.Top {
+		return
+	}
 	drawText(hdc, text, font, color, int(rc.Left), int(rc.Top), int(rc.Right-rc.Left), int(rc.Bottom-rc.Top), flags)
+}
+
+func maxInt32(a, b int32) int32 {
+	if a > b {
+		return a
+	}
+	return b
 }
