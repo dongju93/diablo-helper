@@ -129,8 +129,7 @@ type windowFrame struct {
 }
 
 func computeWindowBounds(metrics monitorMetrics, frame windowFrame) windowBounds {
-	dpi := normalizedDPI(metrics.dpi)
-	scale := monitorVisualScale(metrics.monitorW, metrics.monitorH, dpi)
+	scale := monitorVisualScale(metrics.monitorW, metrics.monitorH)
 	minClientW := scaledWindowBound(windowMinW, scale)
 	minClientH := scaledWindowBound(windowMinH, scale)
 	maxClientW := scaledWindowBound(windowMaxW, scale)
@@ -179,11 +178,8 @@ func computeWindowBounds(metrics monitorMetrics, frame windowFrame) windowBounds
 	}
 }
 
-func monitorVisualScale(monitorW, monitorH int, dpi int) float64 {
-	scale := dpiScale(dpi)
-	logicalW := logicalPixels(monitorW, dpi)
-	logicalH := logicalPixels(monitorH, dpi)
-	return monitorResolutionScale(logicalW, logicalH) * scale
+func monitorVisualScale(monitorW, monitorH int) float64 {
+	return monitorResolutionScale(monitorW, monitorH)
 }
 
 func monitorResolutionScale(monitorW, monitorH int) float64 {

@@ -85,7 +85,7 @@ func TestComputeWindowBoundsScalesForFHDAnd5K(t *testing.T) {
 	}
 }
 
-func TestComputeWindowBoundsUsesClientAreaAndDPI(t *testing.T) {
+func TestComputeWindowBoundsIncludesWindowFrame(t *testing.T) {
 	frame := windowFrame{width: 16, height: 39}
 	bounds := computeWindowBounds(testMonitorMetrics(1920, 1080, 1920, 1040), frame)
 
@@ -94,6 +94,34 @@ func TestComputeWindowBoundsUsesClientAreaAndDPI(t *testing.T) {
 	}
 	if bounds.maxW != 947 || bounds.maxH != 951 {
 		t.Fatalf("max bounds = %dx%d, want 947x951", bounds.maxW, bounds.maxH)
+	}
+}
+
+func TestComputeWindowBoundsDoesNotApplyDPITwiceForFHDWorkArea(t *testing.T) {
+	tests := []struct {
+		name  string
+		dpi   int
+		frame windowFrame
+	}{
+		{name: "150 percent", dpi: defaultDPI * 3 / 2, frame: windowFrame{width: 24, height: 58}},
+		{name: "200 percent", dpi: defaultDPI * 2, frame: windowFrame{width: 32, height: 78}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			metrics := testMonitorMetrics(1920, 1080, 1920, 1040)
+			metrics.dpi = tt.dpi
+
+			bounds := computeWindowBounds(metrics, tt.frame)
+			wantMinW := int32(722 + tt.frame.width)
+			wantMinH := int32(741 + tt.frame.height)
+			if bounds.minW != wantMinW || bounds.minH != wantMinH {
+				t.Fatalf("min bounds = %dx%d, want %dx%d", bounds.minW, bounds.minH, wantMinW, wantMinH)
+			}
+			if bounds.minW > int32(metrics.workW) || bounds.minH > int32(metrics.workH) {
+				t.Fatalf("min bounds = %dx%d must fit work area %dx%d", bounds.minW, bounds.minH, metrics.workW, metrics.workH)
+			}
+		})
 	}
 }
 
