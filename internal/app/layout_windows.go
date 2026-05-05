@@ -5,14 +5,27 @@ package app
 import "math"
 
 const (
+	defaultDPI = 96
+
 	windowMaxW = 980
 	windowMaxH = 960
 	windowMinW = 760
 	windowMinH = 780
 
+	windowFallbackMonitorW = 2560
+	windowFallbackMonitorH = 1440
+
+	windowResolutionMinH           = 720
+	windowResolutionReferenceH     = 1440
+	windowResolutionMaxH           = 3240
+	windowResolutionMinScale       = 0.75
+	windowResolutionReferenceScale = 1.0
+	windowResolutionMaxScale       = 1.6
+
 	layoutDesignW  = 964
 	layoutDesignH  = 920
-	layoutMinScale = 0.7
+	layoutMinScale = 0.58
+	layoutMaxScale = windowResolutionMaxScale
 
 	layoutLX  = 24
 	layoutLW  = 348
@@ -22,18 +35,18 @@ const (
 
 	// Bulk section (right-anchored within right panel)
 	bulkApplyMarR = 32
-	bulkApplyW    = 92
-	bulkMsGapL    = 16
+	bulkApplyW    = 108
+	bulkMsGapL    = 12
 	bulkMsW       = 30
-	bulkEditGapL  = 18
-	bulkEditW     = 62
-	bulkLabelOffL = 202 // fixed offset from rx
+	bulkEditGapL  = 24
+	bulkEditW     = 76
+	bulkLabelOffL = 160 // fixed offset from rx
 
 	// Skill grid (right-anchored)
 	skillMsMarR  = 82
 	skillMsW     = 32
-	skillMsGapL  = 26
-	skillEditW   = 56
+	skillMsGapL  = 30
+	skillEditW   = 64
 	skillBtnOffL = 152
 	skillBtnGapR = 32
 	skillChkOffL = 42
@@ -49,15 +62,17 @@ const (
 	// Clicker (right column, rx-anchored)
 	clickerStartLabelOffL = 24
 	clickerStartBtnOffL   = 72
-	clickerStopLabelOffL  = 186
-	clickerStopBtnOffL    = 234
-	clickerStopBtnW       = 100
+	clickerStartBtnW      = 132
+	clickerStopLabelOffL  = 224
+	clickerStopBtnOffL    = 272
+	clickerStopBtnW       = 132
 	clickerKeyLabelOffL   = 24
 	clickerKeyBtnOffL     = 72
-	clickerIntLabelOffL   = 186
-	clickerIntEditOffL    = 234
-	clickerIntEditW       = 62
-	clickerMsLabelOffL    = 306
+	clickerKeyBtnW        = 132
+	clickerIntLabelOffL   = 224
+	clickerIntEditInsetL  = 8
+	clickerIntEditW       = 86
+	clickerMsLabelOffL    = 390
 
 	// Pause
 	pauseLabelOffL = 30
@@ -104,9 +119,140 @@ type uiLayout struct {
 	statusTextX, statusTextW int
 }
 
-func computeLayout(cw, ch int) uiLayout {
-	sx := layoutScale(cw, layoutDesignW)
-	sy := layoutScale(ch, layoutDesignH)
+type windowBounds struct {
+	minW         int32
+	minH         int32
+	maxW         int32
+	maxH         int32
+	maxPositionX int32
+	maxPositionY int32
+	maximizedW   int32
+	maximizedH   int32
+}
+
+type windowFrame struct {
+	width  int
+	height int
+}
+
+func computeWindowBounds(metrics monitorMetrics, frame windowFrame) windowBounds {
+	scale := monitorVisualScale(metrics.monitorW, metrics.monitorH)
+	minClientW := scaledWindowBound(windowMinW, scale)
+	minClientH := scaledWindowBound(windowMinH, scale)
+	maxClientW := scaledWindowBound(windowMaxW, scale)
+	maxClientH := scaledWindowBound(windowMaxH, scale)
+
+	frameW := maxInt(0, frame.width)
+	frameH := maxInt(0, frame.height)
+	if metrics.workW > frameW {
+		maxClientW = minInt(maxClientW, metrics.workW-frameW)
+	}
+	if metrics.workH > frameH {
+		maxClientH = minInt(maxClientH, metrics.workH-frameH)
+	}
+	maxClientW = maxInt(minClientW, maxClientW)
+	maxClientH = maxInt(minClientH, maxClientH)
+
+	minW := minClientW + frameW
+	minH := minClientH + frameH
+	maxW := maxClientW + frameW
+	maxH := maxClientH + frameH
+
+	maximizedW := metrics.workW
+	maximizedH := metrics.workH
+	if maximizedW <= 0 {
+		maximizedW = metrics.monitorW
+	}
+	if maximizedH <= 0 {
+		maximizedH = metrics.monitorH
+	}
+	if maximizedW <= 0 {
+		maximizedW = maxW
+	}
+	if maximizedH <= 0 {
+		maximizedH = maxH
+	}
+
+	return windowBounds{
+		minW:         int32(maxInt(1, minW)),
+		minH:         int32(maxInt(1, minH)),
+		maxW:         int32(maxInt(1, maxW)),
+		maxH:         int32(maxInt(1, maxH)),
+		maxPositionX: int32(metrics.workX - metrics.monitorX),
+		maxPositionY: int32(metrics.workY - metrics.monitorY),
+		maximizedW:   int32(maxInt(1, maximizedW)),
+		maximizedH:   int32(maxInt(1, maximizedH)),
+	}
+}
+
+func monitorVisualScale(_ int, monitorH int) float64 {
+	return monitorResolutionScale(monitorH)
+}
+
+func monitorResolutionScale(monitorH int) float64 {
+	if monitorH <= 0 {
+		return 1
+	}
+	if monitorH <= windowResolutionMinH {
+		return windowResolutionMinScale
+	}
+	if monitorH >= windowResolutionMaxH {
+		return windowResolutionMaxScale
+	}
+	if monitorH <= windowResolutionReferenceH {
+		return interpolateScale(
+			monitorH,
+			windowResolutionMinH,
+			windowResolutionReferenceH,
+			windowResolutionMinScale,
+			windowResolutionReferenceScale,
+		)
+	}
+	return interpolateScale(
+		monitorH,
+		windowResolutionReferenceH,
+		windowResolutionMaxH,
+		windowResolutionReferenceScale,
+		windowResolutionMaxScale,
+	)
+}
+
+func interpolateScale(value, minValue, maxValue int, minScale, maxScale float64) float64 {
+	if maxValue <= minValue {
+		return minScale
+	}
+	ratio := float64(value-minValue) / float64(maxValue-minValue)
+	return minScale + ratio*(maxScale-minScale)
+}
+
+func normalizedDPI(dpi int) int {
+	if dpi <= 0 {
+		return defaultDPI
+	}
+	return dpi
+}
+
+func dpiScale(dpi int) float64 {
+	return float64(normalizedDPI(dpi)) / float64(defaultDPI)
+}
+
+func logicalPixels(physical int, dpi int) int {
+	if physical <= 0 {
+		return physical
+	}
+	return maxInt(1, int(math.Round(float64(physical)/dpiScale(dpi))))
+}
+
+func scaledWindowBound(value int, scale float64) int {
+	return maxInt(1, int(math.Round(float64(value)*scale)))
+}
+
+func computeLayout(cw, ch int, dpi int) uiLayout {
+	scale := dpiScale(dpi)
+	logicalW := logicalPixels(cw, dpi)
+	logicalH := logicalPixels(ch, dpi)
+	sx := layoutScale(logicalW, layoutDesignW) * scale
+	sy := layoutScale(logicalH, layoutDesignH) * scale
 
 	leftX := scaled(layoutLX, sx)
 	leftW := scaled(layoutLW, sx)
@@ -144,7 +290,7 @@ func computeLayout(cw, ch int) uiLayout {
 	clickerKeyLabelX := rx + scaled(clickerKeyLabelOffL, sx)
 	clickerKeyBtnX := rx + scaled(clickerKeyBtnOffL, sx)
 	clickerIntLabelX := rx + scaled(clickerIntLabelOffL, sx)
-	clickerIntEditX := rx + scaled(clickerIntEditOffL, sx)
+	clickerIntEditX := clickerStopBtnX + scaled(clickerIntEditInsetL, sx)
 	clickerMsLabelX := rx + scaled(clickerMsLabelOffL, sx)
 
 	pauseLabelX := rx + scaled(pauseLabelOffL, sx)
@@ -183,8 +329,8 @@ func layoutScale(size, design int) float64 {
 		return 1
 	}
 	scale := float64(size) / float64(design)
-	if scale > 1 {
-		return 1
+	if scale > layoutMaxScale {
+		return layoutMaxScale
 	}
 	if scale < layoutMinScale {
 		return layoutMinScale
@@ -229,9 +375,33 @@ func (lo uiLayout) s(value int) int {
 	return scaled(value, lo.sy)
 }
 
+func (lo uiLayout) uiScale() float64 {
+	if lo.sx < lo.sy {
+		return lo.sx
+	}
+	return lo.sy
+}
+
 func maxInt(a, b int) int {
 	if a > b {
 		return a
 	}
 	return b
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func clampFloat(value float64, minValue float64, maxValue float64) float64 {
+	if value < minValue {
+		return minValue
+	}
+	if value > maxValue {
+		return maxValue
+	}
+	return value
 }

@@ -130,3 +130,10 @@ type minMaxInfo struct {
 	MinTrackSize point
 	MaxTrackSize point
 }
+
+type monitorInfo struct {
+	Size    uint32
+	Monitor rect
+	Work    rect
+	Flags   uint32
+}

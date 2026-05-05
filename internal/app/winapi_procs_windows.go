@@ -33,40 +33,51 @@ var (
 	uxtheme  *syscall.LazyDLL
 	comdlg32 *syscall.LazyDLL
 
-	procBeginPaint        *syscall.LazyProc
-	procCallNextHookEx    *syscall.LazyProc
-	procCreateWindowExW   *syscall.LazyProc
-	procDefWindowProcW    *syscall.LazyProc
-	procDestroyWindow     *syscall.LazyProc
-	procDispatchMessageW  *syscall.LazyProc
-	procDrawTextW         *syscall.LazyProc
-	procEndPaint          *syscall.LazyProc
-	procFillRect          *syscall.LazyProc
-	procGetClientRect     *syscall.LazyProc
-	procGetDlgItem        *syscall.LazyProc
-	procGetMessageW       *syscall.LazyProc
-	procGetWindowTextW    *syscall.LazyProc
-	procGetWindowTextLenW *syscall.LazyProc
-	procInvalidateRect    *syscall.LazyProc
-	procLoadCursorW       *syscall.LazyProc
-	procLoadIconW         *syscall.LazyProc
-	procMessageBoxW       *syscall.LazyProc
-	procPostQuitMessage   *syscall.LazyProc
-	procRegisterClassExW  *syscall.LazyProc
-	procSendInput         *syscall.LazyProc
-	procSendMessageW      *syscall.LazyProc
-	procSetWindowsHookExW *syscall.LazyProc
-	procSetWindowTextW    *syscall.LazyProc
-	procMoveWindow        *syscall.LazyProc
-	procShowWindow        *syscall.LazyProc
-	procTranslateMessage  *syscall.LazyProc
-	procUnhookWindowsHook *syscall.LazyProc
-	procUpdateWindow      *syscall.LazyProc
+	procAdjustWindowRectEx       *syscall.LazyProc
+	procAdjustWindowRectExForDpi *syscall.LazyProc
+	procBeginPaint               *syscall.LazyProc
+	procCallNextHookEx           *syscall.LazyProc
+	procCreateWindowExW          *syscall.LazyProc
+	procDefWindowProcW           *syscall.LazyProc
+	procDestroyWindow            *syscall.LazyProc
+	procDispatchMessageW         *syscall.LazyProc
+	procDrawTextW                *syscall.LazyProc
+	procEndPaint                 *syscall.LazyProc
+	procFillRect                 *syscall.LazyProc
+	procGetClientRect            *syscall.LazyProc
+	procGetDC                    *syscall.LazyProc
+	procGetDlgItem               *syscall.LazyProc
+	procGetDpiForSystem          *syscall.LazyProc
+	procGetDpiForWindow          *syscall.LazyProc
+	procGetMessageW              *syscall.LazyProc
+	procGetMonitorInfoW          *syscall.LazyProc
+	procGetSystemMetrics         *syscall.LazyProc
+	procGetWindowTextW           *syscall.LazyProc
+	procGetWindowTextLenW        *syscall.LazyProc
+	procInvalidateRect           *syscall.LazyProc
+	procLoadCursorW              *syscall.LazyProc
+	procLoadIconW                *syscall.LazyProc
+	procMessageBoxW              *syscall.LazyProc
+	procMonitorFromWindow        *syscall.LazyProc
+	procPostQuitMessage          *syscall.LazyProc
+	procRegisterClassExW         *syscall.LazyProc
+	procReleaseDC                *syscall.LazyProc
+	procSendInput                *syscall.LazyProc
+	procSendMessageW             *syscall.LazyProc
+	procSetWindowPos             *syscall.LazyProc
+	procSetWindowsHookExW        *syscall.LazyProc
+	procSetWindowTextW           *syscall.LazyProc
+	procMoveWindow               *syscall.LazyProc
+	procShowWindow               *syscall.LazyProc
+	procTranslateMessage         *syscall.LazyProc
+	procUnhookWindowsHook        *syscall.LazyProc
+	procUpdateWindow             *syscall.LazyProc
 
 	procGetModuleHandleW         *syscall.LazyProc
 	procSetDefaultDllDirectories *syscall.LazyProc
 	procSetDllDirectoryW         *syscall.LazyProc
 	procCreateFontW              *syscall.LazyProc
+	procGetDeviceCaps            *syscall.LazyProc
 	procEllipse                  *syscall.LazyProc
 	procCreatePen                *syscall.LazyProc
 	procCreateSolidBrush         *syscall.LazyProc
@@ -110,6 +121,8 @@ func loadWinAPIProcs() {
 	uxtheme = system32LazyDLL("uxtheme.dll")
 	comdlg32 = system32LazyDLL("comdlg32.dll")
 
+	procAdjustWindowRectEx = user32.NewProc("AdjustWindowRectEx")
+	procAdjustWindowRectExForDpi = user32.NewProc("AdjustWindowRectExForDpi")
 	procBeginPaint = user32.NewProc("BeginPaint")
 	procCallNextHookEx = user32.NewProc("CallNextHookEx")
 	procCreateWindowExW = user32.NewProc("CreateWindowExW")
@@ -120,18 +133,26 @@ func loadWinAPIProcs() {
 	procEndPaint = user32.NewProc("EndPaint")
 	procFillRect = user32.NewProc("FillRect")
 	procGetClientRect = user32.NewProc("GetClientRect")
+	procGetDC = user32.NewProc("GetDC")
 	procGetDlgItem = user32.NewProc("GetDlgItem")
+	procGetDpiForSystem = user32.NewProc("GetDpiForSystem")
+	procGetDpiForWindow = user32.NewProc("GetDpiForWindow")
 	procGetMessageW = user32.NewProc("GetMessageW")
+	procGetMonitorInfoW = user32.NewProc("GetMonitorInfoW")
+	procGetSystemMetrics = user32.NewProc("GetSystemMetrics")
 	procGetWindowTextW = user32.NewProc("GetWindowTextW")
 	procGetWindowTextLenW = user32.NewProc("GetWindowTextLengthW")
 	procInvalidateRect = user32.NewProc("InvalidateRect")
 	procLoadCursorW = user32.NewProc("LoadCursorW")
 	procLoadIconW = user32.NewProc("LoadIconW")
 	procMessageBoxW = user32.NewProc("MessageBoxW")
+	procMonitorFromWindow = user32.NewProc("MonitorFromWindow")
 	procPostQuitMessage = user32.NewProc("PostQuitMessage")
 	procRegisterClassExW = user32.NewProc("RegisterClassExW")
+	procReleaseDC = user32.NewProc("ReleaseDC")
 	procSendInput = user32.NewProc("SendInput")
 	procSendMessageW = user32.NewProc("SendMessageW")
+	procSetWindowPos = user32.NewProc("SetWindowPos")
 	procSetWindowsHookExW = user32.NewProc("SetWindowsHookExW")
 	procSetWindowTextW = user32.NewProc("SetWindowTextW")
 	procMoveWindow = user32.NewProc("MoveWindow")
@@ -144,6 +165,7 @@ func loadWinAPIProcs() {
 	procSetDefaultDllDirectories = kernel32.NewProc("SetDefaultDllDirectories")
 	procSetDllDirectoryW = kernel32.NewProc("SetDllDirectoryW")
 	procCreateFontW = gdi32.NewProc("CreateFontW")
+	procGetDeviceCaps = gdi32.NewProc("GetDeviceCaps")
 	procEllipse = gdi32.NewProc("Ellipse")
 	procCreatePen = gdi32.NewProc("CreatePen")
 	procCreateSolidBrush = gdi32.NewProc("CreateSolidBrush")

@@ -144,8 +144,161 @@ func getClientSize(hwnd uintptr) (int, int) {
 	return int(cr.Right), int(cr.Bottom)
 }
 
+type monitorMetrics struct {
+	monitorX int
+	monitorY int
+	monitorW int
+	monitorH int
+	workX    int
+	workY    int
+	workW    int
+	workH    int
+	dpi      int
+}
+
+func getMonitorMetrics(hwnd uintptr) monitorMetrics {
+	metrics := fallbackMonitorMetrics()
+	flag := uintptr(monitorDefaultToNearest)
+	if hwnd == 0 {
+		flag = monitorDefaultToPrimary
+	}
+	monitor, _, _ := procMonitorFromWindow.Call(hwnd, flag)
+	if monitor == 0 {
+		return metrics
+	}
+
+	info := monitorInfo{Size: uint32(unsafe.Sizeof(monitorInfo{}))}
+	ret, _, _ := procGetMonitorInfoW.Call(monitor, uintptr(unsafe.Pointer(&info)))
+	if ret == 0 {
+		return metrics
+	}
+
+	monitorW := int(info.Monitor.Right - info.Monitor.Left)
+	monitorH := int(info.Monitor.Bottom - info.Monitor.Top)
+	workW := int(info.Work.Right - info.Work.Left)
+	workH := int(info.Work.Bottom - info.Work.Top)
+	if monitorW <= 0 || monitorH <= 0 {
+		return metrics
+	}
+	metrics.monitorX = int(info.Monitor.Left)
+	metrics.monitorY = int(info.Monitor.Top)
+	metrics.monitorW = monitorW
+	metrics.monitorH = monitorH
+	if workW > 0 && workH > 0 {
+		metrics.workX = int(info.Work.Left)
+		metrics.workY = int(info.Work.Top)
+		metrics.workW = workW
+		metrics.workH = workH
+	} else {
+		metrics.workX = metrics.monitorX
+		metrics.workY = metrics.monitorY
+		metrics.workW = monitorW
+		metrics.workH = monitorH
+	}
+	metrics.dpi = getWindowDPI(hwnd)
+	return metrics
+}
+
+func fallbackMonitorMetrics() monitorMetrics {
+	width, _, _ := procGetSystemMetrics.Call(smCxScreen)
+	height, _, _ := procGetSystemMetrics.Call(smCyScreen)
+	monitorW := int(width)
+	monitorH := int(height)
+	if monitorW <= 0 || monitorH <= 0 {
+		monitorW = windowFallbackMonitorW
+		monitorH = windowFallbackMonitorH
+	}
+	return monitorMetrics{
+		monitorW: monitorW,
+		monitorH: monitorH,
+		workW:    monitorW,
+		workH:    monitorH,
+		dpi:      getSystemDPI(),
+	}
+}
+
+func getWindowDPI(hwnd uintptr) int {
+	if hwnd != 0 && procGetDpiForWindow != nil && procGetDpiForWindow.Find() == nil {
+		dpi, _, _ := procGetDpiForWindow.Call(hwnd)
+		if dpi != 0 {
+			return int(dpi)
+		}
+	}
+	return getSystemDPI()
+}
+
+func getSystemDPI() int {
+	if procGetDpiForSystem != nil && procGetDpiForSystem.Find() == nil {
+		dpi, _, _ := procGetDpiForSystem.Call()
+		if dpi != 0 {
+			return int(dpi)
+		}
+	}
+	if procGetDC != nil && procReleaseDC != nil && procGetDeviceCaps != nil {
+		hdc, _, _ := procGetDC.Call(0)
+		if hdc != 0 {
+			dpi, _, _ := procGetDeviceCaps.Call(hdc, logPixelsX)
+			procReleaseDC.Call(0, hdc)
+			if dpi != 0 {
+				return int(dpi)
+			}
+		}
+	}
+	return defaultDPI
+}
+
+func windowFrameForDPI(dpi int) windowFrame {
+	rc := rect{}
+	if !adjustWindowRectForDPI(&rc, mainWindowStyle, mainWindowExStyle, dpi) {
+		return windowFrame{}
+	}
+	return windowFrame{
+		width:  int(rc.Right - rc.Left),
+		height: int(rc.Bottom - rc.Top),
+	}
+}
+
+func adjustWindowRectForDPI(rc *rect, style uintptr, exStyle uintptr, dpi int) bool {
+	if rc == nil {
+		return false
+	}
+	if procAdjustWindowRectExForDpi != nil && procAdjustWindowRectExForDpi.Find() == nil {
+		ret, _, _ := procAdjustWindowRectExForDpi.Call(
+			uintptr(unsafe.Pointer(rc)),
+			style,
+			0,
+			exStyle,
+			uintptr(normalizedDPI(dpi)),
+		)
+		if ret != 0 {
+			return true
+		}
+	}
+	if procAdjustWindowRectEx == nil {
+		return false
+	}
+	ret, _, _ := procAdjustWindowRectEx.Call(uintptr(unsafe.Pointer(rc)), style, 0, exStyle)
+	return ret != 0
+}
+
 func moveControl(hwnd uintptr, x, y, width, height int) {
-	procMoveWindow.Call(hwnd, uintptr(x), uintptr(y), uintptr(width), uintptr(height), 1)
+	if hwnd == 0 {
+		return
+	}
+	procSetWindowPos.Call(
+		hwnd,
+		0,
+		uintptr(x),
+		uintptr(y),
+		uintptr(width),
+		uintptr(height),
+		swpNoZOrder|swpNoActivate|swpNoRedraw,
+	)
+	invalidateRect(hwnd, false)
+}
+
+func setWindowPos(hwnd uintptr, x, y, width, height int, flags uintptr) {
+	procSetWindowPos.Call(hwnd, 0, uintptr(x), uintptr(y), uintptr(width), uintptr(height), flags)
 }
 
 func callNextHookEx(code int, wParam uintptr, lParam unsafe.Pointer) uintptr {

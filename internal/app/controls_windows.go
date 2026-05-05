@@ -211,10 +211,9 @@ func (a *application) invalidateCaptureControls(targets ...captureTarget) {
 }
 
 func (a *application) createControls(hwnd uintptr) {
-	a.initUIResources()
-
 	cw, ch := getClientSize(hwnd)
-	lo := computeLayout(cw, ch)
+	lo := computeLayout(cw, ch, a.currentDPI(hwnd))
+	a.applyUIScale(lo.uiScale())
 
 	// Header buttons (right-anchored)
 	a.controls.loadButton = a.createButton(hwnd, idLoad, "불러오기", lo.loadX, lo.y(26), lo.w(headerBtnW), lo.h(34))
@@ -265,11 +264,11 @@ func (a *application) createControls(hwnd uintptr) {
 
 	// Right column – single-key clicker section
 	a.controls.clickerStartLabel = a.createStatic(hwnd, "시작", lo.clickerStartLabelX, lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
-	a.controls.clickerStartButton = a.createButton(hwnd, idClickerStartKey, "", lo.clickerStartBtnX, lo.y(clickerHotkeyY), lo.w(104), lo.h(34))
+	a.controls.clickerStartButton = a.createButton(hwnd, idClickerStartKey, "", lo.clickerStartBtnX, lo.y(clickerHotkeyY), lo.w(clickerStartBtnW), lo.h(34))
 	a.controls.clickerStopLabel = a.createStatic(hwnd, "종료", lo.clickerStopLabelX, lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
 	a.controls.clickerStopButton = a.createButton(hwnd, idClickerStopKey, "", lo.clickerStopBtnX, lo.y(clickerHotkeyY), lo.w(clickerStopBtnW), lo.h(34))
 	a.controls.clickerKeyLabel = a.createStatic(hwnd, "입력", lo.clickerKeyLabelX, lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
-	a.controls.clickerKeyButton = a.createButton(hwnd, idClickerKey, "", lo.clickerKeyBtnX, lo.y(clickerSettingY), lo.w(104), lo.h(34))
+	a.controls.clickerKeyButton = a.createButton(hwnd, idClickerKey, "", lo.clickerKeyBtnX, lo.y(clickerSettingY), lo.w(clickerKeyBtnW), lo.h(34))
 	a.controls.clickerIntervalLabel = a.createStatic(hwnd, "간격", lo.clickerIntLabelX, lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
 	a.controls.clickerInterval = a.createEdit(hwnd, idClickerInterval, strconv.Itoa(config.DefaultClickerIntervalMS), lo.clickerIntEditX, lo.y(clickerSettingY+7), lo.w(clickerIntEditW), lo.h(22))
 	a.controls.clickerMsLabel = a.createStatic(hwnd, "ms", lo.clickerMsLabelX, lo.y(clickerSettingY+6), lo.w(32), lo.h(24))
@@ -283,7 +282,8 @@ func (a *application) createControls(hwnd uintptr) {
 
 func (a *application) repositionControls() {
 	cw, ch := getClientSize(a.hwnd)
-	lo := computeLayout(cw, ch)
+	lo := computeLayout(cw, ch, a.currentDPI(a.hwnd))
+	a.applyUIScale(lo.uiScale())
 
 	moveControl(a.controls.loadButton, lo.loadX, lo.y(26), lo.w(headerBtnW), lo.h(34))
 	moveControl(a.controls.saveButton, lo.saveX, lo.y(26), lo.w(headerBtnW), lo.h(34))
@@ -327,11 +327,11 @@ func (a *application) repositionControls() {
 	moveControl(a.controls.pauseButton, lo.pauseBtnX, lo.y(pauseRowY), lo.pauseBtnW, lo.h(34))
 
 	moveControl(a.controls.clickerStartLabel, lo.clickerStartLabelX, lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
-	moveControl(a.controls.clickerStartButton, lo.clickerStartBtnX, lo.y(clickerHotkeyY), lo.w(104), lo.h(34))
+	moveControl(a.controls.clickerStartButton, lo.clickerStartBtnX, lo.y(clickerHotkeyY), lo.w(clickerStartBtnW), lo.h(34))
 	moveControl(a.controls.clickerStopLabel, lo.clickerStopLabelX, lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
 	moveControl(a.controls.clickerStopButton, lo.clickerStopBtnX, lo.y(clickerHotkeyY), lo.w(clickerStopBtnW), lo.h(34))
 	moveControl(a.controls.clickerKeyLabel, lo.clickerKeyLabelX, lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
-	moveControl(a.controls.clickerKeyButton, lo.clickerKeyBtnX, lo.y(clickerSettingY), lo.w(104), lo.h(34))
+	moveControl(a.controls.clickerKeyButton, lo.clickerKeyBtnX, lo.y(clickerSettingY), lo.w(clickerKeyBtnW), lo.h(34))
 	moveControl(a.controls.clickerIntervalLabel, lo.clickerIntLabelX, lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
 	moveControl(a.controls.clickerInterval, lo.clickerIntEditX, lo.y(clickerSettingY+7), lo.w(clickerIntEditW), lo.h(22))
 	moveControl(a.controls.clickerMsLabel, lo.clickerMsLabelX, lo.y(clickerSettingY+6), lo.w(32), lo.h(24))
@@ -339,7 +339,7 @@ func (a *application) repositionControls() {
 	moveControl(a.controls.statusLabel, lo.x(layoutLX+24), lo.y(statusBarY+11), lo.w(55), lo.h(24))
 	moveControl(a.controls.status, lo.statusTextX, lo.y(statusBarY+11), lo.statusTextW, lo.h(24))
 
-	invalidateRect(a.hwnd, true)
+	invalidateRect(a.hwnd, false)
 }
 
 func (a *application) createStatic(parent uintptr, text string, x int, y int, width int, height int) uintptr {

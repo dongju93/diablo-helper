@@ -3,9 +3,18 @@
 package app
 
 import (
+	"math"
 	"unsafe"
 
 	"github.com/dongju93/diablo-helper/internal/config"
+)
+
+const (
+	uiFontBaseHeight        = -15
+	uiTitleFontBaseHeight   = -28
+	uiSectionFontBaseHeight = -16
+	uiFontMinScale          = 0.8
+	uiFontMaxScale          = 4.0
 )
 
 var (
@@ -36,14 +45,18 @@ func int32Arg(value int32) uintptr {
 }
 
 func (a *application) initUIResources() {
+	scale := a.fontScale
+	if scale <= 0 {
+		scale = 1
+	}
 	if a.font == 0 {
-		a.font = createUIFont("Malgun Gothic", -15, fwNormal)
+		a.font = createUIFont("Malgun Gothic", scaledFontHeight(uiFontBaseHeight, scale), fwNormal)
 	}
 	if a.titleFont == 0 {
-		a.titleFont = createUIFont("Segoe UI Variable Display", -28, fwSemiBold)
+		a.titleFont = createUIFont("Segoe UI Variable Display", scaledFontHeight(uiTitleFontBaseHeight, scale), fwSemiBold)
 	}
 	if a.sectionFont == 0 {
-		a.sectionFont = createUIFont("Malgun Gothic", -16, fwSemiBold)
+		a.sectionFont = createUIFont("Malgun Gothic", scaledFontHeight(uiSectionFontBaseHeight, scale), fwSemiBold)
 	}
 	if a.bgBrush == 0 {
 		a.bgBrush = createBrush(uiBackground)
@@ -69,6 +82,42 @@ func (a *application) initUIResources() {
 	if a.accentPen == 0 {
 		a.accentPen = createPen(uiAccent, 1)
 	}
+}
+
+func (a *application) applyUIScale(scale float64) {
+	if scale <= 0 {
+		scale = 1
+	}
+	scale = clampFloat(scale, uiFontMinScale, uiFontMaxScale)
+	rebuildFonts := a.font == 0 ||
+		a.titleFont == 0 ||
+		a.sectionFont == 0 ||
+		scaledFontHeight(uiFontBaseHeight, a.fontScale) != scaledFontHeight(uiFontBaseHeight, scale) ||
+		scaledFontHeight(uiTitleFontBaseHeight, a.fontScale) != scaledFontHeight(uiTitleFontBaseHeight, scale) ||
+		scaledFontHeight(uiSectionFontBaseHeight, a.fontScale) != scaledFontHeight(uiSectionFontBaseHeight, scale)
+
+	a.fontScale = scale
+	if rebuildFonts {
+		a.disposeUIFontResources()
+	}
+	a.initUIResources()
+	if rebuildFonts {
+		a.updateControlFonts()
+	}
+}
+
+func scaledFontHeight(base int, scale float64) int32 {
+	if scale <= 0 {
+		scale = 1
+	}
+	height := int32(math.Round(math.Abs(float64(base)) * scale))
+	if height < 1 {
+		height = 1
+	}
+	if base < 0 {
+		return -height
+	}
+	return height
 }
 
 func createUIFont(face string, height int32, weight int) uintptr {
@@ -107,10 +156,17 @@ func deleteGDIObject(handle uintptr) {
 	}
 }
 
-func (a *application) disposeUIResources() {
+func (a *application) disposeUIFontResources() {
 	deleteGDIObject(a.font)
 	deleteGDIObject(a.titleFont)
 	deleteGDIObject(a.sectionFont)
+	a.font = 0
+	a.titleFont = 0
+	a.sectionFont = 0
+}
+
+func (a *application) disposeUIResources() {
+	a.disposeUIFontResources()
 	deleteGDIObject(a.bgBrush)
 	deleteGDIObject(a.panelBrush)
 	deleteGDIObject(a.editBrush)
@@ -119,9 +175,6 @@ func (a *application) disposeUIResources() {
 	deleteGDIObject(a.borderBrush)
 	deleteGDIObject(a.accentBrush)
 	deleteGDIObject(a.accentPen)
-	a.font = 0
-	a.titleFont = 0
-	a.sectionFont = 0
 	a.bgBrush = 0
 	a.panelBrush = 0
 	a.editBrush = 0
@@ -132,9 +185,74 @@ func (a *application) disposeUIResources() {
 	a.accentPen = 0
 }
 
-func (a *application) paint(hwnd uintptr) {
-	a.initUIResources()
+func (a *application) updateControlFonts() {
+	if a.font == 0 {
+		return
+	}
+	for _, hwnd := range []uintptr{
+		a.controls.startLabel,
+		a.controls.startButton,
+		a.controls.stopLabel,
+		a.controls.stopButton,
+		a.controls.pauseButton,
+		a.controls.loadButton,
+		a.controls.saveButton,
+		a.controls.bulkLabel,
+		a.controls.bulkInterval,
+		a.controls.bulkMsLabel,
+		a.controls.bulkSkillGapLbl,
+		a.controls.bulkSkillGap,
+		a.controls.bulkGapMsLabel,
+		a.controls.applyBulk,
+		a.controls.skillUseHdr,
+		a.controls.skillNumHdr,
+		a.controls.skillKeyHdr,
+		a.controls.skillIntHdr,
+		a.controls.pauseLabel,
+		a.controls.clickerStartLabel,
+		a.controls.clickerStartButton,
+		a.controls.clickerStopLabel,
+		a.controls.clickerStopButton,
+		a.controls.clickerKeyLabel,
+		a.controls.clickerKeyButton,
+		a.controls.clickerIntervalLabel,
+		a.controls.clickerInterval,
+		a.controls.clickerMsLabel,
+		a.controls.statusLabel,
+		a.controls.status,
+	} {
+		setControlFont(hwnd, a.font)
+	}
+	for _, hwnd := range a.controls.menuLabels {
+		setControlFont(hwnd, a.font)
+	}
+	for _, hwnd := range a.controls.menuButtons {
+		setControlFont(hwnd, a.font)
+	}
+	for _, hwnd := range a.controls.skillEnabled {
+		setControlFont(hwnd, a.font)
+	}
+	for _, hwnd := range a.controls.skillNums {
+		setControlFont(hwnd, a.font)
+	}
+	for _, hwnd := range a.controls.skillButtons {
+		setControlFont(hwnd, a.font)
+	}
+	for _, hwnd := range a.controls.skillInterval {
+		setControlFont(hwnd, a.font)
+	}
+	for _, hwnd := range a.controls.skillMsLbls {
+		setControlFont(hwnd, a.font)
+	}
+}
 
+func setControlFont(hwnd uintptr, font uintptr) {
+	if hwnd != 0 && font != 0 {
+		sendMessage(hwnd, wmSetFont, font, 1)
+	}
+}
+
+func (a *application) paint(hwnd uintptr) {
 	var ps paintStruct
 	hdc, _, _ := procBeginPaint.Call(hwnd, uintptr(unsafe.Pointer(&ps)))
 	if hdc == 0 {
@@ -144,9 +262,9 @@ func (a *application) paint(hwnd uintptr) {
 
 	var client rect
 	procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&client)))
-	procFillRect.Call(hdc, uintptr(unsafe.Pointer(&client)), a.bgBrush)
 
-	lo := computeLayout(int(client.Right), int(client.Bottom))
+	lo := computeLayout(int(client.Right), int(client.Bottom), a.currentDPI(hwnd))
+	procFillRect.Call(hdc, uintptr(unsafe.Pointer(&client)), a.bgBrush)
 
 	// Panels
 	a.drawPanel(hdc, lo.leftX, lo.y(92), lo.leftW, lo.h(126))
@@ -171,12 +289,12 @@ func (a *application) paint(hwnd uintptr) {
 	a.drawDivider(hdc, lo.rx+lo.w(20), lo.y(clickerHotkeyY+38), lo.rw-lo.w(40))
 
 	// Input frames
-	a.drawInputFrame(hdc, lo.bulkEditX-lo.w(8), lo.y(bulkIntervalEditY-6), lo.w(86), lo.h(32))
-	a.drawInputFrame(hdc, lo.bulkEditX-lo.w(8), lo.y(bulkSkillGapEditY-6), lo.w(86), lo.h(32))
+	a.drawInputFrame(hdc, lo.bulkEditX-lo.w(8), lo.y(bulkIntervalEditY-6), lo.w(inputFrameWidth(bulkEditW)), lo.h(32))
+	a.drawInputFrame(hdc, lo.bulkEditX-lo.w(8), lo.y(bulkSkillGapEditY-6), lo.w(inputFrameWidth(bulkEditW)), lo.h(32))
 	for y := skillFirstRowY; y < skillFirstRowY+config.MaxSkills*skillRowGap; y += skillRowGap {
-		a.drawInputFrame(hdc, lo.skillIntervalX-lo.w(8), lo.y(y+1), lo.w(82), lo.h(32))
+		a.drawInputFrame(hdc, lo.skillIntervalX-lo.w(8), lo.y(y+1), lo.w(inputFrameWidth(skillEditW)), lo.h(32))
 	}
-	a.drawInputFrame(hdc, lo.clickerIntEditX-lo.w(8), lo.y(clickerSettingY+1), lo.w(86), lo.h(32))
+	a.drawInputFrame(hdc, lo.clickerIntEditX-lo.w(8), lo.y(clickerSettingY+1), lo.w(inputFrameWidth(clickerIntEditW)), lo.h(32))
 
 	a.drawStatusDot(hdc, lo.statusDotX, lo.y(statusBarY+19), lo.s(10))
 
@@ -192,9 +310,10 @@ func (a *application) drawPanel(hdc uintptr, x int, y int, width int, height int
 	if width <= 0 || height <= 0 {
 		return
 	}
+	corner := maxInt(8, height/8)
 	oldBrush, _, _ := procSelectObject.Call(hdc, a.panelBrush)
 	oldPen, _, _ := procSelectObject.Call(hdc, a.borderPen)
-	procRoundRect.Call(hdc, uintptr(x), uintptr(y), uintptr(x+width), uintptr(y+height), 16, 16)
+	procRoundRect.Call(hdc, uintptr(x), uintptr(y), uintptr(x+width), uintptr(y+height), uintptr(corner), uintptr(corner))
 	procSelectObject.Call(hdc, oldPen)
 	procSelectObject.Call(hdc, oldBrush)
 }
@@ -203,11 +322,16 @@ func (a *application) drawInputFrame(hdc uintptr, x int, y int, width int, heigh
 	if width <= 0 || height <= 0 {
 		return
 	}
+	corner := maxInt(4, height/4)
 	oldBrush, _, _ := procSelectObject.Call(hdc, a.panelBrush)
 	oldPen, _, _ := procSelectObject.Call(hdc, a.borderStrongPen)
-	procRoundRect.Call(hdc, uintptr(x), uintptr(y), uintptr(x+width), uintptr(y+height), 8, 8)
+	procRoundRect.Call(hdc, uintptr(x), uintptr(y), uintptr(x+width), uintptr(y+height), uintptr(corner), uintptr(corner))
 	procSelectObject.Call(hdc, oldPen)
 	procSelectObject.Call(hdc, oldBrush)
+}
+
+func inputFrameWidth(editWidth int) int {
+	return editWidth + 24
 }
 
 func (a *application) drawDivider(hdc uintptr, x int, y int, width int) {
@@ -222,9 +346,10 @@ func (a *application) drawAccentMark(hdc uintptr, x int, y int, width int, heigh
 	if width <= 0 || height <= 0 {
 		return
 	}
+	corner := maxInt(2, height/6)
 	oldBrush, _, _ := procSelectObject.Call(hdc, a.accentBrush)
 	oldPen, _, _ := procSelectObject.Call(hdc, a.accentPen)
-	procRoundRect.Call(hdc, uintptr(x), uintptr(y), uintptr(x+width), uintptr(y+height), 4, 4)
+	procRoundRect.Call(hdc, uintptr(x), uintptr(y), uintptr(x+width), uintptr(y+height), uintptr(corner), uintptr(corner))
 	procSelectObject.Call(hdc, oldPen)
 	procSelectObject.Call(hdc, oldBrush)
 }
@@ -392,14 +517,16 @@ func (a *application) fillRoundedButton(hdc uintptr, rc rect, fill uintptr, bord
 	pen := createPen(border, borderWidth)
 	oldBrush, _, _ := procSelectObject.Call(hdc, brush)
 	oldPen, _, _ := procSelectObject.Call(hdc, pen)
+	height := int(rc.Bottom - rc.Top)
+	corner := maxInt(6, height/3)
 	procRoundRect.Call(
 		hdc,
 		uintptr(rc.Left),
 		uintptr(rc.Top),
 		uintptr(rc.Right),
 		uintptr(rc.Bottom),
-		10,
-		10,
+		uintptr(corner),
+		uintptr(corner),
 	)
 	procSelectObject.Call(hdc, oldPen)
 	procSelectObject.Call(hdc, oldBrush)
@@ -454,7 +581,7 @@ func (a *application) drawToggleSwitch(hdc uintptr, rc rect, on bool, hovered bo
 	deleteGDIObject(trackBrush)
 
 	// Draw the knob (white circle) inside the track.
-	margin := int32(3)
+	margin := maxInt32(2, trackH/8)
 	knobSize := trackH - 2*margin // diameter
 	var knobLeft int32
 	if on {
@@ -483,7 +610,36 @@ func (a *application) drawToggleSwitch(hdc uintptr, rc rect, on bool, hovered bo
 }
 
 func drawTextInRect(hdc uintptr, text string, font uintptr, color uintptr, rc rect, flags uintptr) {
-	rc.Left += 10
-	rc.Right -= 10
+	rc = buttonTextContentRect(rc)
+	if rc.Right <= rc.Left || rc.Bottom <= rc.Top {
+		return
+	}
 	drawText(hdc, text, font, color, int(rc.Left), int(rc.Top), int(rc.Right-rc.Left), int(rc.Bottom-rc.Top), flags)
+}
+
+func buttonTextContentRect(rc rect) rect {
+	width := int(rc.Right - rc.Left)
+	height := int(rc.Bottom - rc.Top)
+	pad := buttonTextHorizontalPadding(width, height)
+	rc.Left += int32(pad)
+	rc.Right -= int32(pad)
+	return rc
+}
+
+func buttonTextHorizontalPadding(width, height int) int {
+	if width <= 0 || height <= 0 {
+		return 0
+	}
+	pad := maxInt(4, minInt(width/12, height/8))
+	if pad*2 >= width {
+		return maxInt(0, (width-1)/2)
+	}
+	return pad
+}
+
+func maxInt32(a, b int32) int32 {
+	if a > b {
+		return a
+	}
+	return b
 }

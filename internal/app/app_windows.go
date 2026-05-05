@@ -31,6 +31,8 @@ type application struct {
 	borderBrush     uintptr
 	accentBrush     uintptr
 	accentPen       uintptr
+	fontScale       float64
+	dpi             int
 	configPath      string
 	cfg             config.Config
 	controls        controlRefs
@@ -143,15 +145,16 @@ func (a *application) run() error {
 	}
 
 	appInstance = a
+	bounds := a.currentWindowBounds(0)
 	hwnd, err := a.winapi.createWindowEx(
-		wsExComposited,
+		mainWindowExStyle,
 		utf16Ptr("DiabloHelperWindow"),
 		utf16Ptr(meta.Title()),
-		wsOverlappedWindow,
+		mainWindowStyle,
 		cwUseDefault,
 		cwUseDefault,
-		windowMaxW,
-		windowMaxH,
+		uintptr(bounds.maxW),
+		uintptr(bounds.maxH),
 		0,
 		0,
 		a.instance,
@@ -241,6 +244,43 @@ func (a *application) cleanup() {
 	}
 }
 
+func (a *application) handleDPIChanged(hwnd uintptr, wParam uintptr, lParam unsafe.Pointer) {
+	if a == nil {
+		return
+	}
+	dpi := dpiFromWParam(wParam)
+	if dpi <= 0 {
+		dpi = getWindowDPI(hwnd)
+	}
+	a.dpi = dpi
+
+	if lParam != nil {
+		suggested := (*rect)(lParam)
+		setWindowPos(
+			hwnd,
+			int(suggested.Left),
+			int(suggested.Top),
+			int(suggested.Right-suggested.Left),
+			int(suggested.Bottom-suggested.Top),
+			swpNoZOrder|swpNoActivate,
+		)
+	}
+	if a.controls.status != 0 {
+		a.repositionControls()
+	}
+	if hwnd != 0 {
+		invalidateRect(hwnd, true)
+	}
+}
+
+func dpiFromWParam(wParam uintptr) int {
+	dpi := lowWord(wParam)
+	if dpi == 0 {
+		dpi = highWord(wParam)
+	}
+	return dpi
+}
+
 func defaultConfigPath() string {
 	executable, err := os.Executable()
 	if err != nil {
@@ -265,6 +305,7 @@ type applicationWinAPI struct {
 	dispatchMessage   func(msg *message)
 	destroyWindow     func(hwnd uintptr)
 	postQuitMessage   func(exitCode int)
+	monitorMetrics    func(hwnd uintptr) monitorMetrics
 }
 
 type createWindowExFunc func(
@@ -360,5 +401,37 @@ func defaultApplicationWinAPI() applicationWinAPI {
 		postQuitMessage: func(exitCode int) {
 			procPostQuitMessage.Call(uintptr(exitCode))
 		},
+		monitorMetrics: getMonitorMetrics,
 	}
+}
+
+func (a *application) currentWindowBounds(hwnd uintptr) windowBounds {
+	if a == nil || a.winapi.monitorMetrics == nil {
+		metrics := monitorMetrics{
+			monitorW: windowFallbackMonitorW,
+			monitorH: windowFallbackMonitorH,
+			workW:    windowFallbackMonitorW,
+			workH:    windowFallbackMonitorH,
+			dpi:      defaultDPI,
+		}
+		return computeWindowBounds(metrics, windowFrame{})
+	}
+	metrics := a.winapi.monitorMetrics(hwnd)
+	if a.dpi > 0 {
+		metrics.dpi = a.dpi
+	} else {
+		a.dpi = normalizedDPI(metrics.dpi)
+	}
+	return computeWindowBounds(metrics, windowFrameForDPI(metrics.dpi))
+}
+
+func (a *application) currentDPI(hwnd uintptr) int {
+	if a != nil && a.dpi > 0 {
+		return a.dpi
+	}
+	dpi := getWindowDPI(hwnd)
+	if a != nil {
+		a.dpi = dpi
+	}
+	return dpi
 }
