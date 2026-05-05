@@ -307,70 +307,85 @@ func TestHandleKeyEventTracksConfiguredKeysForRepeatSuppression(t *testing.T) {
 	}
 }
 
-func TestHandleKeyEventSuppressesIdleHeldHotkeyAfterRunnerStarts(t *testing.T) {
+func TestHandleKeyEventIgnoresStopPauseAndMenuBeforeRunnersStart(t *testing.T) {
 	tests := []struct {
-		name             string
-		vk               uint16
-		configure        func(*config.Config, uint16)
-		assertSuppressed func(*testing.T, *application)
-		assertFresh      func(*testing.T, *application)
+		name string
+		vk   uint16
+	}{
+		{name: "stop key", vk: vkF1 + 1},
+		{name: "pause key", vk: vkF1 + 2},
+		{name: "menu key", vk: vkF1 + 3},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := newApplication()
+			a.cfg = config.Default()
+			a.cfg.Start = config.KeyBinding{Name: "F1", VK: vkF1}
+			a.cfg.Stop = config.KeyBinding{Name: "F2", VK: vkF1 + 1}
+			a.cfg.Pause = config.KeyBinding{Name: "F3", VK: vkF1 + 2}
+			a.cfg.Menu.Character = config.KeyBinding{Name: "F4", VK: vkF1 + 3}
+
+			if a.handleKeyEvent(tt.vk, true) {
+				t.Fatal("idle non-start hotkey down should not be consumed")
+			}
+			if a.pressed.has(tt.vk) {
+				t.Fatal("idle non-start hotkey down was retained in pressed state")
+			}
+		})
+	}
+}
+
+func TestShouldTrackPressedKeyUsesRuntimeRelevantKeys(t *testing.T) {
+	const (
+		startVK        = vkF1
+		stopVK         = vkF1 + 1
+		pauseVK        = vkF1 + 2
+		clickerStartVK = vkF1 + 3
+		clickerStopVK  = vkF1 + 4
+		menuVK         = vkF1 + 5
+	)
+
+	tests := []struct {
+		name           string
+		startRunner    bool
+		startClicker   bool
+		wantStart      bool
+		wantStop       bool
+		wantPause      bool
+		wantClickStart bool
+		wantClickStop  bool
+		wantMenu       bool
 	}{
 		{
-			name: "stop key",
-			vk:   vkF1 + 1,
-			configure: func(cfg *config.Config, vk uint16) {
-				cfg.Stop = config.KeyBinding{Name: config.KeyDisplayName(int(vk)), VK: int(vk)}
-			},
-			assertSuppressed: func(t *testing.T, a *application) {
-				t.Helper()
-				if !a.runner.Running() {
-					t.Fatal("runner stopped from repeated held stop key")
-				}
-			},
-			assertFresh: func(t *testing.T, a *application) {
-				t.Helper()
-				if a.runner.Running() {
-					t.Fatal("runner running after fresh stop key down, want stopped")
-				}
-			},
+			name:           "idle tracks skill and clicker start keys",
+			wantStart:      true,
+			wantClickStart: true,
 		},
 		{
-			name: "pause key",
-			vk:   vkF1 + 2,
-			configure: func(cfg *config.Config, vk uint16) {
-				cfg.Pause = config.KeyBinding{Name: config.KeyDisplayName(int(vk)), VK: int(vk)}
-			},
-			assertSuppressed: func(t *testing.T, a *application) {
-				t.Helper()
-				if a.runner.Paused() {
-					t.Fatal("runner paused from repeated held pause key")
-				}
-			},
-			assertFresh: func(t *testing.T, a *application) {
-				t.Helper()
-				if !a.runner.Paused() {
-					t.Fatal("runner paused = false after fresh pause key down, want true")
-				}
-			},
+			name:           "skill runner tracks skill controls and idle clicker start",
+			startRunner:    true,
+			wantStop:       true,
+			wantPause:      true,
+			wantClickStart: true,
+			wantMenu:       true,
 		},
 		{
-			name: "menu key",
-			vk:   vkF1 + 3,
-			configure: func(cfg *config.Config, vk uint16) {
-				cfg.Menu.Character = config.KeyBinding{Name: config.KeyDisplayName(int(vk)), VK: int(vk)}
-			},
-			assertSuppressed: func(t *testing.T, a *application) {
-				t.Helper()
-				if !a.runner.Running() {
-					t.Fatal("runner stopped from repeated held menu key")
-				}
-			},
-			assertFresh: func(t *testing.T, a *application) {
-				t.Helper()
-				if a.runner.Running() {
-					t.Fatal("runner running after fresh menu key down, want stopped")
-				}
-			},
+			name:          "clicker tracks clicker controls and idle skill start",
+			startClicker:  true,
+			wantStart:     true,
+			wantPause:     true,
+			wantClickStop: true,
+			wantMenu:      true,
+		},
+		{
+			name:          "both runners track only runtime controls",
+			startRunner:   true,
+			startClicker:  true,
+			wantStop:      true,
+			wantPause:     true,
+			wantClickStop: true,
+			wantMenu:      true,
 		},
 	}
 
@@ -379,32 +394,40 @@ func TestHandleKeyEventSuppressesIdleHeldHotkeyAfterRunnerStarts(t *testing.T) {
 			a := newApplication()
 			a.cfg = config.Default()
 			enableRunnableTestSkill(&a.cfg)
-			a.cfg.Start = config.KeyBinding{Name: "F1", VK: vkF1}
-			tt.configure(&a.cfg, tt.vk)
+			a.cfg.Start = config.KeyBinding{Name: "F1", VK: startVK}
+			a.cfg.Stop = config.KeyBinding{Name: "F2", VK: stopVK}
+			a.cfg.Pause = config.KeyBinding{Name: "F3", VK: pauseVK}
+			a.cfg.Clicker.Start = config.KeyBinding{Name: "F4", VK: clickerStartVK}
+			a.cfg.Clicker.Stop = config.KeyBinding{Name: "F5", VK: clickerStopVK}
+			a.cfg.Menu.Character = config.KeyBinding{Name: "F6", VK: menuVK}
 
-			if a.handleKeyEvent(tt.vk, true) {
-				t.Fatal("idle hotkey down should not be consumed")
+			if tt.startRunner {
+				if !a.runner.Start(a.cfg) {
+					t.Fatal("runner did not start")
+				}
+				defer a.runner.Stop()
 			}
-			if !a.pressed.has(tt.vk) {
-				t.Fatal("idle hotkey down was not retained for repeat suppression")
-			}
-
-			if !a.runner.Start(a.cfg) {
-				t.Fatal("runner did not start")
-			}
-			defer a.runner.Stop()
-
-			a.handleKeyEvent(tt.vk, true)
-			tt.assertSuppressed(t, a)
-
-			a.handleKeyEvent(tt.vk, false)
-			if a.pressed.has(tt.vk) {
-				t.Fatal("hotkey remained pressed after key up")
+			if tt.startClicker {
+				if !a.clicker.Start(a.cfg.Clicker) {
+					t.Fatal("clicker did not start")
+				}
+				defer a.clicker.Stop()
 			}
 
-			a.handleKeyEvent(tt.vk, true)
-			tt.assertFresh(t, a)
+			assertTrackPressedKey(t, a, "start", startVK, tt.wantStart)
+			assertTrackPressedKey(t, a, "stop", stopVK, tt.wantStop)
+			assertTrackPressedKey(t, a, "pause", pauseVK, tt.wantPause)
+			assertTrackPressedKey(t, a, "clicker start", clickerStartVK, tt.wantClickStart)
+			assertTrackPressedKey(t, a, "clicker stop", clickerStopVK, tt.wantClickStop)
+			assertTrackPressedKey(t, a, "menu", menuVK, tt.wantMenu)
 		})
+	}
+}
+
+func assertTrackPressedKey(t *testing.T, a *application, name string, vk uint16, want bool) {
+	t.Helper()
+	if got := a.shouldTrackPressedKey(vk); got != want {
+		t.Fatalf("shouldTrackPressedKey(%s) = %v, want %v", name, got, want)
 	}
 }
 
@@ -482,6 +505,25 @@ func TestHandleKeyEventPauseWhenPauseKeyEqualsClickerStartKey(t *testing.T) {
 	a.handleKeyEvent(vkF1+5, false)
 	if a.runner.Paused() {
 		t.Fatal("runner paused = true after key up, want false")
+	}
+}
+
+func TestHandleKeyEventMenuKeyWinsOverStartKeyWhileRunnerRunning(t *testing.T) {
+	a := newApplication()
+	a.cfg = config.Default()
+	enableRunnableTestSkill(&a.cfg)
+	sharedKey := config.KeyBinding{Name: "F7", VK: vkF1 + 6}
+	a.cfg.Start = sharedKey
+	a.cfg.Menu.Character = sharedKey
+
+	if !a.runner.Start(a.cfg) {
+		t.Fatal("runner did not start")
+	}
+
+	a.handleKeyEvent(vkF1+6, true)
+	if a.runner.Running() {
+		a.runner.Stop()
+		t.Fatal("runner running = true after shared start/menu key, want stopped")
 	}
 }
 

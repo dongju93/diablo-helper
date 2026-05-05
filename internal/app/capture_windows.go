@@ -84,8 +84,9 @@ func (a *application) handleKeyEvent(vk uint16, down bool) bool {
 		}
 		a.pressed.set(vk)
 	} else {
+		wasPressed := a.pressed.has(vk)
 		a.pressed.clear(vk)
-		if sameKey(vk, a.cfg.Pause) {
+		if wasPressed && sameKey(vk, a.cfg.Pause) && (a.runner.Running() || a.clicker.Running()) {
 			a.runner.SetPaused(false)
 			a.clicker.SetPaused(false)
 			a.updateRuntimeStatus()
@@ -111,6 +112,37 @@ func (a *application) handleKeyEvent(vk uint16, down bool) bool {
 		return true
 	}
 
+	if a.handleRuntimeControlKey(vk) {
+		return false
+	}
+
+	a.handleStartKey(vk)
+	return false
+}
+
+func (a *application) shouldTrackPressedKey(vk uint16) bool {
+	if a.capture.valid() {
+		return true
+	}
+
+	runnerRunning := a.runner.Running()
+	clickerRunning := a.clicker.Running()
+
+	if runnerRunning {
+		if sameKey(vk, a.cfg.Stop) || sameKey(vk, a.cfg.Pause) || a.menuKeyMatches(vk) {
+			return true
+		}
+	} else if sameKey(vk, a.cfg.Start) {
+		return true
+	}
+
+	if clickerRunning {
+		return sameKey(vk, a.cfg.Clicker.Stop) || sameKey(vk, a.cfg.Pause) || a.menuKeyMatches(vk)
+	}
+	return sameKey(vk, a.cfg.Clicker.Start)
+}
+
+func (a *application) handleRuntimeControlKey(vk uint16) bool {
 	stopped := false
 	if a.runner.Running() && sameKey(vk, a.cfg.Stop) {
 		stopped = a.runner.Stop()
@@ -120,58 +152,30 @@ func (a *application) handleKeyEvent(vk uint16, down bool) bool {
 	}
 	if stopped {
 		a.setStatus("종료 키 입력으로 정지했습니다.")
-		return false
+		return true
 	}
 
 	if sameKey(vk, a.cfg.Pause) && (a.runner.Running() || a.clicker.Running()) {
 		a.runner.SetPaused(true)
 		a.clicker.SetPaused(true)
 		a.updateRuntimeStatus()
-		return false
+		return true
 	}
 
-	started := false
-	if sameKey(vk, a.cfg.Start) {
-		a.startRunnerFromHotkey()
-		started = true
-	}
-	if sameKey(vk, a.cfg.Clicker.Start) {
-		a.startClickerFromHotkey()
-		started = true
-	}
-	if started {
-		return false
-	}
-
-	if a.menuKeyMatches(vk) {
+	if (a.runner.Running() || a.clicker.Running()) && a.menuKeyMatches(vk) {
 		a.stopAllRunners("게임 메뉴 키 입력으로 정지했습니다.")
+		return true
 	}
 	return false
 }
 
-func (a *application) shouldTrackPressedKey(vk uint16) bool {
-	// Track configured control keys even when they are idle right now. If the
-	// runner starts while one is still held, Windows auto-repeat must not turn
-	// that held key into a fresh stop/pause/menu press.
-	if a.capture.valid() {
-		return true
+func (a *application) handleStartKey(vk uint16) {
+	if !a.runner.Running() && sameKey(vk, a.cfg.Start) {
+		a.startRunnerFromHotkey()
 	}
-	if sameKey(vk, a.cfg.Start) {
-		return true
+	if !a.clicker.Running() && sameKey(vk, a.cfg.Clicker.Start) {
+		a.startClickerFromHotkey()
 	}
-	if sameKey(vk, a.cfg.Stop) {
-		return true
-	}
-	if sameKey(vk, a.cfg.Pause) {
-		return true
-	}
-	if sameKey(vk, a.cfg.Clicker.Start) {
-		return true
-	}
-	if sameKey(vk, a.cfg.Clicker.Stop) {
-		return true
-	}
-	return a.menuKeyMatches(vk)
 }
 
 func (a *application) assignCapturedKey(vk uint16) {
