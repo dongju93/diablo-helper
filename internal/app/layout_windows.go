@@ -12,10 +12,15 @@ const (
 	windowMinW = 760
 	windowMinH = 780
 
-	windowReferenceMonitorW  = 2560
-	windowReferenceMonitorH  = 1440
-	windowResolutionMinScale = 0.95
-	windowResolutionMaxScale = 1.6
+	windowFallbackMonitorW = 2560
+	windowFallbackMonitorH = 1440
+
+	windowResolutionMinH           = 720
+	windowResolutionReferenceH     = 1440
+	windowResolutionMaxH           = 3240
+	windowResolutionMinScale       = 0.75
+	windowResolutionReferenceScale = 1.0
+	windowResolutionMaxScale       = 1.6
 
 	layoutDesignW  = 964
 	layoutDesignH  = 920
@@ -30,18 +35,18 @@ const (
 
 	// Bulk section (right-anchored within right panel)
 	bulkApplyMarR = 32
-	bulkApplyW    = 92
-	bulkMsGapL    = 16
+	bulkApplyW    = 108
+	bulkMsGapL    = 12
 	bulkMsW       = 30
-	bulkEditGapL  = 18
-	bulkEditW     = 62
-	bulkLabelOffL = 202 // fixed offset from rx
+	bulkEditGapL  = 24
+	bulkEditW     = 76
+	bulkLabelOffL = 160 // fixed offset from rx
 
 	// Skill grid (right-anchored)
 	skillMsMarR  = 82
 	skillMsW     = 32
-	skillMsGapL  = 26
-	skillEditW   = 56
+	skillMsGapL  = 30
+	skillEditW   = 64
 	skillBtnOffL = 152
 	skillBtnGapR = 32
 	skillChkOffL = 42
@@ -57,15 +62,17 @@ const (
 	// Clicker (right column, rx-anchored)
 	clickerStartLabelOffL = 24
 	clickerStartBtnOffL   = 72
-	clickerStopLabelOffL  = 186
-	clickerStopBtnOffL    = 234
-	clickerStopBtnW       = 100
+	clickerStartBtnW      = 132
+	clickerStopLabelOffL  = 224
+	clickerStopBtnOffL    = 272
+	clickerStopBtnW       = 132
 	clickerKeyLabelOffL   = 24
 	clickerKeyBtnOffL     = 72
-	clickerIntLabelOffL   = 186
-	clickerIntEditOffL    = 234
-	clickerIntEditW       = 62
-	clickerMsLabelOffL    = 306
+	clickerKeyBtnW        = 132
+	clickerIntLabelOffL   = 224
+	clickerIntEditOffL    = 272
+	clickerIntEditW       = 86
+	clickerMsLabelOffL    = 390
 
 	// Pause
 	pauseLabelOffL = 30
@@ -178,19 +185,44 @@ func computeWindowBounds(metrics monitorMetrics, frame windowFrame) windowBounds
 	}
 }
 
-func monitorVisualScale(monitorW, monitorH int) float64 {
-	return monitorResolutionScale(monitorW, monitorH)
+func monitorVisualScale(_ int, monitorH int) float64 {
+	return monitorResolutionScale(monitorH)
 }
 
-func monitorResolutionScale(monitorW, monitorH int) float64 {
-	if monitorW <= 0 || monitorH <= 0 {
+func monitorResolutionScale(monitorH int) float64 {
+	if monitorH <= 0 {
 		return 1
 	}
-	scale := math.Min(
-		float64(monitorW)/float64(windowReferenceMonitorW),
-		float64(monitorH)/float64(windowReferenceMonitorH),
+	if monitorH <= windowResolutionMinH {
+		return windowResolutionMinScale
+	}
+	if monitorH >= windowResolutionMaxH {
+		return windowResolutionMaxScale
+	}
+	if monitorH <= windowResolutionReferenceH {
+		return interpolateScale(
+			monitorH,
+			windowResolutionMinH,
+			windowResolutionReferenceH,
+			windowResolutionMinScale,
+			windowResolutionReferenceScale,
+		)
+	}
+	return interpolateScale(
+		monitorH,
+		windowResolutionReferenceH,
+		windowResolutionMaxH,
+		windowResolutionReferenceScale,
+		windowResolutionMaxScale,
 	)
-	return clampFloat(scale, windowResolutionMinScale, windowResolutionMaxScale)
+}
+
+func interpolateScale(value, minValue, maxValue int, minScale, maxScale float64) float64 {
+	if maxValue <= minValue {
+		return minScale
+	}
+	ratio := float64(value-minValue) / float64(maxValue-minValue)
+	return minScale + ratio*(maxScale-minScale)
 }
 
 func normalizedDPI(dpi int) int {

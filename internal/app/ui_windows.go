@@ -289,12 +289,12 @@ func (a *application) paint(hwnd uintptr) {
 	a.drawDivider(hdc, lo.rx+lo.w(20), lo.y(clickerHotkeyY+38), lo.rw-lo.w(40))
 
 	// Input frames
-	a.drawInputFrame(hdc, lo.bulkEditX-lo.w(8), lo.y(bulkIntervalEditY-6), lo.w(86), lo.h(32))
-	a.drawInputFrame(hdc, lo.bulkEditX-lo.w(8), lo.y(bulkSkillGapEditY-6), lo.w(86), lo.h(32))
+	a.drawInputFrame(hdc, lo.bulkEditX-lo.w(8), lo.y(bulkIntervalEditY-6), lo.w(inputFrameWidth(bulkEditW)), lo.h(32))
+	a.drawInputFrame(hdc, lo.bulkEditX-lo.w(8), lo.y(bulkSkillGapEditY-6), lo.w(inputFrameWidth(bulkEditW)), lo.h(32))
 	for y := skillFirstRowY; y < skillFirstRowY+config.MaxSkills*skillRowGap; y += skillRowGap {
-		a.drawInputFrame(hdc, lo.skillIntervalX-lo.w(8), lo.y(y+1), lo.w(82), lo.h(32))
+		a.drawInputFrame(hdc, lo.skillIntervalX-lo.w(8), lo.y(y+1), lo.w(inputFrameWidth(skillEditW)), lo.h(32))
 	}
-	a.drawInputFrame(hdc, lo.clickerIntEditX-lo.w(8), lo.y(clickerSettingY+1), lo.w(86), lo.h(32))
+	a.drawInputFrame(hdc, lo.clickerIntEditX-lo.w(8), lo.y(clickerSettingY+1), lo.w(inputFrameWidth(clickerIntEditW)), lo.h(32))
 
 	a.drawStatusDot(hdc, lo.statusDotX, lo.y(statusBarY+19), lo.s(10))
 
@@ -328,6 +328,10 @@ func (a *application) drawInputFrame(hdc uintptr, x int, y int, width int, heigh
 	procRoundRect.Call(hdc, uintptr(x), uintptr(y), uintptr(x+width), uintptr(y+height), uintptr(corner), uintptr(corner))
 	procSelectObject.Call(hdc, oldPen)
 	procSelectObject.Call(hdc, oldBrush)
+}
+
+func inputFrameWidth(editWidth int) int {
+	return editWidth + 24
 }
 
 func (a *application) drawDivider(hdc uintptr, x int, y int, width int) {
@@ -606,13 +610,31 @@ func (a *application) drawToggleSwitch(hdc uintptr, rc rect, on bool, hovered bo
 }
 
 func drawTextInRect(hdc uintptr, text string, font uintptr, color uintptr, rc rect, flags uintptr) {
-	pad := int32(maxInt(6, int(rc.Bottom-rc.Top)/4))
-	rc.Left += pad
-	rc.Right -= pad
+	rc = buttonTextContentRect(rc)
 	if rc.Right <= rc.Left || rc.Bottom <= rc.Top {
 		return
 	}
 	drawText(hdc, text, font, color, int(rc.Left), int(rc.Top), int(rc.Right-rc.Left), int(rc.Bottom-rc.Top), flags)
+}
+
+func buttonTextContentRect(rc rect) rect {
+	width := int(rc.Right - rc.Left)
+	height := int(rc.Bottom - rc.Top)
+	pad := buttonTextHorizontalPadding(width, height)
+	rc.Left += int32(pad)
+	rc.Right -= int32(pad)
+	return rc
+}
+
+func buttonTextHorizontalPadding(width, height int) int {
+	if width <= 0 || height <= 0 {
+		return 0
+	}
+	pad := maxInt(4, minInt(width/12, height/8))
+	if pad*2 >= width {
+		return maxInt(0, (width-1)/2)
+	}
+	return pad
 }
 
 func maxInt32(a, b int32) int32 {

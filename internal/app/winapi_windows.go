@@ -205,8 +205,8 @@ func fallbackMonitorMetrics() monitorMetrics {
 	monitorW := int(width)
 	monitorH := int(height)
 	if monitorW <= 0 || monitorH <= 0 {
-		monitorW = windowReferenceMonitorW
-		monitorH = windowReferenceMonitorH
+		monitorW = windowFallbackMonitorW
+		monitorH = windowFallbackMonitorH
 	}
 	return monitorMetrics{
 		monitorW: monitorW,

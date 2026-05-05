@@ -408,10 +408,10 @@ func defaultApplicationWinAPI() applicationWinAPI {
 func (a *application) currentWindowBounds(hwnd uintptr) windowBounds {
 	if a == nil || a.winapi.monitorMetrics == nil {
 		metrics := monitorMetrics{
-			monitorW: windowReferenceMonitorW,
-			monitorH: windowReferenceMonitorH,
-			workW:    windowReferenceMonitorW,
-			workH:    windowReferenceMonitorH,
+			monitorW: windowFallbackMonitorW,
+			monitorH: windowFallbackMonitorH,
+			workW:    windowFallbackMonitorW,
+			workH:    windowFallbackMonitorH,
 			dpi:      defaultDPI,
 		}
 		return computeWindowBounds(metrics, windowFrame{})
