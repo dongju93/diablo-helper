@@ -70,7 +70,7 @@ const (
 	clickerKeyBtnOffL     = 72
 	clickerKeyBtnW        = 132
 	clickerIntLabelOffL   = 224
-	clickerIntEditOffL    = 272
+	clickerIntEditInsetL  = 8
 	clickerIntEditW       = 86
 	clickerMsLabelOffL    = 390
 
@@ -290,7 +290,7 @@ func computeLayout(cw, ch int, dpi int) uiLayout {
 	clickerKeyLabelX := rx + scaled(clickerKeyLabelOffL, sx)
 	clickerKeyBtnX := rx + scaled(clickerKeyBtnOffL, sx)
 	clickerIntLabelX := rx + scaled(clickerIntLabelOffL, sx)
-	clickerIntEditX := rx + scaled(clickerIntEditOffL, sx)
+	clickerIntEditX := clickerStopBtnX + scaled(clickerIntEditInsetL, sx)
 	clickerMsLabelX := rx + scaled(clickerMsLabelOffL, sx)
 
 	pauseLabelX := rx + scaled(pauseLabelOffL, sx)

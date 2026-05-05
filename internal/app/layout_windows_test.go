@@ -325,8 +325,12 @@ func TestComputeLayoutKeepsControlRowsReadable(t *testing.T) {
 			assertBefore(t, clickerStopLabel, clickerStopButton, lo.w(4))
 			assertBefore(t, clickerKeyLabel, clickerKeyButton, lo.w(4))
 			assertBefore(t, clickerKeyButton, clickerIntLabel, lo.w(12))
+			assertBefore(t, clickerIntLabel, clickerIntFrame, 0)
 			assertBefore(t, clickerIntLabel, clickerIntEdit, lo.w(4))
 			assertBefore(t, clickerIntFrame, clickerMS, lo.w(4))
+			if clickerIntFrame.left != clickerStopButton.left {
+				t.Fatalf("clicker interval frame left=%d, want aligned with stop button left=%d", clickerIntFrame.left, clickerStopButton.left)
+			}
 
 			pauseLabel := testRect("pause label", lo.pauseLabelX, lo.y(pauseRowY+6), lo.w(45), lo.h(24))
 			pauseButton := testRect("pause button", lo.pauseBtnX, lo.y(pauseRowY), lo.pauseBtnW, lo.h(34))
