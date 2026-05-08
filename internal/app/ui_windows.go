@@ -362,7 +362,7 @@ func (a *application) drawStatusDot(hdc uintptr, x int, y int, size int) {
 	switch {
 	case a.capture.valid():
 		color = uiAccent
-	case a.runner.Paused():
+	case a.anyPaused():
 		color = uiWarning
 	case a.runner.Running() || a.clicker.Running():
 		color = uiSuccess
@@ -418,13 +418,17 @@ func (a *application) colorStatic(hdc uintptr, hwndCtl uintptr) uintptr {
 // based on the current runner/clicker state.
 func (a *application) statusTextColor() uintptr {
 	switch {
-	case a.runner.Paused():
+	case a.anyPaused():
 		return uiStatusPaused
 	case a.runner.Running() || a.clicker.Running():
 		return uiStatusRunning
 	default:
 		return uiStatusStopped
 	}
+}
+
+func (a *application) anyPaused() bool {
+	return a.runner.Paused() || a.clicker.Paused()
 }
 
 func (a *application) colorEdit(hdc uintptr) uintptr {
