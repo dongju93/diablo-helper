@@ -59,6 +59,7 @@ var (
 	procLoadIconW                *syscall.LazyProc
 	procMessageBoxW              *syscall.LazyProc
 	procMonitorFromWindow        *syscall.LazyProc
+	procPostMessageW             *syscall.LazyProc
 	procPostQuitMessage          *syscall.LazyProc
 	procRegisterClassExW         *syscall.LazyProc
 	procReleaseDC                *syscall.LazyProc
@@ -147,6 +148,7 @@ func loadWinAPIProcs() {
 	procLoadIconW = user32.NewProc("LoadIconW")
 	procMessageBoxW = user32.NewProc("MessageBoxW")
 	procMonitorFromWindow = user32.NewProc("MonitorFromWindow")
+	procPostMessageW = user32.NewProc("PostMessageW")
 	procPostQuitMessage = user32.NewProc("PostQuitMessage")
 	procRegisterClassExW = user32.NewProc("RegisterClassExW")
 	procReleaseDC = user32.NewProc("ReleaseDC")

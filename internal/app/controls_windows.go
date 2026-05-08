@@ -717,6 +717,7 @@ func (a *application) updateRuntimeStatus() {
 }
 
 func (a *application) setStatus(text string) {
+	a.statusText = text
 	if a.controls.status != 0 {
 		setWindowText(a.controls.status, text)
 	}

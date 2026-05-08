@@ -3,6 +3,7 @@
 package app
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -195,6 +196,103 @@ func TestSkillRunnerPauseSuppressesAndResumes(t *testing.T) {
 	expectKey(t, sent, '1')
 }
 
+func TestSkillRunnerStopWaitsForSendAndBlocksRestart(t *testing.T) {
+	entered := make(chan struct{}, 1)
+	release := make(chan struct{})
+	runner := newSkillRunner(func(uint16) error {
+		select {
+		case entered <- struct{}{}:
+		default:
+		}
+		<-release
+		return nil
+	})
+	cfg := config.Default()
+	cfg.Skills[0] = config.Skill{
+		Name:       "Enabled",
+		Key:        config.KeyBinding{Name: "1", VK: int('1')},
+		IntervalMS: config.MinimumIntervalMS,
+		Enabled:    true,
+	}
+
+	if !runner.Start(cfg) {
+		t.Fatal("Start() = false, want true")
+	}
+	select {
+	case <-entered:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timed out waiting for sendKey")
+	}
+
+	stopDone := make(chan bool, 1)
+	go func() {
+		stopDone <- runner.Stop()
+	}()
+	waitForRunnerCondition(t, func() bool {
+		return !runner.Running()
+	})
+	select {
+	case got := <-stopDone:
+		t.Fatalf("Stop() returned %t before sendKey completed", got)
+	default:
+	}
+	if runner.Start(cfg) {
+		t.Fatal("Start() = true while previous runner goroutine is stopping")
+	}
+
+	close(release)
+	select {
+	case got := <-stopDone:
+		if !got {
+			t.Fatal("Stop() = false, want true")
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timed out waiting for Stop()")
+	}
+	if !runner.Start(cfg) {
+		t.Fatal("Start() = false after Stop() completed, want true")
+	}
+	defer runner.Stop()
+}
+
+func TestSkillRunnerReportsSendKeyError(t *testing.T) {
+	wantErr := errors.New("send failed")
+	reported := make(chan error, 1)
+	runner := newSkillRunner(func(uint16) error {
+		return wantErr
+	})
+	runner.SetErrorHandler(func(err error) {
+		reported <- err
+	})
+	cfg := config.Default()
+	cfg.Skills[0] = config.Skill{
+		Name:       "Enabled",
+		Key:        config.KeyBinding{Name: "1", VK: int('1')},
+		IntervalMS: config.MinimumIntervalMS,
+		Enabled:    true,
+	}
+
+	if !runner.Start(cfg) {
+		t.Fatal("Start() = false, want true")
+	}
+	select {
+	case got := <-reported:
+		if !errors.Is(got, wantErr) {
+			t.Fatalf("reported error = %v, want %v", got, wantErr)
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timed out waiting for sendKey error")
+	}
+	if runner.Running() {
+		t.Fatal("Running() = true after sendKey error, want false")
+	}
+	waitForRunnerCondition(t, func() bool {
+		runner.mu.Lock()
+		defer runner.mu.Unlock()
+		return runner.cancel == nil
+	})
+}
+
 func TestClickerRunnerStartStopState(t *testing.T) {
 	runner := newClickerRunner(func(uint16) error { return nil })
 	clicker := config.Clicker{
@@ -300,6 +398,97 @@ func TestClickerRunnerSendsConfiguredKey(t *testing.T) {
 	expectKey(t, sent, vkLButton)
 }
 
+func TestClickerRunnerStopWaitsForSendAndBlocksRestart(t *testing.T) {
+	entered := make(chan struct{}, 1)
+	release := make(chan struct{})
+	runner := newClickerRunner(func(uint16) error {
+		select {
+		case entered <- struct{}{}:
+		default:
+		}
+		<-release
+		return nil
+	})
+	clicker := config.Clicker{
+		Key:        config.KeyBinding{Name: "Mouse Left", VK: vkLButton},
+		IntervalMS: config.MinimumIntervalMS,
+	}
+
+	if !runner.Start(clicker) {
+		t.Fatal("Start() = false, want true")
+	}
+	select {
+	case <-entered:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timed out waiting for sendKey")
+	}
+
+	stopDone := make(chan bool, 1)
+	go func() {
+		stopDone <- runner.Stop()
+	}()
+	waitForRunnerCondition(t, func() bool {
+		return !runner.Running()
+	})
+	select {
+	case got := <-stopDone:
+		t.Fatalf("Stop() returned %t before sendKey completed", got)
+	default:
+	}
+	if runner.Start(clicker) {
+		t.Fatal("Start() = true while previous clicker goroutine is stopping")
+	}
+
+	close(release)
+	select {
+	case got := <-stopDone:
+		if !got {
+			t.Fatal("Stop() = false, want true")
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timed out waiting for Stop()")
+	}
+	if !runner.Start(clicker) {
+		t.Fatal("Start() = false after Stop() completed, want true")
+	}
+	defer runner.Stop()
+}
+
+func TestClickerRunnerReportsSendKeyError(t *testing.T) {
+	wantErr := errors.New("send failed")
+	reported := make(chan error, 1)
+	runner := newClickerRunner(func(uint16) error {
+		return wantErr
+	})
+	runner.SetErrorHandler(func(err error) {
+		reported <- err
+	})
+	clicker := config.Clicker{
+		Key:        config.KeyBinding{Name: "Mouse Left", VK: vkLButton},
+		IntervalMS: config.MinimumIntervalMS,
+	}
+
+	if !runner.Start(clicker) {
+		t.Fatal("Start() = false, want true")
+	}
+	select {
+	case got := <-reported:
+		if !errors.Is(got, wantErr) {
+			t.Fatalf("reported error = %v, want %v", got, wantErr)
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timed out waiting for sendKey error")
+	}
+	if runner.Running() {
+		t.Fatal("Running() = true after sendKey error, want false")
+	}
+	waitForRunnerCondition(t, func() bool {
+		runner.mu.Lock()
+		defer runner.mu.Unlock()
+		return runner.cancel == nil
+	})
+}
+
 func expectKey(t *testing.T, ch <-chan uint16, want uint16) {
 	t.Helper()
 
@@ -311,6 +500,19 @@ func expectKey(t *testing.T, ch <-chan uint16, want uint16) {
 	case <-time.After(200 * time.Millisecond):
 		t.Fatalf("timed out waiting for key %d", want)
 	}
+}
+
+func waitForRunnerCondition(t *testing.T, condition func() bool) {
+	t.Helper()
+
+	deadline := time.Now().Add(200 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if condition() {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatal("timed out waiting for runner condition")
 }
 
 func drainKeys(ch <-chan uint16) {
