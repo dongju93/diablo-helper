@@ -254,23 +254,15 @@ func (a *application) updateBindingControl(target captureTarget) {
 		ignoreSetWindowText(a.controls.clickerKeyButton, bindingText(a.cfg.Clicker.Key))
 	case captureMenu:
 		if hwnd := a.controls.menuButtons[target.menuID]; hwnd != 0 {
-			for _, menu := range a.cfg.MenuBindings() {
-				if menu.ID == target.menuID {
-					ignoreSetWindowText(hwnd, bindingText(menu.Binding))
-					return
-				}
+			if b, ok := a.cfg.Menu.BindingByID(target.menuID); ok {
+				ignoreSetWindowText(hwnd, bindingText(b))
 			}
 		}
 	}
 }
 
 func (a *application) menuKeyMatches(vk uint16) bool {
-	for _, menu := range a.cfg.MenuBindings() {
-		if sameKey(vk, menu.Binding) {
-			return true
-		}
-	}
-	return false
+	return a.cfg.Menu.Matches(vk)
 }
 
 func captureRejectsMouseLeft(kind captureKind) bool {

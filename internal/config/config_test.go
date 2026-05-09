@@ -521,3 +521,40 @@ func TestNormalizeForUICanonicalizesKeyNames(t *testing.T) {
 		t.Fatalf("skill key name = %q, want %q", cfg.Skills[0].Key.Name, "1")
 	}
 }
+
+func TestMenuKeysMatches(t *testing.T) {
+	m := Default().Menu
+	m.SetKeyByID("clan", KeyBinding{Name: "F7", VK: 0x76})
+
+	if !m.Matches(0x76) {
+		t.Fatal("Matches(F7) = false, want true (assigned clan binding)")
+	}
+	if m.Matches(0x77) {
+		t.Fatal("Matches(F8) = true, want false (not assigned)")
+	}
+	if m.Matches(0) {
+		t.Fatal("Matches(0) = true, want false (VK 0 is unassigned)")
+	}
+}
+
+func TestMenuKeysBindingByID(t *testing.T) {
+	m := Default().Menu
+	b, ok := m.BindingByID("character")
+	if !ok || b != m.Character {
+		t.Fatalf("BindingByID(character) = %+v, %v; want %+v, true", b, ok, m.Character)
+	}
+	_, ok = m.BindingByID("nonexistent")
+	if ok {
+		t.Fatal("BindingByID(nonexistent) returned ok=true")
+	}
+}
+
+func BenchmarkMenuKeysMatches(b *testing.B) {
+	m := Default().Menu
+	m.SetKeyByID("shop", KeyBinding{Name: "F7", VK: 0x76})
+	vk := uint16(0x76)
+	b.ReportAllocs()
+	for b.Loop() {
+		m.Matches(vk)
+	}
+}

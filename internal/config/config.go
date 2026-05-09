@@ -155,6 +155,43 @@ func (m *MenuKeys) forEachKey(fn func(*KeyBinding)) {
 	fn(&m.Shop)
 }
 
+// Matches reports whether vk matches any assigned menu binding.
+// Called from the global low-level keyboard hook — no allocations.
+func (m MenuKeys) Matches(vk uint16) bool {
+	eq := func(b KeyBinding) bool { return b.Assigned() && uint16(b.VK) == vk }
+	return eq(m.Character) || eq(m.SkillAssign) || eq(m.Talents) ||
+		eq(m.Map) || eq(m.Journal) || eq(m.Social) ||
+		eq(m.Clan) || eq(m.TownPortal) || eq(m.Collection) || eq(m.Shop)
+}
+
+// BindingByID returns the KeyBinding for the given menu ID.
+func (m MenuKeys) BindingByID(id string) (KeyBinding, bool) {
+	switch id {
+	case "character":
+		return m.Character, true
+	case "skill_assign":
+		return m.SkillAssign, true
+	case "talents":
+		return m.Talents, true
+	case "map":
+		return m.Map, true
+	case "journal":
+		return m.Journal, true
+	case "social":
+		return m.Social, true
+	case "clan":
+		return m.Clan, true
+	case "town_portal":
+		return m.TownPortal, true
+	case "collection":
+		return m.Collection, true
+	case "shop":
+		return m.Shop, true
+	default:
+		return KeyBinding{}, false
+	}
+}
+
 // NormalizeForUI repairs a partially edited config into the shape expected by
 // controls and save output. File loads validate raw input before calling this.
 func (c *Config) NormalizeForUI() {
