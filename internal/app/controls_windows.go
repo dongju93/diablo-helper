@@ -350,10 +350,6 @@ func (a *application) createButton(parent uintptr, id int, text string, x int, y
 	return a.createControl(parent, "BUTTON", text, wsChild|wsVisible|wsTabStop|bsOwnerDraw, x, y, width, height, id)
 }
 
-func (a *application) createCheckbox(parent uintptr, id int, text string, x int, y int, width int, height int) uintptr {
-	return a.createControl(parent, "BUTTON", text, wsChild|wsVisible|wsTabStop|bsAutoCheckbox, x, y, width, height, id)
-}
-
 func (a *application) createEdit(parent uintptr, id int, text string, x int, y int, width int, height int) uintptr {
 	hwnd := a.createControl(parent, "EDIT", text, wsChild|wsVisible|wsTabStop|esNumber|esAutoHScroll, x, y, width, height, id)
 	sendMessage(hwnd, emSetMargins, ecLeftMargin|ecRightMargin, makeLong(0, 0))
@@ -634,14 +630,6 @@ func (a *application) startClickerFromHotkey() {
 	}
 	if a.clicker.Start(a.cfg.Clicker) {
 		a.updateRuntimeStatus()
-		return
-	}
-	a.updateRuntimeStatus()
-}
-
-func (a *application) stopRunner(status string) {
-	if a.runner.Stop() {
-		a.setStatus(status)
 		return
 	}
 	a.updateRuntimeStatus()

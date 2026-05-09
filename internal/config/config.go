@@ -241,12 +241,6 @@ func (c *Config) NormalizeForUI() {
 	c.Menu.forEachKey(normalizeKey)
 }
 
-// Normalize keeps the previous repair behavior for callers that intentionally
-// want canonical UI values.
-func (c *Config) Normalize() {
-	c.NormalizeForUI()
-}
-
 func (c Config) MenuBindings() []MenuBinding {
 	return []MenuBinding{
 		{ID: "character", Label: "Character", Binding: c.Menu.Character},

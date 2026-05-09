@@ -138,18 +138,6 @@ func messageBoxResult(hwnd uintptr, title string, text string, flags uintptr) (u
 	return ret, nil
 }
 
-func checked(hwnd uintptr) bool {
-	return sendMessage(hwnd, bmGetCheck, 0, 0) == bstChecked
-}
-
-func setChecked(hwnd uintptr, value bool) {
-	check := uintptr(0)
-	if value {
-		check = bstChecked
-	}
-	sendMessage(hwnd, bmSetCheck, check, 0)
-}
-
 func getClientSize(hwnd uintptr) (int, int) {
 	var cr rect
 	procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&cr)))
