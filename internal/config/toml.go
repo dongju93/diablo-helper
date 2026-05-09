@@ -104,17 +104,20 @@ func writeFileAtomic(path string, data []byte, perm os.FileMode) (err error) {
 	if err = os.Rename(tmpName, path); err != nil {
 		return err
 	}
-	return syncDir(dir)
+	syncDirBestEffort(dir)
+	return nil
 }
 
-func syncDir(dir string) error {
+// syncDirBestEffort asks the filesystem to persist parent-directory metadata
+// after rename. Directory sync is not portable, notably on Windows, and the file
+// contents have already been synced above, so failures remain non-fatal.
+func syncDirBestEffort(dir string) {
 	d, err := os.Open(dir)
 	if err != nil {
-		return nil
+		return
 	}
 	defer d.Close()
 	_ = d.Sync()
-	return nil
 }
 
 func rejectReparsePath(path string) error {

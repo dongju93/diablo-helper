@@ -430,26 +430,26 @@ func (a *application) handleCommand(wParam uintptr) bool {
 
 func (a *application) updateControlsFromConfig() {
 	a.cfg.NormalizeForUI()
-	setWindowText(a.controls.startButton, bindingText(a.cfg.Start))
-	setWindowText(a.controls.stopButton, bindingText(a.cfg.Stop))
-	setWindowText(a.controls.pauseButton, bindingText(a.cfg.Pause))
-	setWindowText(a.controls.clickerStartButton, bindingText(a.cfg.Clicker.Start))
-	setWindowText(a.controls.clickerStopButton, bindingText(a.cfg.Clicker.Stop))
-	setWindowText(a.controls.clickerKeyButton, bindingText(a.cfg.Clicker.Key))
-	setWindowText(a.controls.clickerInterval, strconv.Itoa(a.cfg.Clicker.IntervalMS))
+	ignoreSetWindowText(a.controls.startButton, bindingText(a.cfg.Start))
+	ignoreSetWindowText(a.controls.stopButton, bindingText(a.cfg.Stop))
+	ignoreSetWindowText(a.controls.pauseButton, bindingText(a.cfg.Pause))
+	ignoreSetWindowText(a.controls.clickerStartButton, bindingText(a.cfg.Clicker.Start))
+	ignoreSetWindowText(a.controls.clickerStopButton, bindingText(a.cfg.Clicker.Stop))
+	ignoreSetWindowText(a.controls.clickerKeyButton, bindingText(a.cfg.Clicker.Key))
+	ignoreSetWindowText(a.controls.clickerInterval, strconv.Itoa(a.cfg.Clicker.IntervalMS))
 	for _, menu := range a.cfg.MenuBindings() {
 		if hwnd := a.controls.menuButtons[menu.ID]; hwnd != 0 {
-			setWindowText(hwnd, bindingText(menu.Binding))
+			ignoreSetWindowText(hwnd, bindingText(menu.Binding))
 		}
 	}
-	setWindowText(a.controls.bulkSkillGap, strconv.Itoa(a.cfg.SkillGapMS))
+	ignoreSetWindowText(a.controls.bulkSkillGap, strconv.Itoa(a.cfg.SkillGapMS))
 	for i := range config.MaxSkills {
 		a.skillEnabled[i] = a.cfg.Skills[i].Enabled
 		if hwnd := a.controls.skillEnabled[i]; hwnd != 0 {
 			invalidateRect(hwnd, true)
 		}
-		setWindowText(a.controls.skillButtons[i], bindingText(a.cfg.Skills[i].Key))
-		setWindowText(a.controls.skillInterval[i], strconv.Itoa(a.cfg.Skills[i].IntervalMS))
+		ignoreSetWindowText(a.controls.skillButtons[i], bindingText(a.cfg.Skills[i].Key))
+		ignoreSetWindowText(a.controls.skillInterval[i], strconv.Itoa(a.cfg.Skills[i].IntervalMS))
 	}
 	a.updateRuntimeStatus()
 }
@@ -476,14 +476,14 @@ func (a *application) applyBulkInterval() {
 		return
 	}
 	a.cfg.SkillGapMS = skillGap
-	setWindowText(a.controls.bulkSkillGap, strconv.Itoa(skillGap))
+	ignoreSetWindowText(a.controls.bulkSkillGap, strconv.Itoa(skillGap))
 	for i := range config.MaxSkills {
 		skillInterval, err := bulkIntervalForSkill(interval, skillGap, i)
 		if err != nil {
 			messageBox(a.hwnd, "잘못된 간격", err.Error(), mbOK|mbIconError)
 			return
 		}
-		setWindowText(a.controls.skillInterval[i], strconv.Itoa(skillInterval))
+		ignoreSetWindowText(a.controls.skillInterval[i], strconv.Itoa(skillInterval))
 	}
 	if skillGap > 0 {
 		a.setStatus("일괄 간격을 키별 간격만큼 벌려 적용했습니다.")
@@ -719,7 +719,7 @@ func (a *application) updateRuntimeStatus() {
 func (a *application) setStatus(text string) {
 	a.statusText = text
 	if a.controls.status != 0 {
-		setWindowText(a.controls.status, text)
+		ignoreSetWindowText(a.controls.status, text)
 	}
 	if a.hwnd != 0 {
 		invalidateRect(a.hwnd, false)

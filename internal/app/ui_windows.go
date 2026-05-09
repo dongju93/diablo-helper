@@ -121,6 +121,8 @@ func scaledFontHeight(base int, scale float64) int32 {
 }
 
 func createUIFont(face string, height int32, weight int) uintptr {
+	// GDI reports allocation failure as a zero handle. WM_SETFONT and paint paths
+	// already tolerate zero by falling back to system defaults.
 	font, _, _ := procCreateFontW.Call(
 		int32Arg(height),
 		0,
@@ -141,18 +143,23 @@ func createUIFont(face string, height int32, weight int) uintptr {
 }
 
 func createBrush(color uintptr) uintptr {
+	// GDI reports allocation failure as a zero handle. Drawing with a zero brush
+	// is best-effort UI degradation rather than a user-actionable failure.
 	brush, _, _ := procCreateSolidBrush.Call(color)
 	return brush
 }
 
 func createPen(color uintptr, width int) uintptr {
+	// GDI reports allocation failure as a zero handle. Drawing with a zero pen is
+	// best-effort UI degradation rather than a user-actionable failure.
 	pen, _, _ := procCreatePen.Call(psSolid, uintptr(width), color)
 	return pen
 }
 
 func deleteGDIObject(handle uintptr) {
 	if handle != 0 {
-		procDeleteObject.Call(handle)
+		// Cleanup failure is non-actionable; handles are process-local UI resources.
+		_, _, _ = procDeleteObject.Call(handle)
 	}
 }
 

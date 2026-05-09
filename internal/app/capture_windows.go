@@ -237,26 +237,26 @@ func (a *application) clearCapturedKey() {
 func (a *application) updateBindingControl(target captureTarget) {
 	switch target.kind {
 	case captureStart:
-		setWindowText(a.controls.startButton, bindingText(a.cfg.Start))
+		ignoreSetWindowText(a.controls.startButton, bindingText(a.cfg.Start))
 	case captureStop:
-		setWindowText(a.controls.stopButton, bindingText(a.cfg.Stop))
+		ignoreSetWindowText(a.controls.stopButton, bindingText(a.cfg.Stop))
 	case capturePause:
-		setWindowText(a.controls.pauseButton, bindingText(a.cfg.Pause))
+		ignoreSetWindowText(a.controls.pauseButton, bindingText(a.cfg.Pause))
 	case captureSkill:
 		if target.index >= 0 && target.index < len(a.cfg.Skills) {
-			setWindowText(a.controls.skillButtons[target.index], bindingText(a.cfg.Skills[target.index].Key))
+			ignoreSetWindowText(a.controls.skillButtons[target.index], bindingText(a.cfg.Skills[target.index].Key))
 		}
 	case captureClickerStart:
-		setWindowText(a.controls.clickerStartButton, bindingText(a.cfg.Clicker.Start))
+		ignoreSetWindowText(a.controls.clickerStartButton, bindingText(a.cfg.Clicker.Start))
 	case captureClickerStop:
-		setWindowText(a.controls.clickerStopButton, bindingText(a.cfg.Clicker.Stop))
+		ignoreSetWindowText(a.controls.clickerStopButton, bindingText(a.cfg.Clicker.Stop))
 	case captureClickerKey:
-		setWindowText(a.controls.clickerKeyButton, bindingText(a.cfg.Clicker.Key))
+		ignoreSetWindowText(a.controls.clickerKeyButton, bindingText(a.cfg.Clicker.Key))
 	case captureMenu:
 		if hwnd := a.controls.menuButtons[target.menuID]; hwnd != 0 {
 			for _, menu := range a.cfg.MenuBindings() {
 				if menu.ID == target.menuID {
-					setWindowText(hwnd, bindingText(menu.Binding))
+					ignoreSetWindowText(hwnd, bindingText(menu.Binding))
 					return
 				}
 			}
