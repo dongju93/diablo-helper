@@ -373,6 +373,22 @@ func KeyDisplayName(vk int) string {
 		return "Left Win"
 	case 0x5C:
 		return "Right Win"
+	case 0x90:
+		return "Num Lock"
+	case 0x91:
+		return "Scroll Lock"
+	case 0xA0:
+		return "Left Shift"
+	case 0xA1:
+		return "Right Shift"
+	case 0xA2:
+		return "Left Ctrl"
+	case 0xA3:
+		return "Right Ctrl"
+	case 0xA4:
+		return "Left Alt"
+	case 0xA5:
+		return "Right Alt"
 	default:
 		return fmt.Sprintf("VK_%d", vk)
 	}
