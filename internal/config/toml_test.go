@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -384,6 +385,41 @@ func TestSaveFileWithOptionsAllowsNonTOMLExtension(t *testing.T) {
 	}
 	if _, err := LoadFile(path); err != nil {
 		t.Fatalf("LoadFile() error = %v", err)
+	}
+}
+
+func TestLoadFileRejectsTooLargeFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "default.toml")
+	if err := os.WriteFile(path, bytes.Repeat([]byte(" "), MaxConfigFileBytes+1), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	_, err := LoadFile(path)
+	if err == nil {
+		t.Fatal("LoadFile() error = nil, want size error")
+	}
+	if !strings.Contains(err.Error(), "too large") {
+		t.Fatalf("LoadFile() error = %v, want too large", err)
+	}
+}
+
+func TestLoadFileRejectsSymlinkPath(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "target.toml")
+	link := filepath.Join(dir, "link.toml")
+	if err := SaveFile(target, Default()); err != nil {
+		t.Fatalf("SaveFile() error = %v", err)
+	}
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("Symlink() unavailable: %v", err)
+	}
+
+	_, err := LoadFile(link)
+	if err == nil {
+		t.Fatal("LoadFile() error = nil, want symlink error")
+	}
+	if !strings.Contains(err.Error(), "symlink") {
+		t.Fatalf("LoadFile() error = %v, want symlink", err)
 	}
 }
 
