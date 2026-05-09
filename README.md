@@ -31,8 +31,15 @@
 - 지원 마우스 버튼은 `Mouse Left`, `Mouse Right`, `Mouse Middle`, `Mouse X1`, `Mouse X2`입니다.
 - `Mouse Left`는 기술 키, 일시정지 키, 게임 메뉴 키, 클릭 반복 출력 키에는 사용할 수 있습니다.
 - `Mouse Left`는 기술 반복 시작/종료 키와 클릭 반복 시작/종료 키에는 사용할 수 없습니다.
-- 기술 키와 클릭 반복 출력 키에는 `Shift`, `Ctrl`, `Alt`, `Pause`, `Caps Lock`, `Esc`, `Left Win`, `Right Win`을 사용할 수 없습니다.
-- 시작/종료/일시정지 같은 핫키에는 위 시스템 키를 지정할 수 있습니다.
+
+키 용도별 허용 기준:
+
+| 용도 | 허용 | 차단 |
+|---|---|---|
+| 기술 키, 클릭 반복 출력 키 | 문자/숫자, 기능키, 방향/편집키, 마우스 버튼, `Shift`, `Ctrl`, `Alt`, `Left/Right Shift`, `Left/Right Ctrl`, `Left/Right Alt` | `Esc`, `Pause`, `Caps Lock`, `Num Lock`, `Scroll Lock`, `Left Win`, `Right Win` |
+| 시작/종료/일시정지/게임 메뉴 키 | 지원되는 키보드/마우스 입력 전반 | 시작/종료 키와 클릭 반복 시작/종료 키의 `Mouse Left` |
+
+자동 출력 키의 허용/차단 기준은 위 표를 따릅니다.
 
 ## 기본 설정
 
