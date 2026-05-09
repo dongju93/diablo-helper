@@ -15,7 +15,7 @@ func sendVirtualKey(vk uint16) error {
 	down := newKeyboardInput(vk, 0)
 	up := newKeyboardInput(vk, keyEventKeyUp)
 	inputs := []input{down, up}
-	n, _, _ := procSendInput.Call(
+	n, _, callErr := procSendInput.Call(
 		uintptr(len(inputs)),
 		uintptr(unsafe.Pointer(&inputs[0])),
 		unsafe.Sizeof(inputs[0]),
@@ -28,7 +28,7 @@ func sendVirtualKey(vk uint16) error {
 		upOnly := []input{up}
 		procSendInput.Call(1, uintptr(unsafe.Pointer(&upOnly[0])), unsafe.Sizeof(upOnly[0]))
 	}
-	return fmt.Errorf("SendInput: sent %d of %d keyboard events for vk %d", int(n), len(inputs), vk)
+	return fmt.Errorf("SendInput: sent %d of %d keyboard events for vk %d: %w", int(n), len(inputs), vk, callErr)
 }
 
 func sendMouseButton(vk uint16) (bool, error) {
@@ -59,7 +59,7 @@ func sendMouseButton(vk uint16) (bool, error) {
 	down := newMouseInput(downFlags, data)
 	up := newMouseInput(upFlags, data)
 	inputs := []input{down, up}
-	n, _, _ := procSendInput.Call(
+	n, _, callErr := procSendInput.Call(
 		uintptr(len(inputs)),
 		uintptr(unsafe.Pointer(&inputs[0])),
 		unsafe.Sizeof(inputs[0]),
@@ -72,7 +72,7 @@ func sendMouseButton(vk uint16) (bool, error) {
 		upOnly := []input{up}
 		procSendInput.Call(1, uintptr(unsafe.Pointer(&upOnly[0])), unsafe.Sizeof(upOnly[0]))
 	}
-	return true, fmt.Errorf("SendInput: sent %d of %d mouse events for vk %d", int(n), len(inputs), vk)
+	return true, fmt.Errorf("SendInput: sent %d of %d mouse events for vk %d: %w", int(n), len(inputs), vk, callErr)
 }
 
 func newKeyboardInput(vk uint16, flags uint32) input {
