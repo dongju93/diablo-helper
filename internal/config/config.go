@@ -91,6 +91,94 @@ type MenuBinding struct {
 	Binding KeyBinding
 }
 
+// MenuBindingDefinition describes a supported game menu action.
+type MenuBindingDefinition struct {
+	ID      string
+	Label   string
+	UILabel string
+}
+
+type menuBindingSpec struct {
+	definition     MenuBindingDefinition
+	validationName string
+	defaultVK      int
+	binding        func(*MenuKeys) *KeyBinding
+	value          func(MenuKeys) KeyBinding
+}
+
+var menuBindingSpecs = [...]menuBindingSpec{
+	{
+		definition:     MenuBindingDefinition{ID: "character", Label: "Character", UILabel: "캐릭터"},
+		validationName: "menu character key",
+		defaultVK:      0x43,
+		binding:        func(m *MenuKeys) *KeyBinding { return &m.Character },
+		value:          func(m MenuKeys) KeyBinding { return m.Character },
+	},
+	{
+		definition:     MenuBindingDefinition{ID: "skill_assign", Label: "Skill Assign", UILabel: "스킬 배치"},
+		validationName: "menu skill assign key",
+		defaultVK:      0x53,
+		binding:        func(m *MenuKeys) *KeyBinding { return &m.SkillAssign },
+		value:          func(m MenuKeys) KeyBinding { return m.SkillAssign },
+	},
+	{
+		definition:     MenuBindingDefinition{ID: "talents", Label: "Talents", UILabel: "능력치"},
+		validationName: "menu talents key",
+		defaultVK:      0x41,
+		binding:        func(m *MenuKeys) *KeyBinding { return &m.Talents },
+		value:          func(m MenuKeys) KeyBinding { return m.Talents },
+	},
+	{
+		definition:     MenuBindingDefinition{ID: "map", Label: "Map", UILabel: "지도"},
+		validationName: "menu map key",
+		defaultVK:      0x4D,
+		binding:        func(m *MenuKeys) *KeyBinding { return &m.Map },
+		value:          func(m MenuKeys) KeyBinding { return m.Map },
+	},
+	{
+		definition:     MenuBindingDefinition{ID: "journal", Label: "Journal", UILabel: "일지"},
+		validationName: "menu journal key",
+		defaultVK:      0x4A,
+		binding:        func(m *MenuKeys) *KeyBinding { return &m.Journal },
+		value:          func(m MenuKeys) KeyBinding { return m.Journal },
+	},
+	{
+		definition:     MenuBindingDefinition{ID: "social", Label: "Social", UILabel: "소셜"},
+		validationName: "menu social key",
+		defaultVK:      0x4F,
+		binding:        func(m *MenuKeys) *KeyBinding { return &m.Social },
+		value:          func(m MenuKeys) KeyBinding { return m.Social },
+	},
+	{
+		definition:     MenuBindingDefinition{ID: "clan", Label: "Clan", UILabel: "클랜"},
+		validationName: "menu clan key",
+		defaultVK:      0x4E,
+		binding:        func(m *MenuKeys) *KeyBinding { return &m.Clan },
+		value:          func(m MenuKeys) KeyBinding { return m.Clan },
+	},
+	{
+		definition:     MenuBindingDefinition{ID: "town_portal", Label: "Town Portal", UILabel: "차원문"},
+		validationName: "menu town portal key",
+		defaultVK:      0x54,
+		binding:        func(m *MenuKeys) *KeyBinding { return &m.TownPortal },
+		value:          func(m MenuKeys) KeyBinding { return m.TownPortal },
+	},
+	{
+		definition:     MenuBindingDefinition{ID: "collection", Label: "Collection", UILabel: "컬렉션"},
+		validationName: "menu collection key",
+		defaultVK:      0x59,
+		binding:        func(m *MenuKeys) *KeyBinding { return &m.Collection },
+		value:          func(m MenuKeys) KeyBinding { return m.Collection },
+	},
+	{
+		definition:     MenuBindingDefinition{ID: "shop", Label: "Shop", UILabel: "상점"},
+		validationName: "menu shop key",
+		defaultVK:      0x50,
+		binding:        func(m *MenuKeys) *KeyBinding { return &m.Shop },
+		value:          func(m MenuKeys) KeyBinding { return m.Shop },
+	},
+}
+
 type Config struct {
 	Start      KeyBinding
 	Stop       KeyBinding
@@ -108,99 +196,71 @@ func Default() Config {
 			Key:        KeyBinding{Name: "Mouse Left", VK: MouseLeftVK},
 			IntervalMS: DefaultClickerIntervalMS,
 		},
-		Menu: MenuKeys{
-			Character:   KeyBinding{Name: "C", VK: 0x43},
-			SkillAssign: KeyBinding{Name: "S", VK: 0x53},
-			Talents:     KeyBinding{Name: "A", VK: 0x41},
-			Map:         KeyBinding{Name: "M", VK: 0x4D},
-			Journal:     KeyBinding{Name: "J", VK: 0x4A},
-			Social:      KeyBinding{Name: "O", VK: 0x4F},
-			Clan:        KeyBinding{Name: "N", VK: 0x4E},
-			TownPortal:  KeyBinding{Name: "T", VK: 0x54},
-			Collection:  KeyBinding{Name: "Y", VK: 0x59},
-			Shop:        KeyBinding{Name: "P", VK: 0x50},
-		},
+		Menu: defaultMenuKeys(),
 	}
 	cfg.NormalizeForUI()
 	return cfg
 }
 
-func (m *MenuKeys) SetKeyByID(id string, binding KeyBinding) bool {
-	switch id {
-	case "character":
-		m.Character = binding
-	case "skill_assign":
-		m.SkillAssign = binding
-	case "talents":
-		m.Talents = binding
-	case "map":
-		m.Map = binding
-	case "journal":
-		m.Journal = binding
-	case "social":
-		m.Social = binding
-	case "clan":
-		m.Clan = binding
-	case "town_portal":
-		m.TownPortal = binding
-	case "collection":
-		m.Collection = binding
-	case "shop":
-		m.Shop = binding
-	default:
-		return false
+// MenuBindingDefinitions returns supported menu actions in UI order.
+func MenuBindingDefinitions() []MenuBindingDefinition {
+	definitions := make([]MenuBindingDefinition, 0, len(menuBindingSpecs))
+	for i := range menuBindingSpecs {
+		definitions = append(definitions, menuBindingSpecs[i].definition)
 	}
-	return true
+	return definitions
+}
+
+func defaultMenuKeys() MenuKeys {
+	var menu MenuKeys
+	for i := range menuBindingSpecs {
+		spec := menuBindingSpecs[i]
+		*spec.binding(&menu) = KeyBinding{
+			Name: KeyDisplayName(spec.defaultVK),
+			VK:   spec.defaultVK,
+		}
+	}
+	return menu
+}
+
+func (m *MenuKeys) SetKeyByID(id string, binding KeyBinding) bool {
+	for i := range menuBindingSpecs {
+		spec := menuBindingSpecs[i]
+		if spec.definition.ID == id {
+			*spec.binding(m) = binding
+			return true
+		}
+	}
+	return false
 }
 
 func (m *MenuKeys) forEachKey(fn func(*KeyBinding)) {
-	fn(&m.Character)
-	fn(&m.SkillAssign)
-	fn(&m.Talents)
-	fn(&m.Map)
-	fn(&m.Journal)
-	fn(&m.Social)
-	fn(&m.Clan)
-	fn(&m.TownPortal)
-	fn(&m.Collection)
-	fn(&m.Shop)
+	for i := range menuBindingSpecs {
+		fn(menuBindingSpecs[i].binding(m))
+	}
 }
 
 // Matches reports whether vk matches any assigned menu binding.
 // Called from the global low-level keyboard hook — no allocations.
 func (m MenuKeys) Matches(vk uint16) bool {
-	eq := func(b KeyBinding) bool { return b.Assigned() && uint16(b.VK) == vk }
-	return eq(m.Character) || eq(m.SkillAssign) || eq(m.Talents) ||
-		eq(m.Map) || eq(m.Journal) || eq(m.Social) ||
-		eq(m.Clan) || eq(m.TownPortal) || eq(m.Collection) || eq(m.Shop)
+	for i := range menuBindingSpecs {
+		binding := menuBindingSpecs[i].value(m)
+		if binding.Assigned() && uint16(binding.VK) == vk {
+			return true
+		}
+	}
+	return false
 }
 
 // BindingByID returns the KeyBinding for the given menu ID.
 func (m MenuKeys) BindingByID(id string) (KeyBinding, bool) {
-	switch id {
-	case "character":
-		return m.Character, true
-	case "skill_assign":
-		return m.SkillAssign, true
-	case "talents":
-		return m.Talents, true
-	case "map":
-		return m.Map, true
-	case "journal":
-		return m.Journal, true
-	case "social":
-		return m.Social, true
-	case "clan":
-		return m.Clan, true
-	case "town_portal":
-		return m.TownPortal, true
-	case "collection":
-		return m.Collection, true
-	case "shop":
-		return m.Shop, true
-	default:
-		return KeyBinding{}, false
+	for i := range menuBindingSpecs {
+		spec := menuBindingSpecs[i]
+		if spec.definition.ID == id {
+			return spec.value(m), true
+		}
 	}
+	return KeyBinding{}, false
 }
 
 // NormalizeForUI repairs a partially edited config into the shape expected by
@@ -242,18 +302,16 @@ func (c *Config) NormalizeForUI() {
 }
 
 func (c Config) MenuBindings() []MenuBinding {
-	return []MenuBinding{
-		{ID: "character", Label: "Character", Binding: c.Menu.Character},
-		{ID: "skill_assign", Label: "Skill Assign", Binding: c.Menu.SkillAssign},
-		{ID: "talents", Label: "Talents", Binding: c.Menu.Talents},
-		{ID: "map", Label: "Map", Binding: c.Menu.Map},
-		{ID: "journal", Label: "Journal", Binding: c.Menu.Journal},
-		{ID: "social", Label: "Social", Binding: c.Menu.Social},
-		{ID: "clan", Label: "Clan", Binding: c.Menu.Clan},
-		{ID: "town_portal", Label: "Town Portal", Binding: c.Menu.TownPortal},
-		{ID: "collection", Label: "Collection", Binding: c.Menu.Collection},
-		{ID: "shop", Label: "Shop", Binding: c.Menu.Shop},
+	bindings := make([]MenuBinding, 0, len(menuBindingSpecs))
+	for i := range menuBindingSpecs {
+		spec := menuBindingSpecs[i]
+		bindings = append(bindings, MenuBinding{
+			ID:      spec.definition.ID,
+			Label:   spec.definition.Label,
+			Binding: spec.value(c.Menu),
+		})
 	}
+	return bindings
 }
 
 func (c Config) Validate() error {
@@ -319,18 +377,14 @@ func (c Config) Validate() error {
 		{name: "pause key", binding: c.Pause},
 		{name: "clicker start key", binding: c.Clicker.Start},
 		{name: "clicker stop key", binding: c.Clicker.Stop},
-		{name: "menu character key", binding: c.Menu.Character},
-		{name: "menu skill assign key", binding: c.Menu.SkillAssign},
-		{name: "menu talents key", binding: c.Menu.Talents},
-		{name: "menu map key", binding: c.Menu.Map},
-		{name: "menu journal key", binding: c.Menu.Journal},
-		{name: "menu social key", binding: c.Menu.Social},
-		{name: "menu clan key", binding: c.Menu.Clan},
-		{name: "menu town portal key", binding: c.Menu.TownPortal},
-		{name: "menu collection key", binding: c.Menu.Collection},
-		{name: "menu shop key", binding: c.Menu.Shop},
 	} {
 		if err := validateKey(item.name, item.binding); err != nil {
+			return err
+		}
+	}
+	for i := range menuBindingSpecs {
+		spec := menuBindingSpecs[i]
+		if err := validateKey(spec.validationName, *spec.binding(&c.Menu)); err != nil {
 			return err
 		}
 	}

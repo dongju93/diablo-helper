@@ -129,7 +129,11 @@ func TestCaptureTargetAndControlID(t *testing.T) {
 		{name: "skill", target: captureTarget{kind: captureSkill, index: 3}, want: idSkillKeyBase + 3},
 		{name: "skill below range", target: captureTarget{kind: captureSkill, index: -1}, want: 0},
 		{name: "skill above range", target: captureTarget{kind: captureSkill, index: config.MaxSkills}, want: 0},
-		{name: "menu", target: captureTarget{kind: captureMenu, menuID: "town_portal"}, want: idMenuTownPortal},
+		{
+			name:   "menu",
+			target: captureTarget{kind: captureMenu, menuID: "town_portal"},
+			want:   mustMenuControl(t, "town_portal").control,
+		},
 		{name: "unknown menu", target: captureTarget{kind: captureMenu, menuID: "missing"}, want: 0},
 		{name: "none", target: captureTarget{}, want: 0},
 	}

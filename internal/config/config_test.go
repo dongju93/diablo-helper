@@ -140,6 +140,36 @@ func TestNormalizeForUIRepairsConfigShapeAndValues(t *testing.T) {
 	}
 }
 
+func TestMenuBindingDefinitionsOrderAndLabels(t *testing.T) {
+	got := MenuBindingDefinitions()
+	want := []MenuBindingDefinition{
+		{ID: "character", Label: "Character", UILabel: "캐릭터"},
+		{ID: "skill_assign", Label: "Skill Assign", UILabel: "스킬 배치"},
+		{ID: "talents", Label: "Talents", UILabel: "능력치"},
+		{ID: "map", Label: "Map", UILabel: "지도"},
+		{ID: "journal", Label: "Journal", UILabel: "일지"},
+		{ID: "social", Label: "Social", UILabel: "소셜"},
+		{ID: "clan", Label: "Clan", UILabel: "클랜"},
+		{ID: "town_portal", Label: "Town Portal", UILabel: "차원문"},
+		{ID: "collection", Label: "Collection", UILabel: "컬렉션"},
+		{ID: "shop", Label: "Shop", UILabel: "상점"},
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("MenuBindingDefinitions() length = %d, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("MenuBindingDefinitions()[%d] = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+
+	got[0].ID = "mutated"
+	if again := MenuBindingDefinitions(); again[0].ID == "mutated" {
+		t.Fatal("MenuBindingDefinitions() exposed mutable backing storage")
+	}
+}
+
 func TestMenuBindingsOrderLabelsAndValues(t *testing.T) {
 	cfg := Default()
 	got := cfg.MenuBindings()

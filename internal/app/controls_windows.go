@@ -25,16 +25,7 @@ const (
 	idApplyBulk    = 111
 	idBulkSkillGap = 112
 
-	idMenuCharacter   = 120
-	idMenuSkillAssign = 121
-	idMenuTalents     = 122
-	idMenuMap         = 123
-	idMenuJournal     = 124
-	idMenuSocial      = 125
-	idMenuClan        = 126
-	idMenuTownPortal  = 127
-	idMenuCollection  = 128
-	idMenuShop        = 129
+	idMenuBase = 120
 
 	idSkillEnabledBase  = 200
 	idSkillKeyBase      = 300
@@ -132,19 +123,39 @@ type menuControl struct {
 }
 
 var (
-	menuControls = []menuControl{
-		{id: "character", label: "캐릭터", control: idMenuCharacter},
-		{id: "skill_assign", label: "스킬 배치", control: idMenuSkillAssign},
-		{id: "talents", label: "능력치", control: idMenuTalents},
-		{id: "map", label: "지도", control: idMenuMap},
-		{id: "journal", label: "일지", control: idMenuJournal},
-		{id: "social", label: "소셜", control: idMenuSocial},
-		{id: "clan", label: "클랜", control: idMenuClan},
-		{id: "town_portal", label: "차원문", control: idMenuTownPortal},
-		{id: "collection", label: "컬렉션", control: idMenuCollection},
-		{id: "shop", label: "상점", control: idMenuShop},
-	}
+	menuControls = buildMenuControls()
 )
+
+func buildMenuControls() []menuControl {
+	definitions := config.MenuBindingDefinitions()
+	controls := make([]menuControl, 0, len(definitions))
+	for i, definition := range definitions {
+		controls = append(controls, menuControl{
+			id:      definition.ID,
+			label:   definition.UILabel,
+			control: idMenuBase + i,
+		})
+	}
+	return controls
+}
+
+func menuControlByID(id string) (menuControl, bool) {
+	for _, menu := range menuControls {
+		if menu.id == id {
+			return menu, true
+		}
+	}
+	return menuControl{}, false
+}
+
+func menuControlByControl(control int) (menuControl, bool) {
+	for _, menu := range menuControls {
+		if menu.control == control {
+			return menu, true
+		}
+	}
+	return menuControl{}, false
+}
 
 func (a *application) isPrimaryButton(id int) bool {
 	return id == idSave || id == idApplyBulk
@@ -162,12 +173,8 @@ func (a *application) isBindingButton(id int) bool {
 	if id >= idSkillKeyBase && id < idSkillKeyBase+config.MaxSkills {
 		return true
 	}
-	for _, menu := range menuControls {
-		if id == menu.control {
-			return true
-		}
-	}
-	return false
+	_, ok := menuControlByControl(id)
+	return ok
 }
 
 func (a *application) captureControlID(target captureTarget) int {
@@ -189,10 +196,8 @@ func (a *application) captureControlID(target captureTarget) int {
 			return idSkillKeyBase + target.index
 		}
 	case captureMenu:
-		for _, menu := range menuControls {
-			if menu.id == target.menuID {
-				return menu.control
-			}
+		if menu, ok := menuControlByID(target.menuID); ok {
+			return menu.control
 		}
 	}
 	return 0
@@ -413,11 +418,9 @@ func (a *application) handleCommand(wParam uintptr) bool {
 	case id == idLoad:
 		a.loadConfig()
 	default:
-		for _, menu := range menuControls {
-			if id == menu.control {
-				a.startCapture(captureTarget{kind: captureMenu, menuID: menu.id})
-				return true
-			}
+		if menu, ok := menuControlByControl(id); ok {
+			a.startCapture(captureTarget{kind: captureMenu, menuID: menu.id})
+			return true
 		}
 		return false
 	}

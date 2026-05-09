@@ -196,16 +196,10 @@ func MarshalTOML(cfg Config) ([]byte, error) {
 	writeKey(&buf, "clicker", cfg.Clicker.Key)
 	writeInt(&buf, "clicker_interval_ms", cfg.Clicker.IntervalMS)
 	buf.WriteByte('\n')
-	writeKey(&buf, "menu_character", cfg.Menu.Character)
-	writeKey(&buf, "menu_skill_assign", cfg.Menu.SkillAssign)
-	writeKey(&buf, "menu_talents", cfg.Menu.Talents)
-	writeKey(&buf, "menu_map", cfg.Menu.Map)
-	writeKey(&buf, "menu_journal", cfg.Menu.Journal)
-	writeKey(&buf, "menu_social", cfg.Menu.Social)
-	writeKey(&buf, "menu_clan", cfg.Menu.Clan)
-	writeKey(&buf, "menu_town_portal", cfg.Menu.TownPortal)
-	writeKey(&buf, "menu_collection", cfg.Menu.Collection)
-	writeKey(&buf, "menu_shop", cfg.Menu.Shop)
+	for i := range menuBindingSpecs {
+		spec := menuBindingSpecs[i]
+		writeKey(&buf, "menu_"+spec.definition.ID, *spec.binding(&cfg.Menu))
+	}
 	for _, skill := range cfg.Skills {
 		buf.WriteString("\n[[skills]]\n")
 		writeString(&buf, "name", skill.Name)
@@ -308,49 +302,27 @@ func setTopLevelValue(cfg *Config, key string, value string) error {
 		return setInt(&cfg.Clicker.Key.VK, value)
 	case "clicker_interval_ms":
 		return setInt(&cfg.Clicker.IntervalMS, value)
-	case "menu_character_key_name":
-		return setKeyName(&cfg.Menu.Character.Name, key, value)
-	case "menu_character_key_vk":
-		return setInt(&cfg.Menu.Character.VK, value)
-	case "menu_skill_assign_key_name":
-		return setKeyName(&cfg.Menu.SkillAssign.Name, key, value)
-	case "menu_skill_assign_key_vk":
-		return setInt(&cfg.Menu.SkillAssign.VK, value)
-	case "menu_talents_key_name":
-		return setKeyName(&cfg.Menu.Talents.Name, key, value)
-	case "menu_talents_key_vk":
-		return setInt(&cfg.Menu.Talents.VK, value)
-	case "menu_map_key_name":
-		return setKeyName(&cfg.Menu.Map.Name, key, value)
-	case "menu_map_key_vk":
-		return setInt(&cfg.Menu.Map.VK, value)
-	case "menu_journal_key_name":
-		return setKeyName(&cfg.Menu.Journal.Name, key, value)
-	case "menu_journal_key_vk":
-		return setInt(&cfg.Menu.Journal.VK, value)
-	case "menu_social_key_name":
-		return setKeyName(&cfg.Menu.Social.Name, key, value)
-	case "menu_social_key_vk":
-		return setInt(&cfg.Menu.Social.VK, value)
-	case "menu_clan_key_name":
-		return setKeyName(&cfg.Menu.Clan.Name, key, value)
-	case "menu_clan_key_vk":
-		return setInt(&cfg.Menu.Clan.VK, value)
-	case "menu_town_portal_key_name":
-		return setKeyName(&cfg.Menu.TownPortal.Name, key, value)
-	case "menu_town_portal_key_vk":
-		return setInt(&cfg.Menu.TownPortal.VK, value)
-	case "menu_collection_key_name":
-		return setKeyName(&cfg.Menu.Collection.Name, key, value)
-	case "menu_collection_key_vk":
-		return setInt(&cfg.Menu.Collection.VK, value)
-	case "menu_shop_key_name":
-		return setKeyName(&cfg.Menu.Shop.Name, key, value)
-	case "menu_shop_key_vk":
-		return setInt(&cfg.Menu.Shop.VK, value)
 	default:
+		if handled, err := setMenuTopLevelValue(&cfg.Menu, key, value); handled {
+			return err
+		}
 		return fmt.Errorf("unknown key %q", key)
 	}
+}
+
+func setMenuTopLevelValue(menu *MenuKeys, key string, value string) (bool, error) {
+	for i := range menuBindingSpecs {
+		spec := menuBindingSpecs[i]
+		prefix := "menu_" + spec.definition.ID
+		binding := spec.binding(menu)
+		switch key {
+		case prefix + "_key_name":
+			return true, setKeyName(&binding.Name, key, value)
+		case prefix + "_key_vk":
+			return true, setInt(&binding.VK, value)
+		}
+	}
+	return false, nil
 }
 
 func setSkillValue(skill *Skill, key string, value string) error {
