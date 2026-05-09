@@ -104,8 +104,12 @@ func (a *application) handleKeyEvent(vk uint16, down bool) bool {
 			a.setStatus("키 할당을 해제했습니다.")
 			return true
 		}
+		if rejected, label := captureRejectsOutputKey(a.capture.kind, vk); rejected {
+			a.rejectCapturedKey(a.capture, label)
+			return true
+		}
 		if vk == vkLButton && captureRejectsMouseLeft(a.capture.kind) {
-			a.setStatus("시작/종료 키에는 Mouse Left를 사용할 수 없습니다.")
+			a.rejectCapturedKey(a.capture, "Mouse Left")
 			return true
 		}
 		a.assignCapturedKey(vk)
@@ -271,6 +275,35 @@ func (a *application) menuKeyMatches(vk uint16) bool {
 
 func captureRejectsMouseLeft(kind captureKind) bool {
 	return kind == captureStart || kind == captureStop || kind == captureClickerStart || kind == captureClickerStop
+}
+
+func captureRejectsOutputKey(kind captureKind, vk uint16) (bool, string) {
+	if kind != captureSkill && kind != captureClickerKey {
+		return false, ""
+	}
+	label, forbidden := config.ForbiddenOutputKeyLabel(int(vk))
+	return forbidden, label
+}
+
+func (a *application) rejectCapturedKey(target captureTarget, keyName string) {
+	message := captureRejectionMessage(target, keyName)
+	a.setStatus(message)
+	if a.hwnd != 0 {
+		_ = messageBox(a.hwnd, "키 할당 불가", message, mbOK|mbIconWarning)
+	}
+}
+
+func captureRejectionMessage(target captureTarget, keyName string) string {
+	switch target.kind {
+	case captureSkill:
+		return "기술 키에는 " + keyName + "를 사용할 수 없습니다."
+	case captureClickerKey:
+		return "클릭 반복 출력 키에는 " + keyName + "를 사용할 수 없습니다."
+	case captureStart, captureStop, captureClickerStart, captureClickerStop:
+		return "시작/종료 키에는 " + keyName + "를 사용할 수 없습니다."
+	default:
+		return "이 용도에는 " + keyName + "를 사용할 수 없습니다."
+	}
 }
 
 func sameKey(vk uint16, binding config.KeyBinding) bool {
