@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -245,6 +246,50 @@ start_key_vk = 13
 	}
 }
 
+func TestParseTOMLAcceptsLegacyModifierKeyNames(t *testing.T) {
+	tests := []struct {
+		name      string
+		keyName   string
+		vk        int
+		wantName  string
+		wantError bool
+	}{
+		{name: "legacy left shift fallback", keyName: "VK_160", vk: 0xA0, wantName: "Left Shift"},
+		{name: "legacy right shift fallback", keyName: "VK_161", vk: 0xA1, wantName: "Right Shift"},
+		{name: "legacy left ctrl fallback", keyName: "VK_162", vk: 0xA2, wantName: "Left Ctrl"},
+		{name: "legacy right ctrl fallback", keyName: "VK_163", vk: 0xA3, wantName: "Right Ctrl"},
+		{name: "legacy left alt fallback", keyName: "VK_164", vk: 0xA4, wantName: "Left Alt"},
+		{name: "legacy right alt fallback", keyName: "VK_165", vk: 0xA5, wantName: "Right Alt"},
+		{name: "generic left shift", keyName: "Shift", vk: 0xA0, wantName: "Left Shift"},
+		{name: "generic left ctrl", keyName: "Ctrl", vk: 0xA2, wantName: "Left Ctrl"},
+		{name: "generic right alt", keyName: "Alt", vk: 0xA5, wantName: "Right Alt"},
+		{name: "wrong generic modifier", keyName: "Alt", vk: 0xA2, wantError: true},
+		{name: "wrong legacy fallback", keyName: "VK_162", vk: 0xA3, wantError: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := fmt.Sprintf("pause_key_name = %q\npause_key_vk = %d\n", tt.keyName, tt.vk)
+			cfg, err := ParseTOML([]byte(input))
+			if tt.wantError {
+				if err == nil {
+					t.Fatal("ParseTOML() error = nil, want error")
+				}
+				if !strings.Contains(err.Error(), "name does not match virtual-key code") {
+					t.Fatalf("ParseTOML() error = %v, want name mismatch", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("ParseTOML() error = %v", err)
+			}
+			if cfg.Pause != (KeyBinding{Name: tt.wantName, VK: tt.vk}) {
+				t.Fatalf("pause = %+v, want name %q vk %d", cfg.Pause, tt.wantName, tt.vk)
+			}
+		})
+	}
+}
+
 func TestParseTOMLDefaultsMissingSkillEnabledToFalse(t *testing.T) {
 	cfg, err := ParseTOML([]byte(`[[skills]]
 name = "Only"
@@ -340,6 +385,41 @@ func TestSaveFileWithOptionsAllowsNonTOMLExtension(t *testing.T) {
 	}
 	if _, err := LoadFile(path); err != nil {
 		t.Fatalf("LoadFile() error = %v", err)
+	}
+}
+
+func TestLoadFileRejectsTooLargeFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "default.toml")
+	if err := os.WriteFile(path, bytes.Repeat([]byte(" "), MaxConfigFileBytes+1), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	_, err := LoadFile(path)
+	if err == nil {
+		t.Fatal("LoadFile() error = nil, want size error")
+	}
+	if !strings.Contains(err.Error(), "too large") {
+		t.Fatalf("LoadFile() error = %v, want too large", err)
+	}
+}
+
+func TestLoadFileRejectsSymlinkPath(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "target.toml")
+	link := filepath.Join(dir, "link.toml")
+	if err := SaveFile(target, Default()); err != nil {
+		t.Fatalf("SaveFile() error = %v", err)
+	}
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("Symlink() unavailable: %v", err)
+	}
+
+	_, err := LoadFile(link)
+	if err == nil {
+		t.Fatal("LoadFile() error = nil, want symlink error")
+	}
+	if !strings.Contains(err.Error(), "symlink") {
+		t.Fatalf("LoadFile() error = %v, want symlink", err)
 	}
 }
 

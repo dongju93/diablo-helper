@@ -224,6 +224,55 @@ func TestHandleKeyEventEscapeClearsCapturedKey(t *testing.T) {
 	}
 }
 
+func TestHandleKeyEventRejectsForbiddenOutputKeysDuringCapture(t *testing.T) {
+	tests := []struct {
+		name     string
+		target   captureTarget
+		vk       uint16
+		keyName  string
+		existing func(*application) config.KeyBinding
+	}{
+		{
+			name:    "clicker num lock",
+			target:  captureTarget{kind: captureClickerKey},
+			vk:      0x90,
+			keyName: "Num Lock",
+			existing: func(a *application) config.KeyBinding {
+				a.cfg.Clicker.Key = config.KeyBinding{Name: "Mouse Left", VK: vkLButton}
+				return a.cfg.Clicker.Key
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := newApplication()
+			want := tt.existing(a)
+			a.startCapture(tt.target)
+
+			if !a.handleKeyEvent(tt.vk, true) {
+				t.Fatal("forbidden output key during capture was not consumed")
+			}
+			switch tt.target.kind {
+			case captureSkill:
+				if a.cfg.Skills[tt.target.index].Key != want {
+					t.Fatalf("skill key = %+v, want preserved %+v", a.cfg.Skills[tt.target.index].Key, want)
+				}
+			case captureClickerKey:
+				if a.cfg.Clicker.Key != want {
+					t.Fatalf("clicker key = %+v, want preserved %+v", a.cfg.Clicker.Key, want)
+				}
+			}
+			if !a.capture.valid() {
+				t.Fatal("capture should remain active after forbidden output key")
+			}
+			if !strings.Contains(a.statusText, tt.keyName) || !strings.Contains(a.statusText, "사용할 수 없습니다") {
+				t.Fatalf("status = %q, want rejection mentioning %s", a.statusText, tt.keyName)
+			}
+		})
+	}
+}
+
 func TestHandleKeyEventRejectsMouseLeftForStartAndStopCapture(t *testing.T) {
 	tests := []struct {
 		name string

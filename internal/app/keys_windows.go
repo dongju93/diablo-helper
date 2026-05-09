@@ -33,4 +33,10 @@ const (
 	vkNumpad0  = 0x60
 	vkF1       = 0x70
 	vkF24      = 0x87
+	vkLShift   = 0xA0
+	vkRShift   = 0xA1
+	vkLControl = 0xA2
+	vkRControl = 0xA3
+	vkLMenu    = 0xA4
+	vkRMenu    = 0xA5
 )

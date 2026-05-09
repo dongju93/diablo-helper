@@ -26,18 +26,16 @@ const (
 var maximumDurationMilliseconds = int64(math.MaxInt64 / int64(time.Millisecond))
 
 // forbiddenOutputVKs is the set of virtual-key codes that must not be used as
-// automated output (skill keys, clicker key). Synthesising these system-wide
-// triggers OS-level or application-global side effects that the user cannot
-// easily interrupt.
+// automated output (skill keys, clicker key). These keys trigger OS/window
+// actions or toggle keyboard state rather than acting as ordinary game inputs.
 var forbiddenOutputVKs = map[int]string{
-	0x10: "Shift",
-	0x11: "Ctrl",
-	0x12: "Alt",
 	0x13: "Pause",
 	0x14: "Caps Lock",
 	0x1B: "Esc",
 	0x5B: "Left Win",
 	0x5C: "Right Win",
+	0x90: "Num Lock",
+	0x91: "Scroll Lock",
 }
 
 type KeyBinding struct {
@@ -103,7 +101,7 @@ func Default() Config {
 			Character:   KeyBinding{Name: "C", VK: 0x43},
 			SkillAssign: KeyBinding{Name: "S", VK: 0x53},
 			Talents:     KeyBinding{Name: "A", VK: 0x41},
-			Map:         KeyBinding{Name: "Tab", VK: 0x09},
+			Map:         KeyBinding{Name: "M", VK: 0x4D},
 			Journal:     KeyBinding{Name: "J", VK: 0x4A},
 			Social:      KeyBinding{Name: "O", VK: 0x4F},
 			Clan:        KeyBinding{Name: "N", VK: 0x4E},
@@ -373,6 +371,22 @@ func KeyDisplayName(vk int) string {
 		return "Left Win"
 	case 0x5C:
 		return "Right Win"
+	case 0x90:
+		return "Num Lock"
+	case 0x91:
+		return "Scroll Lock"
+	case 0xA0:
+		return "Left Shift"
+	case 0xA1:
+		return "Right Shift"
+	case 0xA2:
+		return "Left Ctrl"
+	case 0xA3:
+		return "Right Ctrl"
+	case 0xA4:
+		return "Left Alt"
+	case 0xA5:
+		return "Right Alt"
 	default:
 		return fmt.Sprintf("VK_%d", vk)
 	}
@@ -393,10 +407,15 @@ func validateOutputKey(name string, binding KeyBinding) error {
 	if err := validateKey(name, binding); err != nil {
 		return err
 	}
-	if label, forbidden := forbiddenOutputVKs[binding.VK]; forbidden {
+	if label, forbidden := ForbiddenOutputKeyLabel(binding.VK); forbidden {
 		return fmt.Errorf("%s must not be a system key (%s)", name, label)
 	}
 	return nil
+}
+
+func ForbiddenOutputKeyLabel(vk int) (string, bool) {
+	label, forbidden := forbiddenOutputVKs[vk]
+	return label, forbidden
 }
 
 func validateKey(name string, binding KeyBinding) error {
@@ -409,10 +428,32 @@ func validateKey(name string, binding KeyBinding) error {
 	if binding.VK == 0 && binding.Name != "" {
 		return fmt.Errorf("%s has a name but no virtual-key code", name)
 	}
-	if binding.VK > 0 && binding.Name != KeyDisplayName(binding.VK) {
+	if binding.VK > 0 && !keyNameMatchesVK(binding.Name, binding.VK) {
 		return fmt.Errorf("%s name does not match virtual-key code", name)
 	}
 	return nil
+}
+
+func keyNameMatchesVK(name string, vk int) bool {
+	if name == KeyDisplayName(vk) {
+		return true
+	}
+	if name == fmt.Sprintf("VK_%d", vk) {
+		return acceptsLegacyFallbackName(vk)
+	}
+	switch vk {
+	case 0xA0, 0xA1:
+		return name == "Shift"
+	case 0xA2, 0xA3:
+		return name == "Ctrl"
+	case 0xA4, 0xA5:
+		return name == "Alt"
+	}
+	return false
+}
+
+func acceptsLegacyFallbackName(vk int) bool {
+	return vk == 0x90 || vk == 0x91 || (vk >= 0xA0 && vk <= 0xA5)
 }
 
 func validateConfigString(name string, value string, maxLength int) error {
