@@ -25,17 +25,28 @@ const (
 
 var maximumDurationMilliseconds = int64(math.MaxInt64 / int64(time.Millisecond))
 
-// forbiddenOutputVKs is the set of virtual-key codes that must not be used as
-// automated output (skill keys, clicker key). These keys trigger OS/window
-// actions or toggle keyboard state rather than acting as ordinary game inputs.
-var forbiddenOutputVKs = map[int]string{
-	0x13: "Pause",
-	0x14: "Caps Lock",
-	0x1B: "Esc",
-	0x5B: "Left Win",
-	0x5C: "Right Win",
-	0x90: "Num Lock",
-	0x91: "Scroll Lock",
+// forbiddenOutputKey reports whether vk must not be used as automated output.
+// These keys trigger OS/window actions or toggle keyboard state rather than
+// acting as ordinary game inputs.
+func forbiddenOutputKey(vk int) (string, bool) {
+	switch vk {
+	case 0x13:
+		return "Pause", true
+	case 0x14:
+		return "Caps Lock", true
+	case 0x1B:
+		return "Esc", true
+	case 0x5B:
+		return "Left Win", true
+	case 0x5C:
+		return "Right Win", true
+	case 0x90:
+		return "Num Lock", true
+	case 0x91:
+		return "Scroll Lock", true
+	default:
+		return "", false
+	}
 }
 
 type KeyBinding struct {
@@ -451,8 +462,7 @@ func validateOutputKey(name string, binding KeyBinding) error {
 }
 
 func ForbiddenOutputKeyLabel(vk int) (string, bool) {
-	label, forbidden := forbiddenOutputVKs[vk]
-	return label, forbidden
+	return forbiddenOutputKey(vk)
 }
 
 func validateKey(name string, binding KeyBinding) error {
