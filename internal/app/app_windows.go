@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"syscall"
 	"unsafe"
 
@@ -16,33 +17,36 @@ import (
 )
 
 type application struct {
-	hwnd            uintptr
-	instance        uintptr
-	hook            uintptr
-	mouseHook       uintptr
-	font            uintptr
-	titleFont       uintptr
-	sectionFont     uintptr
-	bgBrush         uintptr
-	panelBrush      uintptr
-	editBrush       uintptr
-	borderPen       uintptr
-	borderStrongPen uintptr
-	borderBrush     uintptr
-	accentBrush     uintptr
-	accentPen       uintptr
-	fontScale       float64
-	dpi             int
-	configPath      string
-	cfg             config.Config
-	controls        controlRefs
-	capture         captureTarget
-	pressed         pressedKeys
-	runner          *skillRunner
-	clicker         *clickerRunner
-	skillEnabled    [config.MaxSkills]bool
-	winapi          applicationWinAPI
-	cleanedUp       bool
+	hwnd               uintptr
+	instance           uintptr
+	hook               uintptr
+	mouseHook          uintptr
+	font               uintptr
+	titleFont          uintptr
+	sectionFont        uintptr
+	bgBrush            uintptr
+	panelBrush         uintptr
+	editBrush          uintptr
+	borderPen          uintptr
+	borderStrongPen    uintptr
+	borderBrush        uintptr
+	accentBrush        uintptr
+	accentPen          uintptr
+	fontScale          float64
+	dpi                int
+	configPath         string
+	cfg                config.Config
+	controls           controlRefs
+	capture            captureTarget
+	pressed            pressedKeys
+	runner             *skillRunner
+	clicker            *clickerRunner
+	statusText         string
+	runnerErrorMu      sync.Mutex
+	pendingRunnerError string
+	skillEnabled       [config.MaxSkills]bool
+	winapi             applicationWinAPI
+	cleanedUp          bool
 }
 
 var (
@@ -113,9 +117,10 @@ func fallbackMessageBox(title string, text string, flags uintptr) error {
 
 func newApplication() *application {
 	_ = ensureWinAPI()
-	return &application{
-		cfg:    config.Default(),
-		runner: newSkillRunner(sendVirtualKey),
+	a := &application{
+		cfg:        config.Default(),
+		runner:     newSkillRunner(sendVirtualKey),
+		statusText: "■ 정지.",
 		controls: controlRefs{
 			menuLabels:  make(map[string]uintptr),
 			menuButtons: make(map[string]uintptr),
@@ -123,6 +128,38 @@ func newApplication() *application {
 		clicker: newClickerRunner(sendVirtualKey),
 		winapi:  defaultApplicationWinAPI(),
 	}
+	a.runner.SetErrorHandler(func(err error) {
+		a.handleRunnerError("기술 반복", err)
+	})
+	a.clicker.SetErrorHandler(func(err error) {
+		a.handleRunnerError("클릭 반복", err)
+	})
+	return a
+}
+
+func (a *application) handleRunnerError(name string, err error) {
+	if a == nil || err == nil {
+		return
+	}
+	status := fmt.Sprintf("입력 전송 실패로 %s을 정지했습니다: %v", name, err)
+	a.runnerErrorMu.Lock()
+	a.pendingRunnerError = status
+	a.runnerErrorMu.Unlock()
+	if a.hwnd != 0 && a.winapi.postMessage != nil {
+		a.winapi.postMessage(a.hwnd, wmRunnerError, 0, 0)
+	}
+}
+
+func (a *application) showPendingRunnerError() {
+	a.runnerErrorMu.Lock()
+	status := a.pendingRunnerError
+	a.pendingRunnerError = ""
+	a.runnerErrorMu.Unlock()
+	if status == "" {
+		a.updateRuntimeStatus()
+		return
+	}
+	a.setStatus(status)
 }
 
 func (a *application) run() error {
@@ -300,6 +337,7 @@ type applicationWinAPI struct {
 	unhookWindowsHook func(hook uintptr)
 	showWindow        func(hwnd uintptr, command uintptr)
 	updateWindow      func(hwnd uintptr)
+	postMessage       func(hwnd uintptr, msg uint32, wParam uintptr, lParam uintptr) bool
 	getMessage        func(msg *message) (int32, error)
 	translateMessage  func(msg *message)
 	dispatchMessage   func(msg *message)
@@ -384,6 +422,10 @@ func defaultApplicationWinAPI() applicationWinAPI {
 		},
 		updateWindow: func(hwnd uintptr) {
 			procUpdateWindow.Call(hwnd)
+		},
+		postMessage: func(hwnd uintptr, msg uint32, wParam uintptr, lParam uintptr) bool {
+			ret, _, _ := procPostMessageW.Call(hwnd, uintptr(msg), wParam, lParam)
+			return ret != 0
 		},
 		getMessage: func(msg *message) (int32, error) {
 			ret, _, err := procGetMessageW.Call(uintptr(unsafe.Pointer(msg)), 0, 0, 0)

@@ -17,23 +17,22 @@ type SaveOptions struct {
 }
 
 func LoadFile(path string) (Config, error) {
+	if err := rejectReparsePath(path); err != nil {
+		return Config{}, err
+	}
+
 	f, err := os.Open(path)
 	if err != nil {
 		return Config{}, err
 	}
 	defer f.Close()
 
-	fi, err := f.Stat()
+	data, err := io.ReadAll(io.LimitReader(f, MaxConfigFileBytes+1))
 	if err != nil {
 		return Config{}, err
 	}
-	if fi.Size() > MaxConfigFileBytes {
-		return Config{}, fmt.Errorf("config file too large (%d bytes, max %d)", fi.Size(), MaxConfigFileBytes)
-	}
-
-	data, err := io.ReadAll(f)
-	if err != nil {
-		return Config{}, err
+	if len(data) > MaxConfigFileBytes {
+		return Config{}, fmt.Errorf("config file too large (%d bytes, max %d)", len(data), MaxConfigFileBytes)
 	}
 	return ParseTOML(data)
 }

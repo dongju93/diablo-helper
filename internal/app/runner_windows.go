@@ -12,15 +12,24 @@ import (
 )
 
 type skillRunner struct {
-	mu      sync.Mutex
-	cancel  context.CancelFunc
-	running atomic.Bool
-	paused  atomic.Bool
-	sendKey func(vk uint16) error
+	mu       sync.Mutex
+	cancel   context.CancelFunc
+	done     chan struct{}
+	stopping bool
+	running  atomic.Bool
+	paused   atomic.Bool
+	sendKey  func(vk uint16) error
+	onError  func(error)
 }
 
 func newSkillRunner(sendKey func(vk uint16) error) *skillRunner {
 	return &skillRunner{sendKey: sendKey}
+}
+
+func (r *skillRunner) SetErrorHandler(onError func(error)) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.onError = onError
 }
 
 func (r *skillRunner) Start(cfg config.Config) bool {
@@ -37,26 +46,50 @@ func (r *skillRunner) Start(cfg config.Config) bool {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
 	r.cancel = cancel
+	r.done = done
+	r.stopping = false
 	r.running.Store(true)
 	r.paused.Store(false)
 
+	var wg sync.WaitGroup
+	wg.Add(len(skills))
 	for _, skill := range skills {
-		go r.runSkill(ctx, skill)
+		skill := skill
+		go func() {
+			defer wg.Done()
+			r.runSkill(ctx, skill)
+		}()
 	}
+	go func() {
+		wg.Wait()
+		r.finish(done)
+	}()
 	return true
 }
 
 func (r *skillRunner) Stop() bool {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	if r.cancel == nil {
+		r.mu.Unlock()
 		return false
 	}
-	r.cancel()
-	r.cancel = nil
+	if r.stopping {
+		done := r.done
+		r.mu.Unlock()
+		<-done
+		return false
+	}
+	cancel := r.cancel
+	done := r.done
+	r.stopping = true
 	r.running.Store(false)
 	r.paused.Store(false)
+	r.mu.Unlock()
+
+	cancel()
+	<-done
 	return true
 }
 
@@ -89,15 +122,56 @@ func (r *skillRunner) runSkill(ctx context.Context, skill config.Skill) {
 		case <-ctx.Done():
 			return
 		case <-timer.C:
+			if ctx.Err() != nil {
+				return
+			}
 			if !r.paused.Load() {
-				if err := r.sendKey(uint16(skill.Key.VK)); err != nil {
-					r.Stop()
+				if ctx.Err() != nil {
 					return
 				}
+				if err := r.sendKey(uint16(skill.Key.VK)); err != nil {
+					r.fail(err)
+					return
+				}
+			}
+			if ctx.Err() != nil {
+				return
 			}
 			timer.Reset(interval)
 		}
 	}
+}
+
+func (r *skillRunner) fail(err error) {
+	r.mu.Lock()
+	if r.cancel == nil || r.stopping {
+		r.mu.Unlock()
+		return
+	}
+	cancel := r.cancel
+	onError := r.onError
+	r.stopping = true
+	r.running.Store(false)
+	r.paused.Store(false)
+	r.mu.Unlock()
+
+	cancel()
+	if onError != nil {
+		go onError(err)
+	}
+}
+
+func (r *skillRunner) finish(done chan struct{}) {
+	r.mu.Lock()
+	if r.done == done {
+		r.cancel = nil
+		r.done = nil
+		r.stopping = false
+		r.running.Store(false)
+		r.paused.Store(false)
+	}
+	close(done)
+	r.mu.Unlock()
 }
 
 func runnableSkills(cfg config.Config) []config.Skill {
@@ -116,15 +190,24 @@ func skillRunnable(skill config.Skill) bool {
 }
 
 type clickerRunner struct {
-	mu      sync.Mutex
-	cancel  context.CancelFunc
-	running atomic.Bool
-	paused  atomic.Bool
-	sendKey func(vk uint16) error
+	mu       sync.Mutex
+	cancel   context.CancelFunc
+	done     chan struct{}
+	stopping bool
+	running  atomic.Bool
+	paused   atomic.Bool
+	sendKey  func(vk uint16) error
+	onError  func(error)
 }
 
 func newClickerRunner(sendKey func(vk uint16) error) *clickerRunner {
 	return &clickerRunner{sendKey: sendKey}
+}
+
+func (r *clickerRunner) SetErrorHandler(onError func(error)) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.onError = onError
 }
 
 func (r *clickerRunner) Start(clicker config.Clicker) bool {
@@ -139,24 +222,47 @@ func (r *clickerRunner) Start(clicker config.Clicker) bool {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
 	r.cancel = cancel
+	r.done = done
+	r.stopping = false
 	r.running.Store(true)
 	r.paused.Store(false)
 
-	go r.run(ctx, clicker)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		r.run(ctx, clicker)
+	}()
+	go func() {
+		wg.Wait()
+		r.finish(done)
+	}()
 	return true
 }
 
 func (r *clickerRunner) Stop() bool {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	if r.cancel == nil {
+		r.mu.Unlock()
 		return false
 	}
-	r.cancel()
-	r.cancel = nil
+	if r.stopping {
+		done := r.done
+		r.mu.Unlock()
+		<-done
+		return false
+	}
+	cancel := r.cancel
+	done := r.done
+	r.stopping = true
 	r.running.Store(false)
 	r.paused.Store(false)
+	r.mu.Unlock()
+
+	cancel()
+	<-done
 	return true
 }
 
@@ -189,15 +295,56 @@ func (r *clickerRunner) run(ctx context.Context, clicker config.Clicker) {
 		case <-ctx.Done():
 			return
 		case <-timer.C:
+			if ctx.Err() != nil {
+				return
+			}
 			if !r.paused.Load() {
-				if err := r.sendKey(uint16(clicker.Key.VK)); err != nil {
-					r.Stop()
+				if ctx.Err() != nil {
 					return
 				}
+				if err := r.sendKey(uint16(clicker.Key.VK)); err != nil {
+					r.fail(err)
+					return
+				}
+			}
+			if ctx.Err() != nil {
+				return
 			}
 			timer.Reset(interval)
 		}
 	}
+}
+
+func (r *clickerRunner) fail(err error) {
+	r.mu.Lock()
+	if r.cancel == nil || r.stopping {
+		r.mu.Unlock()
+		return
+	}
+	cancel := r.cancel
+	onError := r.onError
+	r.stopping = true
+	r.running.Store(false)
+	r.paused.Store(false)
+	r.mu.Unlock()
+
+	cancel()
+	if onError != nil {
+		go onError(err)
+	}
+}
+
+func (r *clickerRunner) finish(done chan struct{}) {
+	r.mu.Lock()
+	if r.done == done {
+		r.cancel = nil
+		r.done = nil
+		r.stopping = false
+		r.running.Store(false)
+		r.paused.Store(false)
+	}
+	close(done)
+	r.mu.Unlock()
 }
 
 func clickerRunnable(clicker config.Clicker) bool {

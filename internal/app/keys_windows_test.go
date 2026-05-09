@@ -46,6 +46,12 @@ func TestKeyDisplayName(t *testing.T) {
 		{name: "delete", vk: 0x2E, want: "Delete"},
 		{name: "left win", vk: 0x5B, want: "Left Win"},
 		{name: "right win", vk: 0x5C, want: "Right Win"},
+		{name: "left shift", vk: vkLShift, want: "Left Shift"},
+		{name: "right shift", vk: vkRShift, want: "Right Shift"},
+		{name: "left ctrl", vk: vkLControl, want: "Left Ctrl"},
+		{name: "right ctrl", vk: vkRControl, want: "Right Ctrl"},
+		{name: "left alt", vk: vkLMenu, want: "Left Alt"},
+		{name: "right alt", vk: vkRMenu, want: "Right Alt"},
 		{name: "unknown", vk: 255, want: "VK_255"},
 	}
 

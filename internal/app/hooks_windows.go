@@ -57,6 +57,9 @@ func wndProc(hwnd uintptr, msg uint32, wParam uintptr, lParam unsafe.Pointer) ui
 		if appInstance.handleCommand(wParam) {
 			return 0
 		}
+	case wmRunnerError:
+		appInstance.showPendingRunnerError()
+		return 0
 	case wmClose:
 		appInstance.winapi.destroyWindow(hwnd)
 		return 0

@@ -104,6 +104,34 @@ func TestApplicationCleanupIsIdempotent(t *testing.T) {
 	}
 }
 
+func TestApplicationRunnerErrorPostsAndUpdatesStatus(t *testing.T) {
+	a := newApplication()
+	a.winapi = stubApplicationWinAPI()
+	a.hwnd = 123
+
+	var posted []uint32
+	a.winapi.postMessage = func(hwnd uintptr, msg uint32, _ uintptr, _ uintptr) bool {
+		if hwnd != a.hwnd {
+			t.Fatalf("postMessage hwnd = %d, want %d", hwnd, a.hwnd)
+		}
+		posted = append(posted, msg)
+		return true
+	}
+
+	a.handleRunnerError("기술 반복", errors.New("forced send failure"))
+	if len(posted) != 1 || posted[0] != wmRunnerError {
+		t.Fatalf("posted messages = %v, want [%d]", posted, wmRunnerError)
+	}
+	if a.statusText != "■ 정지." {
+		t.Fatalf("status before message = %q, want unchanged", a.statusText)
+	}
+
+	a.showPendingRunnerError()
+	if !strings.Contains(a.statusText, "입력 전송 실패") || !strings.Contains(a.statusText, "기술 반복") {
+		t.Fatalf("status after message = %q, want runner error", a.statusText)
+	}
+}
+
 func stubApplicationWinAPI() applicationWinAPI {
 	return applicationWinAPI{
 		getModuleHandle: func() (uintptr, error) {
@@ -148,6 +176,7 @@ func stubApplicationWinAPI() applicationWinAPI {
 		unhookWindowsHook: func(uintptr) {},
 		showWindow:        func(uintptr, uintptr) {},
 		updateWindow:      func(uintptr) {},
+		postMessage:       func(uintptr, uint32, uintptr, uintptr) bool { return true },
 		getMessage: func(*message) (int32, error) {
 			return 0, nil
 		},

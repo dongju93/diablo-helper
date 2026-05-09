@@ -89,6 +89,8 @@ const (
 	wmDrawItem              = 0x002B
 	wmCommand               = 0x0111
 	wmSetFont               = 0x0030
+	wmApp                   = 0x8000
+	wmRunnerError           = wmApp + 1
 	wmKeyDown               = 0x0100
 	wmKeyUp                 = 0x0101
 	wmSysKeyDown            = 0x0104

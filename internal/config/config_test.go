@@ -330,25 +330,17 @@ func TestValidateRejectsInvalidConfig(t *testing.T) {
 			wantError: "must not be a system key",
 		},
 		{
-			name: "skill key is Shift",
+			name: "skill key is Num Lock",
 			mutate: func(cfg *Config) {
-				cfg.Skills[0].Key = KeyBinding{Name: "Shift", VK: 0x10}
+				cfg.Skills[0].Key = KeyBinding{Name: "Num Lock", VK: 0x90}
 				cfg.Skills[0].Enabled = true
 			},
 			wantError: "must not be a system key",
 		},
 		{
-			name: "skill key is Ctrl",
+			name: "skill key is Scroll Lock",
 			mutate: func(cfg *Config) {
-				cfg.Skills[0].Key = KeyBinding{Name: "Ctrl", VK: 0x11}
-				cfg.Skills[0].Enabled = true
-			},
-			wantError: "must not be a system key",
-		},
-		{
-			name: "skill key is Alt",
-			mutate: func(cfg *Config) {
-				cfg.Skills[0].Key = KeyBinding{Name: "Alt", VK: 0x12}
+				cfg.Skills[0].Key = KeyBinding{Name: "Scroll Lock", VK: 0x91}
 				cfg.Skills[0].Enabled = true
 			},
 			wantError: "must not be a system key",
@@ -387,7 +379,7 @@ func TestValidateRejectsInvalidConfig(t *testing.T) {
 
 func TestHotkeysPermitKeysBlockedForOutput(t *testing.T) {
 	// Hotkeys (start/stop/pause) use validateKey, not validateOutputKey, so
-	// system keys like Esc and Shift are allowed as user-controlled triggers.
+	// output-blocked keys like Esc are allowed as user-controlled triggers.
 	tests := []struct {
 		name   string
 		mutate func(*Config)
@@ -410,12 +402,53 @@ func TestHotkeysPermitKeysBlockedForOutput(t *testing.T) {
 				cfg.Pause = KeyBinding{Name: "Alt", VK: 0x12}
 			},
 		},
+		{
+			name: "stop key can be Left Ctrl",
+			mutate: func(cfg *Config) {
+				cfg.Stop = KeyBinding{Name: "Left Ctrl", VK: 0xA2}
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := Default()
 			tt.mutate(&cfg)
+			if err := cfg.Validate(); err != nil {
+				t.Fatalf("Validate() error = %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestOutputKeysPermitModifiers(t *testing.T) {
+	tests := []KeyBinding{
+		{Name: "Shift", VK: 0x10},
+		{Name: "Ctrl", VK: 0x11},
+		{Name: "Alt", VK: 0x12},
+		{Name: "Left Shift", VK: 0xA0},
+		{Name: "Right Shift", VK: 0xA1},
+		{Name: "Left Ctrl", VK: 0xA2},
+		{Name: "Right Ctrl", VK: 0xA3},
+		{Name: "Left Alt", VK: 0xA4},
+		{Name: "Right Alt", VK: 0xA5},
+	}
+
+	for _, binding := range tests {
+		t.Run("skill "+binding.Name, func(t *testing.T) {
+			cfg := Default()
+			cfg.Skills[0].Key = binding
+			cfg.Skills[0].Enabled = true
+
+			if err := cfg.Validate(); err != nil {
+				t.Fatalf("Validate() error = %v, want nil", err)
+			}
+		})
+
+		t.Run("clicker "+binding.Name, func(t *testing.T) {
+			cfg := Default()
+			cfg.Clicker.Key = binding
+
 			if err := cfg.Validate(); err != nil {
 				t.Fatalf("Validate() error = %v, want nil", err)
 			}
@@ -438,6 +471,12 @@ func TestKeyDisplayName(t *testing.T) {
 		{name: "mouse right", vk: 0x02, want: "Mouse Right"},
 		{name: "enter", vk: 0x0D, want: "Enter"},
 		{name: "space", vk: 0x20, want: "Space"},
+		{name: "left shift", vk: 0xA0, want: "Left Shift"},
+		{name: "right shift", vk: 0xA1, want: "Right Shift"},
+		{name: "left ctrl", vk: 0xA2, want: "Left Ctrl"},
+		{name: "right ctrl", vk: 0xA3, want: "Right Ctrl"},
+		{name: "left alt", vk: 0xA4, want: "Left Alt"},
+		{name: "right alt", vk: 0xA5, want: "Right Alt"},
 		{name: "unknown", vk: 255, want: "VK_255"},
 		{name: "negative", vk: -1, want: "VK_-1"},
 		{name: "over 255", vk: 256, want: "VK_256"},
