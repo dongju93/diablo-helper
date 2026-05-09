@@ -101,7 +101,7 @@ func Default() Config {
 			Character:   KeyBinding{Name: "C", VK: 0x43},
 			SkillAssign: KeyBinding{Name: "S", VK: 0x53},
 			Talents:     KeyBinding{Name: "A", VK: 0x41},
-			Map:         KeyBinding{Name: "Tab", VK: 0x09},
+			Map:         KeyBinding{Name: "M", VK: 0x4D},
 			Journal:     KeyBinding{Name: "J", VK: 0x4A},
 			Social:      KeyBinding{Name: "O", VK: 0x4F},
 			Clan:        KeyBinding{Name: "N", VK: 0x4E},
