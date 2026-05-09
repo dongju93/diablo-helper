@@ -425,10 +425,32 @@ func validateKey(name string, binding KeyBinding) error {
 	if binding.VK == 0 && binding.Name != "" {
 		return fmt.Errorf("%s has a name but no virtual-key code", name)
 	}
-	if binding.VK > 0 && binding.Name != KeyDisplayName(binding.VK) {
+	if binding.VK > 0 && !keyNameMatchesVK(binding.Name, binding.VK) {
 		return fmt.Errorf("%s name does not match virtual-key code", name)
 	}
 	return nil
+}
+
+func keyNameMatchesVK(name string, vk int) bool {
+	if name == KeyDisplayName(vk) {
+		return true
+	}
+	if name == fmt.Sprintf("VK_%d", vk) {
+		return acceptsLegacyFallbackName(vk)
+	}
+	switch vk {
+	case 0xA0, 0xA1:
+		return name == "Shift"
+	case 0xA2, 0xA3:
+		return name == "Ctrl"
+	case 0xA4, 0xA5:
+		return name == "Alt"
+	}
+	return false
+}
+
+func acceptsLegacyFallbackName(vk int) bool {
+	return vk == 0x90 || vk == 0x91 || (vk >= 0xA0 && vk <= 0xA5)
 }
 
 func validateConfigString(name string, value string, maxLength int) error {
