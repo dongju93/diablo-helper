@@ -1,3 +1,4 @@
+// Package config loads, validates, normalizes, and saves Diablo Helper settings.
 package config
 
 import (
@@ -9,18 +10,30 @@ import (
 )
 
 const (
-	MaxConfigFileBytes       = 64 * 1024
-	MaxSkills                = 8
-	MaxKeyNameLength         = 64
-	MaxSkillNameLength       = 64
-	DefaultIntervalMS        = 1000
-	DefaultSkillGapMS        = 0
+	// MaxConfigFileBytes is the largest TOML config file accepted by LoadFile.
+	MaxConfigFileBytes = 64 * 1024
+	// MaxSkills is the fixed number of skill slots shown by the UI and saved to TOML.
+	MaxSkills = 8
+	// MaxKeyNameLength is the maximum number of runes accepted for a stored key_name.
+	MaxKeyNameLength = 64
+	// MaxSkillNameLength is the maximum number of runes accepted for a skill name.
+	MaxSkillNameLength = 64
+	// DefaultIntervalMS is the default skill repeat interval in milliseconds.
+	DefaultIntervalMS = 1000
+	// DefaultSkillGapMS is the default delay inserted between skill sends in milliseconds.
+	DefaultSkillGapMS = 0
+	// DefaultClickerIntervalMS is the default clicker repeat interval in milliseconds.
 	DefaultClickerIntervalMS = 100
-	MinimumIntervalMS        = 10
-	MaximumIntervalMS        = 60 * 60 * 1000
-	MaximumSkillGapMS        = 60 * 60 * 1000
-	MouseLeftVK              = 0x01
-	DefaultSkillEnabled      = false
+	// MinimumIntervalMS is the minimum accepted repeat interval in milliseconds.
+	MinimumIntervalMS = 10
+	// MaximumIntervalMS is the maximum accepted repeat interval in milliseconds.
+	MaximumIntervalMS = 60 * 60 * 1000
+	// MaximumSkillGapMS is the maximum accepted delay between skill sends in milliseconds.
+	MaximumSkillGapMS = 60 * 60 * 1000
+	// MouseLeftVK is the Win32 virtual-key code for the left mouse button.
+	MouseLeftVK = 0x01
+	// DefaultSkillEnabled is the enabled state assigned to newly created skill slots.
+	DefaultSkillEnabled = false
 )
 
 var maximumDurationMilliseconds = int64(math.MaxInt64 / int64(time.Millisecond))
@@ -49,52 +62,84 @@ func forbiddenOutputKey(vk int) (string, bool) {
 	}
 }
 
+// KeyBinding stores a display name together with its Win32 virtual-key code.
 type KeyBinding struct {
+	// Name is the stored key_name and is rewritten from VK by NormalizeForUI.
 	Name string
-	VK   int
+	// VK is the Win32 virtual-key code, with 0 meaning unassigned.
+	VK int
 }
 
+// Assigned reports whether the binding has a nonzero virtual-key code.
 func (k KeyBinding) Assigned() bool {
 	return k.VK > 0
 }
 
+// Skill describes one automated skill slot and its repeat settings.
 type Skill struct {
-	Name       string
-	Key        KeyBinding
+	// Name is the user-facing skill slot label.
+	Name string
+	// Key is the automated output key sent for this skill.
+	Key KeyBinding
+	// IntervalMS is the repeat interval for this skill in milliseconds.
 	IntervalMS int
-	Enabled    bool
+	// Enabled reports whether the runner should include this skill slot.
+	Enabled bool
 }
 
+// MenuKeys groups the hotkeys used to open Diablo IV menu screens.
 type MenuKeys struct {
-	Character   KeyBinding
+	// Character is the hotkey for the character menu.
+	Character KeyBinding
+	// SkillAssign is the hotkey for the skill assignment menu.
 	SkillAssign KeyBinding
-	Talents     KeyBinding
-	Map         KeyBinding
-	Journal     KeyBinding
-	Social      KeyBinding
-	Clan        KeyBinding
-	TownPortal  KeyBinding
-	Collection  KeyBinding
-	Shop        KeyBinding
+	// Talents is the hotkey for the talents menu.
+	Talents KeyBinding
+	// Map is the hotkey for the map menu.
+	Map KeyBinding
+	// Journal is the hotkey for the journal menu.
+	Journal KeyBinding
+	// Social is the hotkey for the social menu.
+	Social KeyBinding
+	// Clan is the hotkey for the clan menu.
+	Clan KeyBinding
+	// TownPortal is the hotkey for the town portal action.
+	TownPortal KeyBinding
+	// Collection is the hotkey for the collection menu.
+	Collection KeyBinding
+	// Shop is the hotkey for the shop menu.
+	Shop KeyBinding
 }
 
+// Clicker describes the mouse click automation bindings and interval.
 type Clicker struct {
-	Start      KeyBinding
-	Stop       KeyBinding
-	Key        KeyBinding
+	// Start is the hotkey that starts click automation.
+	Start KeyBinding
+	// Stop is the hotkey that stops click automation.
+	Stop KeyBinding
+	// Key is the automated output key sent by the clicker.
+	Key KeyBinding
+	// IntervalMS is the repeat interval for click automation in milliseconds.
 	IntervalMS int
 }
 
+// MenuBinding is a resolved menu binding presented by ID and label.
 type MenuBinding struct {
-	ID      string
-	Label   string
+	// ID is the stable menu action identifier.
+	ID string
+	// Label is the English menu action label.
+	Label string
+	// Binding is the configured key for the menu action.
 	Binding KeyBinding
 }
 
 // MenuBindingDefinition describes a supported game menu action.
 type MenuBindingDefinition struct {
-	ID      string
-	Label   string
+	// ID is the stable menu action identifier used by config and UI code.
+	ID string
+	// Label is the English menu action label.
+	Label string
+	// UILabel is the localized label shown in the Windows UI.
 	UILabel string
 }
 
@@ -179,16 +224,25 @@ var menuBindingSpecs = [...]menuBindingSpec{
 	},
 }
 
+// Config is the full persisted Diablo Helper configuration used by the UI and runners.
 type Config struct {
-	Start      KeyBinding
-	Stop       KeyBinding
-	Pause      KeyBinding
-	Menu       MenuKeys
-	Skills     []Skill
+	// Start is the hotkey that starts skill automation.
+	Start KeyBinding
+	// Stop is the hotkey that stops skill automation.
+	Stop KeyBinding
+	// Pause is the hotkey that pauses or resumes skill automation.
+	Pause KeyBinding
+	// Menu contains the configured game menu hotkeys.
+	Menu MenuKeys
+	// Skills contains the configured skill slots and is normalized to MaxSkills entries for the UI.
+	Skills []Skill
+	// SkillGapMS is the delay inserted between skill sends in milliseconds.
 	SkillGapMS int
-	Clicker    Clicker
+	// Clicker contains the mouse click automation bindings and interval.
+	Clicker Clicker
 }
 
+// Default returns the UI-normalized built-in configuration.
 func Default() Config {
 	cfg := Config{
 		Pause: KeyBinding{Name: "Mouse Right", VK: 0x02},
@@ -223,6 +277,7 @@ func defaultMenuKeys() MenuKeys {
 	return menu
 }
 
+// SetKeyByID replaces the menu key binding for id and reports whether id was known.
 func (m *MenuKeys) SetKeyByID(id string, binding KeyBinding) bool {
 	for i := range menuBindingSpecs {
 		spec := menuBindingSpecs[i]
@@ -240,8 +295,7 @@ func (m *MenuKeys) forEachKey(fn func(*KeyBinding)) {
 	}
 }
 
-// Matches reports whether vk matches any assigned menu binding.
-// Called from the global low-level keyboard hook — no allocations.
+// Matches reports whether vk matches any assigned menu binding without allocating in the low-level keyboard hook.
 func (m MenuKeys) Matches(vk uint16) bool {
 	for i := range menuBindingSpecs {
 		binding := menuBindingSpecs[i].value(m)
@@ -263,8 +317,9 @@ func (m MenuKeys) BindingByID(id string) (KeyBinding, bool) {
 	return KeyBinding{}, false
 }
 
-// NormalizeForUI repairs a partially edited config into the shape expected by
-// controls and save output. File loads validate raw input before calling this.
+// NormalizeForUI repairs a partially edited config for controls and save output,
+// and file loads must Validate before calling it so invalid raw key_name values
+// are rejected before names are rewritten from KeyDisplayName.
 func (c *Config) NormalizeForUI() {
 	if len(c.Skills) > MaxSkills {
 		c.Skills = c.Skills[:MaxSkills]
@@ -301,6 +356,7 @@ func (c *Config) NormalizeForUI() {
 	c.Menu.forEachKey(normalizeKey)
 }
 
+// MenuBindings returns configured menu bindings in UI order.
 func (c Config) MenuBindings() []MenuBinding {
 	bindings := make([]MenuBinding, 0, len(menuBindingSpecs))
 	for i := range menuBindingSpecs {
@@ -314,6 +370,9 @@ func (c Config) MenuBindings() []MenuBinding {
 	return bindings
 }
 
+// Validate checks config invariants without repairing values, including that
+// each stored key_name matches key_vk or an accepted legacy alias before
+// NormalizeForUI rewrites names from KeyDisplayName.
 func (c Config) Validate() error {
 	if len(c.Skills) > MaxSkills {
 		return fmt.Errorf("skills must not exceed %d entries", MaxSkills)
@@ -391,10 +450,12 @@ func (c Config) Validate() error {
 	return nil
 }
 
+// MillisecondsFitDuration reports whether ms can be represented as a nonnegative time.Duration.
 func MillisecondsFitDuration(ms int) bool {
 	return ms >= 0 && int64(ms) <= maximumDurationMilliseconds
 }
 
+// KeyDisplayName returns the canonical persisted and displayed key_name for a Win32 virtual-key code.
 func KeyDisplayName(vk int) string {
 	if vk < 0 || vk > 255 {
 		return fmt.Sprintf("VK_%d", vk)
@@ -509,6 +570,7 @@ func validateOutputKey(name string, binding KeyBinding) error {
 	return nil
 }
 
+// ForbiddenOutputKeyLabel reports whether vk is blocked as an automated output key and returns its label.
 func ForbiddenOutputKeyLabel(vk int) (string, bool) {
 	return forbiddenOutputKey(vk)
 }

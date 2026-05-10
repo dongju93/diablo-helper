@@ -12,10 +12,15 @@ import (
 	"strings"
 )
 
+// SaveOptions controls validation rules used when writing config files.
 type SaveOptions struct {
+	// AllowNonTOMLExtension allows SaveFileWithOptions to write paths without
+	// a .toml extension for caller-controlled export flows.
 	AllowNonTOMLExtension bool
 }
 
+// LoadFile reads a TOML config from path after rejecting reparse points and
+// enforcing MaxConfigFileBytes.
 func LoadFile(path string) (Config, error) {
 	if err := rejectReparsePath(path); err != nil {
 		return Config{}, err
@@ -37,10 +42,12 @@ func LoadFile(path string) (Config, error) {
 	return ParseTOML(data)
 }
 
+// SaveFile writes cfg atomically to a .toml path after normalizing and validating it.
 func SaveFile(path string, cfg Config) error {
 	return SaveFileWithOptions(path, cfg, SaveOptions{})
 }
 
+// SaveFileWithOptions writes cfg atomically using opts to control path validation.
 func SaveFileWithOptions(path string, cfg Config, opts SaveOptions) error {
 	data, err := MarshalTOML(cfg)
 	if err != nil {
@@ -52,6 +59,7 @@ func SaveFileWithOptions(path string, cfg Config, opts SaveOptions) error {
 	return writeFileAtomic(path, data, 0o600)
 }
 
+// HasTOMLExtension reports whether path ends with .toml using a case-insensitive comparison.
 func HasTOMLExtension(path string) bool {
 	return strings.EqualFold(filepath.Ext(path), ".toml")
 }
@@ -179,6 +187,8 @@ func fileInfoIsReparsePoint(info os.FileInfo) bool {
 	return attributes.Uint()&0x400 != 0
 }
 
+// MarshalTOML normalizes cfg for UI/save shape, validates it, and writes
+// canonical key_name values derived from key_vk.
 func MarshalTOML(cfg Config) ([]byte, error) {
 	cfg.NormalizeForUI()
 	if err := cfg.Validate(); err != nil {
@@ -211,6 +221,9 @@ func MarshalTOML(cfg Config) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// ParseTOML parses strict config TOML, validates raw key_name/key_vk pairs
+// before NormalizeForUI rewrites names to KeyDisplayName form, and validates
+// again before returning.
 func ParseTOML(data []byte) (Config, error) {
 	cfg := Default()
 	cfg.Skills = nil
