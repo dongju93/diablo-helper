@@ -117,15 +117,16 @@ func fallbackMessageBox(title string, text string, flags uintptr) error {
 
 func newApplication() *application {
 	_ = ensureWinAPI()
+	input := newSerializedInputSender(sendVirtualKey, releaseVirtualKey)
 	a := &application{
 		cfg:        config.Default(),
-		runner:     newSkillRunner(sendVirtualKey),
+		runner:     newSkillRunnerWithTimedSend(input.Send, input.Release),
 		statusText: "■ 정지.",
 		controls: controlRefs{
 			menuLabels:  make(map[string]uintptr),
 			menuButtons: make(map[string]uintptr),
 		},
-		clicker: newClickerRunner(sendVirtualKey),
+		clicker: newClickerRunnerWithTimedSend(input.Send, input.Release),
 		winapi:  defaultApplicationWinAPI(),
 	}
 	a.runner.SetErrorHandler(func(err error) {

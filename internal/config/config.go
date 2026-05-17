@@ -22,6 +22,8 @@ const (
 	DefaultIntervalMS = 1000
 	// DefaultSkillGapMS is the default delay inserted between skill sends in milliseconds.
 	DefaultSkillGapMS = 0
+	// DefaultInputHoldMS is the default duration a generated input is held before release.
+	DefaultInputHoldMS = 10
 	// DefaultClickerIntervalMS is the default clicker repeat interval in milliseconds.
 	DefaultClickerIntervalMS = 100
 	// MinimumIntervalMS is the minimum accepted repeat interval in milliseconds.
@@ -30,6 +32,10 @@ const (
 	MaximumIntervalMS = 60 * 60 * 1000
 	// MaximumSkillGapMS is the maximum accepted delay between skill sends in milliseconds.
 	MaximumSkillGapMS = 60 * 60 * 1000
+	// MinimumInputHoldMS is the minimum accepted generated input hold time in milliseconds.
+	MinimumInputHoldMS = 1
+	// MaximumInputHoldMS is the maximum accepted generated input hold time in milliseconds.
+	MaximumInputHoldMS = 1000
 	// MouseLeftVK is the Win32 virtual-key code for the left mouse button.
 	MouseLeftVK = 0x01
 	// DefaultSkillEnabled is the enabled state assigned to newly created skill slots.
@@ -83,6 +89,8 @@ type Skill struct {
 	Key KeyBinding
 	// IntervalMS is the repeat interval for this skill in milliseconds.
 	IntervalMS int
+	// InputHoldMS is the duration the generated skill input is held before release.
+	InputHoldMS int
 	// Enabled reports whether the runner should include this skill slot.
 	Enabled bool
 }
@@ -121,6 +129,8 @@ type Clicker struct {
 	Key KeyBinding
 	// IntervalMS is the repeat interval for click automation in milliseconds.
 	IntervalMS int
+	// InputHoldMS is the duration the generated click input is held before release.
+	InputHoldMS int
 }
 
 // MenuBinding is a resolved menu binding presented by ID and label.
@@ -238,6 +248,8 @@ type Config struct {
 	Skills []Skill
 	// SkillGapMS is the delay inserted between skill sends in milliseconds.
 	SkillGapMS int
+	// InputHoldMS is the bulk/default generated input hold duration.
+	InputHoldMS int
 	// Clicker contains the mouse click automation bindings and interval.
 	Clicker Clicker
 }
@@ -245,10 +257,12 @@ type Config struct {
 // Default returns the UI-normalized built-in configuration.
 func Default() Config {
 	cfg := Config{
-		Pause: KeyBinding{Name: "Mouse Right", VK: 0x02},
+		Pause:       KeyBinding{Name: "Mouse Right", VK: 0x02},
+		InputHoldMS: DefaultInputHoldMS,
 		Clicker: Clicker{
-			Key:        KeyBinding{Name: "Mouse Left", VK: MouseLeftVK},
-			IntervalMS: DefaultClickerIntervalMS,
+			Key:         KeyBinding{Name: "Mouse Left", VK: MouseLeftVK},
+			IntervalMS:  DefaultClickerIntervalMS,
+			InputHoldMS: DefaultInputHoldMS,
 		},
 		Menu: defaultMenuKeys(),
 	}
@@ -321,15 +335,17 @@ func (m MenuKeys) BindingByID(id string) (KeyBinding, bool) {
 // and file loads must Validate before calling it so invalid raw key_name values
 // are rejected before names are rewritten from KeyDisplayName.
 func (c *Config) NormalizeForUI() {
+	inputHoldDefault := normalizedInputHoldDefault(c.InputHoldMS)
 	if len(c.Skills) > MaxSkills {
 		c.Skills = c.Skills[:MaxSkills]
 	}
 	for len(c.Skills) < MaxSkills {
 		index := len(c.Skills) + 1
 		c.Skills = append(c.Skills, Skill{
-			Name:       fmt.Sprintf("Skill %d", index),
-			IntervalMS: DefaultIntervalMS,
-			Enabled:    DefaultSkillEnabled,
+			Name:        fmt.Sprintf("Skill %d", index),
+			IntervalMS:  DefaultIntervalMS,
+			InputHoldMS: inputHoldDefault,
+			Enabled:     DefaultSkillEnabled,
 		})
 	}
 	for i := range c.Skills {
@@ -339,13 +355,22 @@ func (c *Config) NormalizeForUI() {
 		if c.Skills[i].IntervalMS < MinimumIntervalMS {
 			c.Skills[i].IntervalMS = DefaultIntervalMS
 		}
+		if c.Skills[i].InputHoldMS < MinimumInputHoldMS {
+			c.Skills[i].InputHoldMS = inputHoldDefault
+		}
 		normalizeKey(&c.Skills[i].Key)
 	}
 	if c.SkillGapMS < 0 {
 		c.SkillGapMS = DefaultSkillGapMS
 	}
+	if c.InputHoldMS < MinimumInputHoldMS {
+		c.InputHoldMS = DefaultInputHoldMS
+	}
 	if c.Clicker.IntervalMS < MinimumIntervalMS {
 		c.Clicker.IntervalMS = DefaultClickerIntervalMS
+	}
+	if c.Clicker.InputHoldMS < MinimumInputHoldMS {
+		c.Clicker.InputHoldMS = inputHoldDefault
 	}
 	normalizeKey(&c.Start)
 	normalizeKey(&c.Stop)
@@ -354,6 +379,13 @@ func (c *Config) NormalizeForUI() {
 	normalizeKey(&c.Clicker.Stop)
 	normalizeKey(&c.Clicker.Key)
 	c.Menu.forEachKey(normalizeKey)
+}
+
+func normalizedInputHoldDefault(ms int) int {
+	if ms < MinimumInputHoldMS || ms > MaximumInputHoldMS || !MillisecondsFitDuration(ms) {
+		return DefaultInputHoldMS
+	}
+	return ms
 }
 
 // MenuBindings returns configured menu bindings in UI order.
@@ -398,6 +430,15 @@ func (c Config) Validate() error {
 	if !MillisecondsFitDuration(c.SkillGapMS) {
 		return fmt.Errorf("skill gap is too large for time.Duration")
 	}
+	if c.InputHoldMS < MinimumInputHoldMS {
+		return fmt.Errorf("input hold must be at least %dms", MinimumInputHoldMS)
+	}
+	if c.InputHoldMS > MaximumInputHoldMS {
+		return fmt.Errorf("input hold must be at most %dms", MaximumInputHoldMS)
+	}
+	if !MillisecondsFitDuration(c.InputHoldMS) {
+		return fmt.Errorf("input hold is too large for time.Duration")
+	}
 	if c.Clicker.IntervalMS < MinimumIntervalMS {
 		return fmt.Errorf("clicker interval must be at least %dms", MinimumIntervalMS)
 	}
@@ -417,6 +458,15 @@ func (c Config) Validate() error {
 		if !MillisecondsFitDuration(skill.IntervalMS) {
 			return fmt.Errorf("skill %d interval is too large for time.Duration", i+1)
 		}
+		if skill.InputHoldMS < MinimumInputHoldMS {
+			return fmt.Errorf("skill %d input hold must be at least %dms", i+1, MinimumInputHoldMS)
+		}
+		if skill.InputHoldMS > MaximumInputHoldMS {
+			return fmt.Errorf("skill %d input hold must be at most %dms", i+1, MaximumInputHoldMS)
+		}
+		if !MillisecondsFitDuration(skill.InputHoldMS) {
+			return fmt.Errorf("skill %d input hold is too large for time.Duration", i+1)
+		}
 		if err := validateConfigString(fmt.Sprintf("skill %d name", i+1), skill.Name, MaxSkillNameLength); err != nil {
 			return err
 		}
@@ -426,6 +476,15 @@ func (c Config) Validate() error {
 	}
 	if err := validateOutputKey("clicker key", c.Clicker.Key); err != nil {
 		return err
+	}
+	if c.Clicker.InputHoldMS < MinimumInputHoldMS {
+		return fmt.Errorf("clicker input hold must be at least %dms", MinimumInputHoldMS)
+	}
+	if c.Clicker.InputHoldMS > MaximumInputHoldMS {
+		return fmt.Errorf("clicker input hold must be at most %dms", MaximumInputHoldMS)
+	}
+	if !MillisecondsFitDuration(c.Clicker.InputHoldMS) {
+		return fmt.Errorf("clicker input hold is too large for time.Duration")
 	}
 	for _, item := range []struct {
 		name    string

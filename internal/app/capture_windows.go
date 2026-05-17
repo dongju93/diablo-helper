@@ -356,3 +356,27 @@ func parseSkillGap(value string) (int, error) {
 	}
 	return gap, nil
 }
+
+func parseInputHold(value string) (int, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return 0, fmt.Errorf("눌림 시간은 필수입니다")
+	}
+	if len(trimmed) > maxEditTextLen {
+		return 0, fmt.Errorf("눌림 시간 입력이 너무 깁니다")
+	}
+	hold, err := strconv.Atoi(trimmed)
+	if err != nil {
+		return 0, fmt.Errorf("눌림 시간은 숫자여야 합니다")
+	}
+	if hold < config.MinimumInputHoldMS {
+		return 0, fmt.Errorf("눌림 시간은 최소 %dms 이상이어야 합니다", config.MinimumInputHoldMS)
+	}
+	if hold > config.MaximumInputHoldMS {
+		return 0, fmt.Errorf("눌림 시간은 최대 %dms 이하여야 합니다", config.MaximumInputHoldMS)
+	}
+	if !config.MillisecondsFitDuration(hold) {
+		return 0, fmt.Errorf("눌림 시간이 너무 큽니다")
+	}
+	return hold, nil
+}

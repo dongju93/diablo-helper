@@ -48,7 +48,7 @@ func TestApplicationControlClassification(t *testing.T) {
 			t.Fatalf("id %d should be a binding button", id)
 		}
 	}
-	for _, id := range []int{idSave, idApplyBulk, idClickerInterval, idSkillKeyBase + config.MaxSkills} {
+	for _, id := range []int{idSave, idApplyBulk, idInputHold, idClickerInterval, idClickerHold, idSkillHoldBase, idSkillKeyBase + config.MaxSkills} {
 		if a.isBindingButton(id) {
 			t.Fatalf("id %d should not be a binding button", id)
 		}

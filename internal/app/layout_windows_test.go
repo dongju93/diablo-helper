@@ -225,11 +225,17 @@ func TestComputeLayoutKeepsCriticalRectsContained(t *testing.T) {
 			if lo.loadX < 0 || lo.loadX+headerW > lo.saveX || lo.saveX+headerW > tt.cw {
 				t.Fatalf("header buttons out of order or bounds: loadX=%d saveX=%d width=%d cw=%d", lo.loadX, lo.saveX, headerW, tt.cw)
 			}
-			if lo.skillBtnX+lo.skillBtnW > lo.skillIntervalX || lo.skillIntervalX+lo.w(skillEditW) > lo.skillMsX || lo.skillMsX+lo.w(skillMsW) > lo.rx+lo.rw {
-				t.Fatalf("skill row overlaps: btn=%d..%d interval=%d..%d ms=%d..%d panelRight=%d",
+			if lo.skillBtnX+lo.skillBtnW > lo.skillIntervalX ||
+				lo.skillIntervalX+lo.w(skillEditW) > lo.skillMsX ||
+				lo.skillMsX+lo.w(skillMsW) > lo.skillHoldX ||
+				lo.skillHoldX+lo.w(skillHoldEditW) > lo.skillHoldMsX ||
+				lo.skillHoldMsX+lo.w(skillMsW) > lo.rx+lo.rw {
+				t.Fatalf("skill row overlaps: btn=%d..%d interval=%d..%d ms=%d..%d hold=%d..%d holdMS=%d..%d panelRight=%d",
 					lo.skillBtnX, lo.skillBtnX+lo.skillBtnW,
 					lo.skillIntervalX, lo.skillIntervalX+lo.w(skillEditW),
 					lo.skillMsX, lo.skillMsX+lo.w(skillMsW),
+					lo.skillHoldX, lo.skillHoldX+lo.w(skillHoldEditW),
+					lo.skillHoldMsX, lo.skillHoldMsX+lo.w(skillMsW),
 					lo.rx+lo.rw)
 			}
 			if lo.pauseBtnX+lo.pauseBtnW > lo.rx+lo.rw {
@@ -286,11 +292,23 @@ func TestComputeLayoutKeepsControlRowsReadable(t *testing.T) {
 			bulkEdit := testRect("bulk edit", lo.bulkEditX, lo.y(bulkIntervalEditY), lo.w(bulkEditW), lo.h(22))
 			bulkFrame := testRect("bulk edit frame", lo.bulkEditX-lo.w(8), lo.y(bulkIntervalEditY-6), lo.w(inputFrameWidth(bulkEditW)), lo.h(32))
 			bulkMS := testRect("bulk ms", lo.bulkMsX, lo.y(bulkIntervalLabelY), lo.w(bulkMsW), lo.h(24))
+			gapLabel := testRect("skill gap label", lo.bulkLabelX, lo.y(bulkSkillGapLabelY), lo.w(78), lo.h(24))
+			gapEdit := testRect("skill gap edit", lo.bulkEditX, lo.y(bulkSkillGapEditY), lo.w(bulkEditW), lo.h(22))
+			gapFrame := testRect("skill gap frame", lo.bulkEditX-lo.w(8), lo.y(bulkSkillGapEditY-6), lo.w(inputFrameWidth(bulkEditW)), lo.h(32))
+			gapMS := testRect("skill gap ms", lo.bulkMsX, lo.y(bulkSkillGapLabelY), lo.w(bulkMsW), lo.h(24))
+			holdLabel := testRect("input hold label", lo.bulkLabelX, lo.y(inputHoldLabelY), lo.w(78), lo.h(24))
+			holdEdit := testRect("input hold edit", lo.bulkEditX, lo.y(inputHoldEditY), lo.w(bulkEditW), lo.h(22))
+			holdFrame := testRect("input hold frame", lo.bulkEditX-lo.w(8), lo.y(inputHoldEditY-6), lo.w(inputFrameWidth(bulkEditW)), lo.h(32))
+			holdMS := testRect("input hold ms", lo.bulkMsX, lo.y(inputHoldLabelY), lo.w(bulkMsW), lo.h(24))
 			bulkApply := testRect("bulk apply", lo.bulkApplyX, lo.y(bulkApplyY), lo.w(bulkApplyW), lo.h(bulkApplyH))
-			assertContained(t, skillPanel, bulkLabel, bulkEdit, bulkFrame, bulkMS, bulkApply)
+			assertContained(t, skillPanel, bulkLabel, bulkEdit, bulkFrame, bulkMS, gapLabel, gapEdit, gapFrame, gapMS, holdLabel, holdEdit, holdFrame, holdMS, bulkApply)
 			assertBefore(t, bulkLabel, bulkEdit, lo.w(6))
 			assertBefore(t, bulkFrame, bulkMS, lo.w(4))
 			assertBefore(t, bulkMS, bulkApply, lo.w(4))
+			assertBefore(t, gapLabel, gapEdit, lo.w(6))
+			assertBefore(t, gapFrame, gapMS, lo.w(4))
+			assertBefore(t, holdLabel, holdEdit, lo.w(6))
+			assertBefore(t, holdFrame, holdMS, lo.w(4))
 
 			y := skillFirstRowY
 			for range config.MaxSkills {
@@ -300,11 +318,16 @@ func TestComputeLayoutKeepsControlRowsReadable(t *testing.T) {
 				edit := testRect("skill interval", lo.skillIntervalX, lo.y(y+7), lo.w(skillEditW), lo.h(22))
 				frame := testRect("skill interval frame", lo.skillIntervalX-lo.w(8), lo.y(y+1), lo.w(inputFrameWidth(skillEditW)), lo.h(32))
 				ms := testRect("skill ms", lo.skillMsX, lo.y(y+6), lo.w(skillMsW), lo.h(22))
-				assertContained(t, skillPanel, toggle, num, key, edit, frame, ms)
+				holdEdit := testRect("skill hold", lo.skillHoldX, lo.y(y+7), lo.w(skillHoldEditW), lo.h(22))
+				holdFrame := testRect("skill hold frame", lo.skillHoldX-lo.w(8), lo.y(y+1), lo.w(inputFrameWidth(skillHoldEditW)), lo.h(32))
+				holdMS := testRect("skill hold ms", lo.skillHoldMsX, lo.y(y+6), lo.w(skillMsW), lo.h(22))
+				assertContained(t, skillPanel, toggle, num, key, edit, frame, ms, holdEdit, holdFrame, holdMS)
 				assertBefore(t, toggle, num, lo.w(4))
 				assertBefore(t, num, key, lo.w(8))
 				assertBefore(t, key, edit, lo.w(8))
 				assertBefore(t, frame, ms, lo.w(4))
+				assertBefore(t, ms, holdEdit, lo.w(2))
+				assertBefore(t, holdFrame, holdMS, lo.w(4))
 				assertMinWidth(t, key, lo.w(120))
 				y += skillRowGap
 			}
@@ -319,7 +342,11 @@ func TestComputeLayoutKeepsControlRowsReadable(t *testing.T) {
 			clickerIntEdit := testRect("clicker interval edit", lo.clickerIntEditX, lo.y(clickerSettingY+7), lo.w(clickerIntEditW), lo.h(22))
 			clickerIntFrame := testRect("clicker interval frame", lo.clickerIntEditX-lo.w(8), lo.y(clickerSettingY+1), lo.w(inputFrameWidth(clickerIntEditW)), lo.h(32))
 			clickerMS := testRect("clicker ms", lo.clickerMsLabelX, lo.y(clickerSettingY+6), lo.w(32), lo.h(24))
-			assertContained(t, clickerPanel, clickerStartLabel, clickerStartButton, clickerStopLabel, clickerStopButton, clickerKeyLabel, clickerKeyButton, clickerIntLabel, clickerIntEdit, clickerIntFrame, clickerMS)
+			clickerHoldLabel := testRect("clicker hold label", lo.clickerHoldLabelX, lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
+			clickerHoldEdit := testRect("clicker hold edit", lo.clickerHoldEditX, lo.y(clickerSettingY+7), lo.w(clickerHoldEditW), lo.h(22))
+			clickerHoldFrame := testRect("clicker hold frame", lo.clickerHoldEditX-lo.w(8), lo.y(clickerSettingY+1), lo.w(inputFrameWidth(clickerHoldEditW)), lo.h(32))
+			clickerHoldMS := testRect("clicker hold ms", lo.clickerHoldMsX, lo.y(clickerSettingY+6), lo.w(32), lo.h(24))
+			assertContained(t, clickerPanel, clickerStartLabel, clickerStartButton, clickerStopLabel, clickerStopButton, clickerKeyLabel, clickerKeyButton, clickerIntLabel, clickerIntEdit, clickerIntFrame, clickerMS, clickerHoldLabel, clickerHoldEdit, clickerHoldFrame, clickerHoldMS)
 			assertBefore(t, clickerStartLabel, clickerStartButton, lo.w(4))
 			assertBefore(t, clickerStartButton, clickerStopLabel, lo.w(12))
 			assertBefore(t, clickerStopLabel, clickerStopButton, lo.w(4))
@@ -328,9 +355,10 @@ func TestComputeLayoutKeepsControlRowsReadable(t *testing.T) {
 			assertBefore(t, clickerIntLabel, clickerIntFrame, 0)
 			assertBefore(t, clickerIntLabel, clickerIntEdit, lo.w(4))
 			assertBefore(t, clickerIntFrame, clickerMS, lo.w(4))
-			if clickerIntFrame.left != clickerStopButton.left {
-				t.Fatalf("clicker interval frame left=%d, want aligned with stop button left=%d", clickerIntFrame.left, clickerStopButton.left)
-			}
+			assertBefore(t, clickerMS, clickerHoldLabel, lo.w(4))
+			assertBefore(t, clickerHoldLabel, clickerHoldFrame, 0)
+			assertBefore(t, clickerHoldLabel, clickerHoldEdit, lo.w(4))
+			assertBefore(t, clickerHoldFrame, clickerHoldMS, lo.w(4))
 
 			pauseLabel := testRect("pause label", lo.pauseLabelX, lo.y(pauseRowY+6), lo.w(45), lo.h(24))
 			pauseButton := testRect("pause button", lo.pauseBtnX, lo.y(pauseRowY), lo.pauseBtnW, lo.h(34))

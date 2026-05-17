@@ -200,11 +200,13 @@ func MarshalTOML(cfg Config) ([]byte, error) {
 	writeKey(&buf, "stop", cfg.Stop)
 	writeKey(&buf, "pause", cfg.Pause)
 	writeInt(&buf, "skill_gap_ms", cfg.SkillGapMS)
+	writeInt(&buf, "input_hold_ms", cfg.InputHoldMS)
 	buf.WriteByte('\n')
 	writeKey(&buf, "clicker_start", cfg.Clicker.Start)
 	writeKey(&buf, "clicker_stop", cfg.Clicker.Stop)
 	writeKey(&buf, "clicker", cfg.Clicker.Key)
 	writeInt(&buf, "clicker_interval_ms", cfg.Clicker.IntervalMS)
+	writeInt(&buf, "clicker_hold_ms", cfg.Clicker.InputHoldMS)
 	buf.WriteByte('\n')
 	for i := range menuBindingSpecs {
 		spec := menuBindingSpecs[i]
@@ -216,6 +218,7 @@ func MarshalTOML(cfg Config) ([]byte, error) {
 		writeString(&buf, "key_name", skill.Key.Name)
 		writeInt(&buf, "key_vk", skill.Key.VK)
 		writeInt(&buf, "interval_ms", skill.IntervalMS)
+		writeInt(&buf, "hold_ms", skill.InputHoldMS)
 		writeBool(&buf, "enabled", skill.Enabled)
 	}
 	return buf.Bytes(), nil
@@ -227,6 +230,7 @@ func MarshalTOML(cfg Config) ([]byte, error) {
 func ParseTOML(data []byte) (Config, error) {
 	cfg := Default()
 	cfg.Skills = nil
+	cfg.Clicker.InputHoldMS = -1
 
 	var currentSkill *Skill
 	scanner := bufio.NewScanner(bytes.NewReader(data))
@@ -240,9 +244,10 @@ func ParseTOML(data []byte) (Config, error) {
 				return Config{}, fmt.Errorf("line %d: too many [[skills]] sections (max %d)", lineNumber, MaxSkills)
 			}
 			cfg.Skills = append(cfg.Skills, Skill{
-				Name:       fmt.Sprintf("Skill %d", len(cfg.Skills)+1),
-				IntervalMS: DefaultIntervalMS,
-				Enabled:    DefaultSkillEnabled,
+				Name:        fmt.Sprintf("Skill %d", len(cfg.Skills)+1),
+				IntervalMS:  DefaultIntervalMS,
+				InputHoldMS: -1,
+				Enabled:     DefaultSkillEnabled,
 			})
 			currentSkill = &cfg.Skills[len(cfg.Skills)-1]
 			continue
@@ -275,6 +280,7 @@ func ParseTOML(data []byte) (Config, error) {
 		return Config{}, err
 	}
 
+	fillMissingInputHolds(&cfg)
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err
 	}
@@ -301,6 +307,8 @@ func setTopLevelValue(cfg *Config, key string, value string) error {
 		return setInt(&cfg.Pause.VK, value)
 	case "skill_gap_ms":
 		return setInt(&cfg.SkillGapMS, value)
+	case "input_hold_ms":
+		return setInt(&cfg.InputHoldMS, value)
 	case "clicker_start_key_name":
 		return setKeyName(&cfg.Clicker.Start.Name, key, value)
 	case "clicker_start_key_vk":
@@ -315,6 +323,8 @@ func setTopLevelValue(cfg *Config, key string, value string) error {
 		return setInt(&cfg.Clicker.Key.VK, value)
 	case "clicker_interval_ms":
 		return setInt(&cfg.Clicker.IntervalMS, value)
+	case "clicker_hold_ms":
+		return setInt(&cfg.Clicker.InputHoldMS, value)
 	default:
 		if handled, err := setMenuTopLevelValue(&cfg.Menu, key, value); handled {
 			return err
@@ -348,10 +358,23 @@ func setSkillValue(skill *Skill, key string, value string) error {
 		return setInt(&skill.Key.VK, value)
 	case "interval_ms":
 		return setInt(&skill.IntervalMS, value)
+	case "hold_ms":
+		return setInt(&skill.InputHoldMS, value)
 	case "enabled":
 		return setBool(&skill.Enabled, value)
 	default:
 		return fmt.Errorf("unknown skill key %q", key)
+	}
+}
+
+func fillMissingInputHolds(cfg *Config) {
+	if cfg.Clicker.InputHoldMS < 0 {
+		cfg.Clicker.InputHoldMS = cfg.InputHoldMS
+	}
+	for i := range cfg.Skills {
+		if cfg.Skills[i].InputHoldMS < 0 {
+			cfg.Skills[i].InputHoldMS = cfg.InputHoldMS
+		}
 	}
 }
 

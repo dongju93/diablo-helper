@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dongju93/diablo-helper/internal/config"
 )
@@ -18,8 +19,8 @@ func TestMainWindowStyleAvoidsCompositedResizePath(t *testing.T) {
 
 func TestApplicationRunCleansUpAfterGetMessageError(t *testing.T) {
 	a := newApplication()
-	a.runner = newSkillRunner(func(uint16) error { return nil })
-	a.clicker = newClickerRunner(func(uint16) error { return nil })
+	a.runner = newSkillRunner(func(uint16, time.Duration) error { return nil })
+	a.clicker = newClickerRunner(func(uint16, time.Duration) error { return nil })
 	a.winapi = stubApplicationWinAPI()
 
 	cfg := config.Default()
@@ -33,7 +34,7 @@ func TestApplicationRunCleansUpAfterGetMessageError(t *testing.T) {
 		t.Fatal("runner.Start() = false, want true")
 	}
 	defer a.runner.Stop()
-	if !a.clicker.Start(config.Clicker{Key: config.KeyBinding{Name: "A", VK: 0x41}, IntervalMS: config.MinimumIntervalMS}) {
+	if !a.clicker.Start(config.Clicker{Key: config.KeyBinding{Name: "A", VK: 0x41}, IntervalMS: config.MinimumIntervalMS, InputHoldMS: config.DefaultInputHoldMS}) {
 		t.Fatal("clicker.Start() = false, want true")
 	}
 	defer a.clicker.Stop()

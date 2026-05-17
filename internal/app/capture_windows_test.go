@@ -105,6 +105,43 @@ func TestParseSkillGap(t *testing.T) {
 	}
 }
 
+func TestParseInputHold(t *testing.T) {
+	tests := []struct {
+		name      string
+		value     string
+		want      int
+		wantError string
+	}{
+		{name: "valid", value: "10", want: 10},
+		{name: "trims whitespace", value: " 20 \t", want: 20},
+		{name: "empty", value: "", wantError: "필수"},
+		{name: "not a number", value: "slow", wantError: "숫자"},
+		{name: "below minimum", value: "0", wantError: "최소"},
+		{name: "above maximum", value: strconv.Itoa(config.MaximumInputHoldMS + 1), wantError: "최대"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseInputHold(tt.value)
+			if tt.wantError == "" {
+				if err != nil {
+					t.Fatalf("parseInputHold() error = %v", err)
+				}
+				if got != tt.want {
+					t.Fatalf("parseInputHold() = %d, want %d", got, tt.want)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("parseInputHold() error = nil, want error")
+			}
+			if !strings.Contains(err.Error(), tt.wantError) {
+				t.Fatalf("parseInputHold() error = %v, want %q", err, tt.wantError)
+			}
+		})
+	}
+}
+
 func TestCaptureTargetAndControlID(t *testing.T) {
 	a := newApplication()
 

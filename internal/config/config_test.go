@@ -46,11 +46,17 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.SkillGapMS != DefaultSkillGapMS {
 		t.Fatalf("skill gap = %d, want %d", cfg.SkillGapMS, DefaultSkillGapMS)
 	}
+	if cfg.InputHoldMS != DefaultInputHoldMS {
+		t.Fatalf("input hold = %d, want %d", cfg.InputHoldMS, DefaultInputHoldMS)
+	}
 	if cfg.Clicker.Key != (KeyBinding{Name: "Mouse Left", VK: MouseLeftVK}) {
 		t.Fatalf("clicker key = %+v, want Mouse Left", cfg.Clicker.Key)
 	}
 	if cfg.Clicker.IntervalMS != DefaultClickerIntervalMS {
 		t.Fatalf("clicker interval = %d, want %d", cfg.Clicker.IntervalMS, DefaultClickerIntervalMS)
+	}
+	if cfg.Clicker.InputHoldMS != DefaultInputHoldMS {
+		t.Fatalf("clicker hold = %d, want %d", cfg.Clicker.InputHoldMS, DefaultInputHoldMS)
 	}
 	if cfg.Clicker.Start.Assigned() || cfg.Clicker.Stop.Assigned() {
 		t.Fatalf("clicker start/stop = %+v/%+v, want unassigned", cfg.Clicker.Start, cfg.Clicker.Stop)
@@ -65,6 +71,9 @@ func TestDefaultConfig(t *testing.T) {
 		}
 		if skill.IntervalMS != DefaultIntervalMS {
 			t.Fatalf("skill %d interval = %d, want %d", i+1, skill.IntervalMS, DefaultIntervalMS)
+		}
+		if skill.InputHoldMS != DefaultInputHoldMS {
+			t.Fatalf("skill %d hold = %d, want %d", i+1, skill.InputHoldMS, DefaultInputHoldMS)
 		}
 		if skill.Enabled != DefaultSkillEnabled {
 			t.Fatalf("skill %d enabled = %v, want %v", i+1, skill.Enabled, DefaultSkillEnabled)
@@ -83,7 +92,8 @@ func TestNormalizeForUIRepairsConfigShapeAndValues(t *testing.T) {
 		Menu: MenuKeys{
 			Character: KeyBinding{Name: "Bad Menu", VK: 999},
 		},
-		SkillGapMS: -1,
+		SkillGapMS:  -1,
+		InputHoldMS: -1,
 		Clicker: Clicker{
 			Start:      KeyBinding{Name: "Bad Clicker Start", VK: 999},
 			Stop:       KeyBinding{Name: "Bad Clicker Stop", VK: -1},
@@ -113,6 +123,9 @@ func TestNormalizeForUIRepairsConfigShapeAndValues(t *testing.T) {
 		if skill.IntervalMS != DefaultIntervalMS {
 			t.Fatalf("skill %d interval = %d, want %d", i+1, skill.IntervalMS, DefaultIntervalMS)
 		}
+		if skill.InputHoldMS != DefaultInputHoldMS {
+			t.Fatalf("skill %d hold = %d, want %d", i+1, skill.InputHoldMS, DefaultInputHoldMS)
+		}
 		if skill.Key != (KeyBinding{}) {
 			t.Fatalf("skill %d key = %+v, want cleared", i+1, skill.Key)
 		}
@@ -132,11 +145,17 @@ func TestNormalizeForUIRepairsConfigShapeAndValues(t *testing.T) {
 	if cfg.SkillGapMS != DefaultSkillGapMS {
 		t.Fatalf("skill gap = %d, want %d", cfg.SkillGapMS, DefaultSkillGapMS)
 	}
+	if cfg.InputHoldMS != DefaultInputHoldMS {
+		t.Fatalf("input hold = %d, want %d", cfg.InputHoldMS, DefaultInputHoldMS)
+	}
 	if cfg.Clicker.Start != (KeyBinding{}) || cfg.Clicker.Stop != (KeyBinding{}) || cfg.Clicker.Key != (KeyBinding{}) {
 		t.Fatalf("clicker bindings = %+v, want cleared", cfg.Clicker)
 	}
 	if cfg.Clicker.IntervalMS != DefaultClickerIntervalMS {
 		t.Fatalf("clicker interval = %d, want %d", cfg.Clicker.IntervalMS, DefaultClickerIntervalMS)
+	}
+	if cfg.Clicker.InputHoldMS != DefaultInputHoldMS {
+		t.Fatalf("clicker hold = %d, want %d", cfg.Clicker.InputHoldMS, DefaultInputHoldMS)
 	}
 }
 
@@ -238,6 +257,34 @@ func TestValidateRejectsInvalidConfig(t *testing.T) {
 			wantError: "skill gap must be at most",
 		},
 		{
+			name: "input hold below minimum",
+			mutate: func(cfg *Config) {
+				cfg.InputHoldMS = MinimumInputHoldMS - 1
+			},
+			wantError: "input hold must be at least",
+		},
+		{
+			name: "input hold above maximum",
+			mutate: func(cfg *Config) {
+				cfg.InputHoldMS = MaximumInputHoldMS + 1
+			},
+			wantError: "input hold must be at most",
+		},
+		{
+			name: "skill input hold below minimum",
+			mutate: func(cfg *Config) {
+				cfg.Skills[0].InputHoldMS = MinimumInputHoldMS - 1
+			},
+			wantError: "skill 1 input hold must be at least",
+		},
+		{
+			name: "skill input hold above maximum",
+			mutate: func(cfg *Config) {
+				cfg.Skills[0].InputHoldMS = MaximumInputHoldMS + 1
+			},
+			wantError: "skill 1 input hold must be at most",
+		},
+		{
 			name: "clicker interval below minimum",
 			mutate: func(cfg *Config) {
 				cfg.Clicker.IntervalMS = MinimumIntervalMS - 1
@@ -250,6 +297,20 @@ func TestValidateRejectsInvalidConfig(t *testing.T) {
 				cfg.Clicker.IntervalMS = MaximumIntervalMS + 1
 			},
 			wantError: "clicker interval must be at most",
+		},
+		{
+			name: "clicker input hold below minimum",
+			mutate: func(cfg *Config) {
+				cfg.Clicker.InputHoldMS = MinimumInputHoldMS - 1
+			},
+			wantError: "clicker input hold must be at least",
+		},
+		{
+			name: "clicker input hold above maximum",
+			mutate: func(cfg *Config) {
+				cfg.Clicker.InputHoldMS = MaximumInputHoldMS + 1
+			},
+			wantError: "clicker input hold must be at most",
 		},
 		{
 			name: "clicker start mouse left",
