@@ -65,8 +65,20 @@ func setWindowText(hwnd uintptr, text string) error {
 	if err != nil {
 		return err
 	}
-	procSetWindowTextW.Call(hwnd, uintptr(unsafe.Pointer(ptr)))
+	ret, _, callErr := procSetWindowTextW.Call(hwnd, uintptr(unsafe.Pointer(ptr)))
+	if ret == 0 {
+		if callErr != syscall.Errno(0) {
+			return callErr
+		}
+		return fmt.Errorf("SetWindowTextW failed")
+	}
 	return nil
+}
+
+// ignoreSetWindowText is for labels and edit fields populated from app-owned
+// strings. There is no useful user recovery path if such text cannot be applied.
+func ignoreSetWindowText(hwnd uintptr, text string) {
+	_ = setWindowText(hwnd, text)
 }
 
 func setWindowTheme(hwnd uintptr, theme string) {
@@ -124,18 +136,6 @@ func messageBoxResult(hwnd uintptr, title string, text string, flags uintptr) (u
 		flags,
 	)
 	return ret, nil
-}
-
-func checked(hwnd uintptr) bool {
-	return sendMessage(hwnd, bmGetCheck, 0, 0) == bstChecked
-}
-
-func setChecked(hwnd uintptr, value bool) {
-	check := uintptr(0)
-	if value {
-		check = bstChecked
-	}
-	sendMessage(hwnd, bmSetCheck, check, 0)
 }
 
 func getClientSize(hwnd uintptr) (int, int) {

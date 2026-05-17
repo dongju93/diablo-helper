@@ -17,9 +17,7 @@ const (
 	mainWindowStyle   = wsOverlappedWindow
 	mainWindowExStyle = 0
 
-	bsAutoCheckbox        = 0x00000003
 	bsOwnerDraw           = 0x0000000B
-	bstChecked            = 1
 	cleartypeQuality      = 5
 	defaultCharset        = 1
 	dwmSystemBackdropMain = 2
@@ -106,8 +104,6 @@ const (
 	wmMButtonUp             = 0x0208
 	wmXButtonDown           = 0x020B
 	wmXButtonUp             = 0x020C
-	bmGetCheck              = 0x00F0
-	bmSetCheck              = 0x00F1
 	bnClicked               = 0
 	odsSelected             = 0x0001
 	odsDisabled             = 0x0004

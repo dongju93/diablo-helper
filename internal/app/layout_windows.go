@@ -43,15 +43,17 @@ const (
 	bulkLabelOffL = 160 // fixed offset from rx
 
 	// Skill grid (right-anchored)
-	skillMsMarR  = 82
-	skillMsW     = 32
-	skillMsGapL  = 30
-	skillEditW   = 64
-	skillBtnOffL = 152
-	skillBtnGapR = 32
-	skillChkOffL = 42
-	skillNumOffL = 105
-	skillNumW    = 30
+	skillHoldMsMarR = 24
+	skillMsW        = 32
+	skillMsGapL     = 20
+	skillHoldGapL   = 10
+	skillEditW      = 64
+	skillHoldEditW  = 52
+	skillBtnOffL    = 152
+	skillBtnGapR    = 16
+	skillChkOffL    = 42
+	skillNumOffL    = 105
+	skillNumW       = 30
 
 	// Skill header offsets from rx
 	skillUseHdrOffL  = 34
@@ -68,11 +70,15 @@ const (
 	clickerStopBtnW       = 132
 	clickerKeyLabelOffL   = 24
 	clickerKeyBtnOffL     = 72
-	clickerKeyBtnW        = 132
-	clickerIntLabelOffL   = 224
-	clickerIntEditInsetL  = 8
-	clickerIntEditW       = 86
-	clickerMsLabelOffL    = 390
+	clickerKeyBtnW        = 112
+	clickerIntLabelOffL   = 200
+	clickerIntEditOffL    = 254
+	clickerIntEditW       = 58
+	clickerMsLabelOffL    = 332
+	clickerHoldLabelOffL  = 368
+	clickerHoldEditOffL   = 424
+	clickerHoldEditW      = 52
+	clickerHoldMsOffL     = 500
 
 	// Pause
 	pauseLabelOffL = 30
@@ -102,15 +108,17 @@ type uiLayout struct {
 
 	bulkLabelX, bulkEditX, bulkMsX, bulkApplyX int
 
-	skillUseHdrX, skillNumHdrX, skillKeyHdrX, skillIntHdrX int
-	skillChkX, skillNumX                                   int
-	skillBtnX, skillBtnW                                   int
-	skillIntervalX, skillMsX                               int
+	skillUseHdrX, skillNumHdrX, skillKeyHdrX, skillIntHdrX, skillHoldHdrX int
+	skillChkX, skillNumX                                                  int
+	skillBtnX, skillBtnW                                                  int
+	skillIntervalX, skillMsX                                              int
+	skillHoldX, skillHoldMsX                                              int
 
-	clickerStartLabelX, clickerStartBtnX               int
-	clickerStopLabelX, clickerStopBtnX                 int
-	clickerKeyLabelX, clickerKeyBtnX                   int
-	clickerIntLabelX, clickerIntEditX, clickerMsLabelX int
+	clickerStartLabelX, clickerStartBtnX                int
+	clickerStopLabelX, clickerStopBtnX                  int
+	clickerKeyLabelX, clickerKeyBtnX                    int
+	clickerIntLabelX, clickerIntEditX, clickerMsLabelX  int
+	clickerHoldLabelX, clickerHoldEditX, clickerHoldMsX int
 
 	pauseLabelX, pauseBtnX, pauseBtnW int
 
@@ -275,11 +283,14 @@ func computeLayout(cw, ch int, dpi int) uiLayout {
 	skillNumHdrX := rx + scaled(skillNumHdrOffL, sx)
 	skillKeyHdrX := rx + scaled(skillKeyHdrOffL, sx)
 
-	skillMsX := rx + rw - scaled(skillMsMarR, sx) - scaled(skillMsW, sx)
+	skillHoldMsX := rx + rw - scaled(skillHoldMsMarR, sx) - scaled(skillMsW, sx)
+	skillHoldX := skillHoldMsX - scaled(skillMsGapL, sx) - scaled(skillHoldEditW, sx)
+	skillMsX := skillHoldX - scaled(skillHoldGapL, sx) - scaled(skillMsW, sx)
 	skillIntervalX := skillMsX - scaled(skillMsGapL, sx) - scaled(skillEditW, sx)
 	skillBtnX := rx + scaled(skillBtnOffL, sx)
 	skillBtnW := maxInt(1, skillIntervalX-scaled(skillBtnGapR, sx)-skillBtnX)
 	skillIntHdrX := skillIntervalX - scaled(skillIntHdrShift, sx)
+	skillHoldHdrX := skillHoldX - scaled(skillIntHdrShift, sx)
 	skillChkX := rx + scaled(skillChkOffL, sx)
 	skillNumX := rx + scaled(skillNumOffL, sx)
 
@@ -290,8 +301,11 @@ func computeLayout(cw, ch int, dpi int) uiLayout {
 	clickerKeyLabelX := rx + scaled(clickerKeyLabelOffL, sx)
 	clickerKeyBtnX := rx + scaled(clickerKeyBtnOffL, sx)
 	clickerIntLabelX := rx + scaled(clickerIntLabelOffL, sx)
-	clickerIntEditX := clickerStopBtnX + scaled(clickerIntEditInsetL, sx)
+	clickerIntEditX := rx + scaled(clickerIntEditOffL, sx)
 	clickerMsLabelX := rx + scaled(clickerMsLabelOffL, sx)
+	clickerHoldLabelX := rx + scaled(clickerHoldLabelOffL, sx)
+	clickerHoldEditX := rx + scaled(clickerHoldEditOffL, sx)
+	clickerHoldMsX := rx + scaled(clickerHoldMsOffL, sx)
 
 	pauseLabelX := rx + scaled(pauseLabelOffL, sx)
 	pauseBtnX := rx + scaled(pauseBtnOffL, sx)
@@ -310,14 +324,16 @@ func computeLayout(cw, ch int, dpi int) uiLayout {
 		rx:  rx, rw: rw,
 		saveX: saveX, loadX: loadX,
 		bulkLabelX: bulkLabelX, bulkEditX: bulkEditX, bulkMsX: bulkMsX, bulkApplyX: bulkApplyX,
-		skillUseHdrX: skillUseHdrX, skillNumHdrX: skillNumHdrX, skillKeyHdrX: skillKeyHdrX, skillIntHdrX: skillIntHdrX,
+		skillUseHdrX: skillUseHdrX, skillNumHdrX: skillNumHdrX, skillKeyHdrX: skillKeyHdrX, skillIntHdrX: skillIntHdrX, skillHoldHdrX: skillHoldHdrX,
 		skillChkX: skillChkX, skillNumX: skillNumX,
 		skillBtnX: skillBtnX, skillBtnW: skillBtnW,
 		skillIntervalX: skillIntervalX, skillMsX: skillMsX,
+		skillHoldX: skillHoldX, skillHoldMsX: skillHoldMsX,
 		clickerStartLabelX: clickerStartLabelX, clickerStartBtnX: clickerStartBtnX,
 		clickerStopLabelX: clickerStopLabelX, clickerStopBtnX: clickerStopBtnX,
 		clickerKeyLabelX: clickerKeyLabelX, clickerKeyBtnX: clickerKeyBtnX,
 		clickerIntLabelX: clickerIntLabelX, clickerIntEditX: clickerIntEditX, clickerMsLabelX: clickerMsLabelX,
+		clickerHoldLabelX: clickerHoldLabelX, clickerHoldEditX: clickerHoldEditX, clickerHoldMsX: clickerHoldMsX,
 		pauseLabelX: pauseLabelX, pauseBtnX: pauseBtnX, pauseBtnW: pauseBtnW,
 		statusBarW: statusBarW, statusDotX: statusDotX,
 		statusTextX: statusTextX, statusTextW: statusTextW,
