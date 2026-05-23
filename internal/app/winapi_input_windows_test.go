@@ -68,9 +68,11 @@ func TestSendVirtualKeyDoesNotWaitDuringAnotherKeyInputHold(t *testing.T) {
 }
 
 func TestSendVirtualKeyContextCancelsInputHoldAndReleasesKey(t *testing.T) {
+	injectedInputs.reset()
 	oldSendInputCall := sendInputCall
 	defer func() {
 		sendInputCall = oldSendInputCall
+		injectedInputs.reset()
 	}()
 
 	keyDown := make(chan struct{})
@@ -112,5 +114,114 @@ func TestSendVirtualKeyContextCancelsInputHoldAndReleasesKey(t *testing.T) {
 		}
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("timed out waiting for sendVirtualKeyContext to return")
+	}
+}
+
+func TestReleaseInjectedInputsRecoversMouseButtonAfterMissingUp(t *testing.T) {
+	injectedInputs.reset()
+	oldSendInputCall := sendInputCall
+	defer func() {
+		sendInputCall = oldSendInputCall
+		injectedInputs.reset()
+	}()
+
+	upErr := errors.New("up failed")
+	releaseCount := 0
+	sendInputCall = func(_ input, label string, _ uint16) error {
+		switch label {
+		case "mouse up", "mouse up recovery":
+			return upErr
+		case "mouse up release":
+			releaseCount++
+		}
+		return nil
+	}
+
+	if err := sendVirtualKeyContext(context.Background(), vkLButton, 0); !errors.Is(err, upErr) {
+		t.Fatalf("sendVirtualKeyContext() error = %v, want %v", err, upErr)
+	}
+	releaseInjectedInputs()
+	if releaseCount != 1 {
+		t.Fatalf("release count = %d, want 1", releaseCount)
+	}
+	releaseInjectedInputs()
+	if releaseCount != 1 {
+		t.Fatalf("second release count = %d, want still 1", releaseCount)
+	}
+}
+
+func TestReleaseInjectedInputsKeepsFailedReleaseTracked(t *testing.T) {
+	injectedInputs.reset()
+	oldSendInputCall := sendInputCall
+	defer func() {
+		sendInputCall = oldSendInputCall
+		injectedInputs.reset()
+	}()
+
+	releaseErr := errors.New("release failed")
+	releaseCount := 0
+	sendInputCall = func(_ input, label string, _ uint16) error {
+		if label == "mouse up release" {
+			releaseCount++
+			return releaseErr
+		}
+		return nil
+	}
+
+	markInjectedInputDown(vkLButton)
+	releaseInjectedInputs()
+	releaseInjectedInputs()
+	if releaseCount != 2 {
+		t.Fatalf("release count = %d, want retry while release fails", releaseCount)
+	}
+}
+
+func TestSendMouseButtonPreReleasesMouseButtons(t *testing.T) {
+	injectedInputs.reset()
+	oldSendInputCall := sendInputCall
+	defer func() {
+		sendInputCall = oldSendInputCall
+		injectedInputs.reset()
+	}()
+
+	var labels []string
+	sendInputCall = func(_ input, label string, _ uint16) error {
+		labels = append(labels, label)
+		return nil
+	}
+
+	if err := sendVirtualKeyContext(context.Background(), vkLButton, 0); err != nil {
+		t.Fatalf("sendVirtualKeyContext() error = %v", err)
+	}
+	wantPrefix := []string{
+		"mouse down",
+		"mouse up",
+		"mouse up release",
+	}
+	if len(labels) != len(wantPrefix) {
+		t.Fatalf("labels = %v, want %v", labels, wantPrefix)
+	}
+	for i := range wantPrefix {
+		if labels[i] != wantPrefix[i] {
+			t.Fatalf("labels = %v, want %v", labels, wantPrefix)
+		}
+	}
+}
+
+func TestInjectedInputTrackerIgnoresOutOfRangeVK(t *testing.T) {
+	injectedInputs.reset()
+	defer injectedInputs.reset()
+
+	markInjectedInputDown(256)
+	if got := injectedInputs.keys(); len(got) != 0 {
+		t.Fatalf("tracked keys = %v, want none", got)
+	}
+
+	for _, vk := range []uint16{vkLButton, 'A'} {
+		markInjectedInputDown(vk)
+	}
+	got := injectedInputs.keys()
+	if len(got) != 2 || got[0] != vkLButton || got[1] != 'A' {
+		t.Fatalf("tracked keys = %v, want [%d %d]", got, vkLButton, 'A')
 	}
 }

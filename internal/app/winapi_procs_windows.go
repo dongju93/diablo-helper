@@ -49,6 +49,7 @@ var (
 	procGetDlgItem               *syscall.LazyProc
 	procGetDpiForSystem          *syscall.LazyProc
 	procGetDpiForWindow          *syscall.LazyProc
+	procGetForegroundWindow      *syscall.LazyProc
 	procGetMessageW              *syscall.LazyProc
 	procGetMonitorInfoW          *syscall.LazyProc
 	procGetSystemMetrics         *syscall.LazyProc
@@ -137,6 +138,7 @@ func loadWinAPIProcs() {
 	procGetDlgItem = user32.NewProc("GetDlgItem")
 	procGetDpiForSystem = user32.NewProc("GetDpiForSystem")
 	procGetDpiForWindow = user32.NewProc("GetDpiForWindow")
+	procGetForegroundWindow = user32.NewProc("GetForegroundWindow")
 	procGetMessageW = user32.NewProc("GetMessageW")
 	procGetMonitorInfoW = user32.NewProc("GetMonitorInfoW")
 	procGetSystemMetrics = user32.NewProc("GetSystemMetrics")

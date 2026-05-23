@@ -5,11 +5,55 @@ package app
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 	"unsafe"
 )
 
 var sendInputCall = callSendInput
+
+var injectedInputs injectedInputTracker
+
+type injectedInputTracker struct {
+	mu   sync.Mutex
+	down pressedKeys
+}
+
+func (t *injectedInputTracker) set(vk uint16) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.down.set(vk)
+}
+
+func (t *injectedInputTracker) clear(vk uint16) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.down.clear(vk)
+}
+
+func (t *injectedInputTracker) keys() []uint16 {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	keys := make([]uint16, 0, 4)
+	for vk := uint16(0); vk < 256; vk++ {
+		if t.down.has(vk) {
+			keys = append(keys, vk)
+		}
+	}
+	return keys
+}
+
+func (t *injectedInputTracker) has(vk uint16) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.down.has(vk)
+}
+
+func (t *injectedInputTracker) reset() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.down = pressedKeys{}
+}
 
 func sendVirtualKey(vk uint16, hold time.Duration) error {
 	return sendVirtualKeyContext(context.Background(), vk, hold)
@@ -31,18 +75,18 @@ func sendVirtualKeyContext(ctx context.Context, vk uint16, hold time.Duration) e
 	if err := sendSingleInput(down, "keyboard down", vk); err != nil {
 		return err
 	}
+	markInjectedInputDown(vk)
 	holdErr := waitInputHold(ctx, hold)
 	up := newKeyboardInput(vk, keyEventKeyUp)
 	if err := sendSingleInput(up, "keyboard up", vk); err != nil {
 		// down injected but up was not; best-effort recovery avoids a stuck key.
-		_ = sendSingleInput(up, "keyboard up recovery", vk)
+		if recoverErr := sendSingleInput(up, "keyboard up recovery", vk); recoverErr == nil {
+			markInjectedInputUp(vk)
+		}
 		return err
 	}
+	markInjectedInputUp(vk)
 	return holdErr
-}
-
-func sendMouseButton(vk uint16, hold time.Duration) (bool, error) {
-	return sendMouseButtonContext(context.Background(), vk, hold)
 }
 
 func sendMouseButtonContext(ctx context.Context, vk uint16, hold time.Duration) (bool, error) {
@@ -58,17 +102,25 @@ func sendMouseButtonContext(ctx context.Context, vk uint16, hold time.Duration) 
 		return true, err
 	}
 
+	if injectedInputs.has(vk) {
+		_ = releaseVirtualKey(vk)
+	}
 	down := newMouseInput(downFlags, data)
 	if err := sendSingleInput(down, "mouse down", vk); err != nil {
 		return true, err
 	}
+	markInjectedInputDown(vk)
 	holdErr := waitInputHold(ctx, hold)
 	up := newMouseInput(upFlags, data)
 	if err := sendSingleInput(up, "mouse up", vk); err != nil {
 		// mouseDown injected but mouseUp was not; best-effort recovery.
-		_ = sendSingleInput(up, "mouse up recovery", vk)
+		if recoverErr := sendSingleInput(up, "mouse up recovery", vk); recoverErr == nil {
+			markInjectedInputUp(vk)
+		}
 		return true, err
 	}
+	markInjectedInputUp(vk)
+	_ = releaseVirtualKey(vk)
 	return true, holdErr
 }
 
@@ -81,7 +133,11 @@ func releaseVirtualKey(vk uint16) error {
 	if isMouse {
 		return err
 	}
-	return sendSingleInput(newKeyboardInput(vk, keyEventKeyUp), "keyboard up release", vk)
+	if err := sendSingleInput(newKeyboardInput(vk, keyEventKeyUp), "keyboard up release", vk); err != nil {
+		return err
+	}
+	markInjectedInputUp(vk)
+	return nil
 }
 
 func releaseMouseButton(vk uint16) (bool, error) {
@@ -89,7 +145,31 @@ func releaseMouseButton(vk uint16) (bool, error) {
 	if !ok {
 		return false, nil
 	}
-	return true, sendSingleInput(newMouseInput(upFlags, data), "mouse up release", vk)
+	if err := sendSingleInput(newMouseInput(upFlags, data), "mouse up release", vk); err != nil {
+		return true, err
+	}
+	markInjectedInputUp(vk)
+	return true, nil
+}
+
+func markInjectedInputDown(vk uint16) {
+	injectedInputs.set(vk)
+}
+
+func markInjectedInputUp(vk uint16) {
+	injectedInputs.clear(vk)
+}
+
+func releaseInjectedInputs() {
+	for _, vk := range injectedInputs.keys() {
+		_ = releaseVirtualKey(vk)
+	}
+}
+
+func releaseMouseButtons() {
+	for _, vk := range []uint16{vkLButton, vkRButton, vkMButton, vkXButton1, vkXButton2} {
+		_ = releaseVirtualKey(vk)
+	}
 }
 
 func mouseButtonInput(vk uint16) (downFlags, upFlags, data uint32, ok bool) {

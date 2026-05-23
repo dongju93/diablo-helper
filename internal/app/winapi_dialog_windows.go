@@ -82,7 +82,7 @@ func chooseConfigPath(hwnd uintptr, title string, initialPath string, save bool)
 }
 
 func configOpenFileDialogFilter() []uint16 {
-	return utf16Slice("TOML 설정 파일 (*.toml)\x00*.toml\x00모든 파일 (*.*)\x00*.*\x00")
+	return utf16Slice("TOML 설정 파일 (*.toml)\x00*.toml\x00")
 }
 
 func configSaveFileDialogFilter() []uint16 {

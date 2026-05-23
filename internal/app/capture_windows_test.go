@@ -3,9 +3,12 @@
 package app
 
 import (
+	"context"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/dongju93/diablo-helper/internal/config"
 )
@@ -314,7 +317,7 @@ func TestHandleKeyEventRejectsForbiddenOutputKeysDuringCapture(t *testing.T) {
 	}
 }
 
-func TestHandleKeyEventRejectsMouseLeftForStartAndStopCapture(t *testing.T) {
+func TestHandleKeyEventRejectsMouseLeftForStartAndStopCaptureWithoutConsumingClick(t *testing.T) {
 	tests := []struct {
 		name string
 		kind captureKind
@@ -330,14 +333,20 @@ func TestHandleKeyEventRejectsMouseLeftForStartAndStopCapture(t *testing.T) {
 			a := newApplication()
 			a.startCapture(captureTarget{kind: tt.kind})
 
-			if !a.handleKeyEvent(vkLButton, true) {
-				t.Fatal("Mouse Left during start/stop capture was not consumed")
+			if a.handleKeyEvent(vkLButton, true) {
+				t.Fatal("Mouse Left during start/stop capture was consumed")
 			}
 			if a.cfg.Start.Assigned() || a.cfg.Stop.Assigned() || a.cfg.Clicker.Start.Assigned() || a.cfg.Clicker.Stop.Assigned() {
 				t.Fatalf("start/stop = %+v/%+v clicker %+v/%+v, want unassigned", a.cfg.Start, a.cfg.Stop, a.cfg.Clicker.Start, a.cfg.Clicker.Stop)
 			}
 			if !a.capture.valid() {
 				t.Fatal("capture should remain active after rejected Mouse Left")
+			}
+			if a.handleKeyEvent(vkLButton, false) {
+				t.Fatal("Mouse Left up during start/stop capture was consumed")
+			}
+			if a.pressed.has(vkLButton) {
+				t.Fatal("Mouse Left remained pressed after key up")
 			}
 		})
 	}
@@ -790,6 +799,89 @@ func TestHandleKeyEventStopsClickerForClickerStopAndMenuKeys(t *testing.T) {
 				t.Fatal("clicker running = true, want stopped")
 			}
 		})
+	}
+}
+
+func TestHandleRuntimeControlKeyStopsSharedStopRunnersConcurrently(t *testing.T) {
+	runnerEntered := make(chan struct{}, 1)
+	clickerSent := make(chan struct{}, 1)
+	releaseRunner := make(chan struct{})
+	var releaseOnce sync.Once
+	release := func() {
+		releaseOnce.Do(func() {
+			close(releaseRunner)
+		})
+	}
+	defer release()
+
+	input := newSerializedContextInputSender(func(_ context.Context, vk uint16, _ time.Duration) error {
+		switch vk {
+		case '1':
+			select {
+			case runnerEntered <- struct{}{}:
+			default:
+			}
+			<-releaseRunner
+		case '2':
+			select {
+			case clickerSent <- struct{}{}:
+			default:
+			}
+		}
+		return nil
+	}, nil)
+
+	a := newApplication()
+	a.runner = newSkillRunnerWithContextTimedSend(input.SendContext, input.Release)
+	a.clicker = newClickerRunnerWithContextTimedSend(input.SendContext, input.Release)
+	a.cfg = config.Default()
+	enableRunnableTestSkill(&a.cfg)
+	a.cfg.Stop = config.KeyBinding{Name: "F1", VK: vkF1}
+	a.cfg.Clicker.Stop = config.KeyBinding{Name: "F1", VK: vkF1}
+	a.cfg.Clicker.Key = config.KeyBinding{Name: "2", VK: int('2')}
+	a.cfg.Clicker.IntervalMS = config.MinimumIntervalMS
+	a.cfg.Clicker.InputHoldMS = config.DefaultInputHoldMS
+
+	if !a.runner.Start(a.cfg) {
+		t.Fatal("runner did not start")
+	}
+	select {
+	case <-runnerEntered:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timed out waiting for runner send")
+	}
+	if !a.clicker.Start(a.cfg.Clicker) {
+		t.Fatal("clicker did not start")
+	}
+	if !a.clicker.Running() {
+		t.Fatal("clicker running = false before shared stop, want true")
+	}
+
+	done := make(chan bool, 1)
+	go func() {
+		done <- a.handleRuntimeControlKey(vkF1)
+	}()
+
+	waitForRunnerCondition(t, func() bool {
+		return !a.runner.Running()
+	})
+	waitForRunnerCondition(t, func() bool {
+		return !a.clicker.Running()
+	})
+	select {
+	case <-clickerSent:
+		t.Fatal("clicker sent queued input after concurrent shared stop")
+	default:
+	}
+
+	release()
+	select {
+	case handled := <-done:
+		if !handled {
+			t.Fatal("handleRuntimeControlKey() = false, want true")
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timed out waiting for shared stop to finish")
 	}
 }
 

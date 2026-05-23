@@ -635,8 +635,10 @@ func (a *application) loadConfig() {
 		messageBox(a.hwnd, "설정 파일 경고", "올바른 diablo-helper 설정 파일이 아닙니다.\n\n"+err.Error(), mbOK|mbIconWarning)
 		return
 	}
-	a.runner.Stop()
-	a.clicker.Stop()
+	stopRuntimeRunners(a.runner, a.clicker)
+	releaseInjectedInputs()
+	releaseMouseButtons()
+	a.runtimeInputTarget.Store(0)
 	a.cfg = loaded
 	a.configPath = path
 	previous := a.capture
@@ -659,10 +661,14 @@ func (a *application) startRunnerFromHotkey() {
 		a.setStatus("실행할 기술이 없습니다. 기술 사용을 켜고 키를 지정하세요.")
 		return
 	}
+	if !a.clicker.Running() {
+		a.captureRuntimeInputTarget()
+	}
 	if a.runner.Start(a.cfg) {
 		a.updateRuntimeStatus()
 		return
 	}
+	a.clearRuntimeInputTargetIfIdle()
 	a.updateRuntimeStatus()
 }
 
@@ -679,15 +685,22 @@ func (a *application) startClickerFromHotkey() {
 		a.setStatus("클릭 반복에 사용할 입력 키, 간격, 눌림 시간을 지정하세요.")
 		return
 	}
+	if !a.runner.Running() {
+		a.captureRuntimeInputTarget()
+	}
 	if a.clicker.Start(a.cfg.Clicker) {
 		a.updateRuntimeStatus()
 		return
 	}
+	a.clearRuntimeInputTargetIfIdle()
 	a.updateRuntimeStatus()
 }
 
 func (a *application) stopAllRunners(status string) {
 	stopped := stopRuntimeRunners(a.runner, a.clicker)
+	releaseInjectedInputs()
+	releaseMouseButtons()
+	a.clearRuntimeInputTargetIfIdle()
 	if stopped {
 		a.setStatus(status)
 		return

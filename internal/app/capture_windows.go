@@ -110,7 +110,7 @@ func (a *application) handleKeyEvent(vk uint16, down bool) bool {
 		}
 		if vk == vkLButton && captureRejectsMouseLeft(a.capture.kind) {
 			a.rejectCapturedKey(a.capture, "Mouse Left")
-			return true
+			return false
 		}
 		a.assignCapturedKey(vk)
 		return true
@@ -147,14 +147,21 @@ func (a *application) shouldTrackPressedKey(vk uint16) bool {
 }
 
 func (a *application) handleRuntimeControlKey(vk uint16) bool {
+	stopRunner := a.runner.Running() && sameKey(vk, a.cfg.Stop)
+	stopClicker := a.clicker.Running() && sameKey(vk, a.cfg.Clicker.Stop)
 	stopped := false
-	if a.runner.Running() && sameKey(vk, a.cfg.Stop) {
+	switch {
+	case stopRunner && stopClicker:
+		stopped = stopRuntimeRunners(a.runner, a.clicker)
+	case stopRunner:
 		stopped = a.runner.Stop()
-	}
-	if a.clicker.Running() && sameKey(vk, a.cfg.Clicker.Stop) {
-		stopped = a.clicker.Stop() || stopped
+	case stopClicker:
+		stopped = a.clicker.Stop()
 	}
 	if stopped {
+		releaseInjectedInputs()
+		releaseMouseButtons()
+		a.clearRuntimeInputTargetIfIdle()
 		a.setStatus("종료 키 입력으로 정지했습니다.")
 		return true
 	}

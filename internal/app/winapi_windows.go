@@ -115,6 +115,11 @@ func getWindowText(hwnd uintptr) (string, error) {
 	return syscall.UTF16ToString(buffer), nil
 }
 
+func getForegroundWindow() uintptr {
+	hwnd, _, _ := procGetForegroundWindow.Call()
+	return hwnd
+}
+
 func messageBox(hwnd uintptr, title string, text string, flags uintptr) error {
 	_, err := messageBoxResult(hwnd, title, text, flags)
 	return err
