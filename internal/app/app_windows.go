@@ -117,16 +117,16 @@ func fallbackMessageBox(title string, text string, flags uintptr) error {
 
 func newApplication() *application {
 	_ = ensureWinAPI()
-	input := newSerializedInputSender(sendVirtualKey, releaseVirtualKey)
+	input := newSerializedContextInputSender(sendVirtualKeyContext, releaseVirtualKey)
 	a := &application{
 		cfg:        config.Default(),
-		runner:     newSkillRunnerWithTimedSend(input.Send, input.Release),
+		runner:     newSkillRunnerWithContextTimedSend(input.SendContext, input.Release),
 		statusText: "■ 정지.",
 		controls: controlRefs{
 			menuLabels:  make(map[string]uintptr),
 			menuButtons: make(map[string]uintptr),
 		},
-		clicker: newClickerRunnerWithTimedSend(input.Send, input.Release),
+		clicker: newClickerRunnerWithContextTimedSend(input.SendContext, input.Release),
 		winapi:  defaultApplicationWinAPI(),
 	}
 	a.runner.SetErrorHandler(func(err error) {
@@ -262,11 +262,8 @@ func (a *application) cleanup() {
 	}
 	a.cleanedUp = true
 
-	if a.runner != nil {
-		a.runner.Stop()
-	}
-	if a.clicker != nil {
-		a.clicker.Stop()
+	if appInstance == a {
+		appInstance = nil
 	}
 	if a.hook != 0 {
 		a.winapi.unhookWindowsHook(a.hook)
@@ -276,10 +273,8 @@ func (a *application) cleanup() {
 		a.winapi.unhookWindowsHook(a.mouseHook)
 		a.mouseHook = 0
 	}
+	stopRuntimeRunners(a.runner, a.clicker)
 	a.disposeUIResources()
-	if appInstance == a {
-		appInstance = nil
-	}
 }
 
 func (a *application) handleDPIChanged(hwnd uintptr, wParam uintptr, lParam unsafe.Pointer) {

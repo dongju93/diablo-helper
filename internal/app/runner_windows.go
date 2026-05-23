@@ -18,7 +18,7 @@ type skillRunner struct {
 	stopping bool
 	running  atomic.Bool
 	paused   atomic.Bool
-	sendKey  timedKeySender
+	sendKey  contextTimedKeySender
 	release  func(vk uint16) error
 	onError  func(error)
 	active   []uint16
@@ -33,6 +33,12 @@ func newSkillRunnerWithRelease(sendKey func(vk uint16, hold time.Duration) error
 }
 
 func newSkillRunnerWithTimedSend(sendKey timedKeySender, release func(vk uint16) error) *skillRunner {
+	return newSkillRunnerWithContextTimedSend(func(_ context.Context, vk uint16, hold time.Duration) (time.Time, error) {
+		return sendKey(vk, hold)
+	}, release)
+}
+
+func newSkillRunnerWithContextTimedSend(sendKey contextTimedKeySender, release func(vk uint16) error) *skillRunner {
 	return &skillRunner{sendKey: sendKey, release: release}
 }
 
@@ -155,9 +161,15 @@ func (r *skillRunner) run(ctx context.Context, skills []config.Skill, skillGap t
 		if ctx.Err() != nil {
 			return
 		}
-		startedAt, err := r.sendKey(uint16(scheduled[index].skill.Key.VK), scheduled[index].hold)
+		startedAt, err := r.sendKey(ctx, uint16(scheduled[index].skill.Key.VK), scheduled[index].hold)
 		if err != nil {
+			if ctx.Err() != nil {
+				return
+			}
 			r.fail(err)
+			return
+		}
+		if ctx.Err() != nil {
 			return
 		}
 		lastStarted = startedAt
@@ -224,7 +236,7 @@ type clickerRunner struct {
 	stopping bool
 	running  atomic.Bool
 	paused   atomic.Bool
-	sendKey  timedKeySender
+	sendKey  contextTimedKeySender
 	release  func(vk uint16) error
 	onError  func(error)
 	active   uint16
@@ -239,6 +251,12 @@ func newClickerRunnerWithRelease(sendKey func(vk uint16, hold time.Duration) err
 }
 
 func newClickerRunnerWithTimedSend(sendKey timedKeySender, release func(vk uint16) error) *clickerRunner {
+	return newClickerRunnerWithContextTimedSend(func(_ context.Context, vk uint16, hold time.Duration) (time.Time, error) {
+		return sendKey(vk, hold)
+	}, release)
+}
+
+func newClickerRunnerWithContextTimedSend(sendKey contextTimedKeySender, release func(vk uint16) error) *clickerRunner {
 	return &clickerRunner{sendKey: sendKey, release: release}
 }
 
@@ -351,9 +369,15 @@ func (r *clickerRunner) run(ctx context.Context, clicker config.Clicker) {
 		if ctx.Err() != nil {
 			return
 		}
-		startedAt, err := r.sendKey(uint16(clicker.Key.VK), hold)
+		startedAt, err := r.sendKey(ctx, uint16(clicker.Key.VK), hold)
 		if err != nil {
+			if ctx.Err() != nil {
+				return
+			}
 			r.fail(err)
+			return
+		}
+		if ctx.Err() != nil {
 			return
 		}
 		next = nextScheduledInput(startedAt, interval)
@@ -428,7 +452,36 @@ func releaseOutputKeys(release func(vk uint16) error, keys []uint16) {
 	}
 }
 
+func stopRuntimeRunners(runner *skillRunner, clicker *clickerRunner) bool {
+	stopped := make(chan bool, 2)
+	var wg sync.WaitGroup
+	if runner != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			stopped <- runner.Stop()
+		}()
+	}
+	if clicker != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			stopped <- clicker.Stop()
+		}()
+	}
+	wg.Wait()
+	close(stopped)
+
+	stoppedAny := false
+	for result := range stopped {
+		stoppedAny = result || stoppedAny
+	}
+	return stoppedAny
+}
+
 type timedKeySender func(vk uint16, hold time.Duration) (time.Time, error)
+
+type contextTimedKeySender func(ctx context.Context, vk uint16, hold time.Duration) (time.Time, error)
 
 func wrapTimedKeySender(sendKey func(vk uint16, hold time.Duration) error) timedKeySender {
 	return func(vk uint16, hold time.Duration) (time.Time, error) {

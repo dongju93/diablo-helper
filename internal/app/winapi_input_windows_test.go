@@ -3,6 +3,8 @@
 package app
 
 import (
+	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -62,5 +64,53 @@ func TestSendVirtualKeyDoesNotWaitDuringAnotherKeyInputHold(t *testing.T) {
 	case <-secondDown:
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("second key down waited for first key hold to finish")
+	}
+}
+
+func TestSendVirtualKeyContextCancelsInputHoldAndReleasesKey(t *testing.T) {
+	oldSendInputCall := sendInputCall
+	defer func() {
+		sendInputCall = oldSendInputCall
+	}()
+
+	keyDown := make(chan struct{})
+	keyUp := make(chan struct{})
+	var downOnce sync.Once
+	var upOnce sync.Once
+	sendInputCall = func(_ input, label string, _ uint16) error {
+		switch label {
+		case "keyboard down":
+			downOnce.Do(func() { close(keyDown) })
+		case "keyboard up":
+			upOnce.Do(func() { close(keyUp) })
+		}
+		return nil
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		done <- sendVirtualKeyContext(ctx, 'A', 200*time.Millisecond)
+	}()
+
+	select {
+	case <-keyDown:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("timed out waiting for key down")
+	}
+
+	cancel()
+	select {
+	case <-keyUp:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("timed out waiting for key up after cancellation")
+	}
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("sendVirtualKeyContext() error = %v, want context.Canceled", err)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("timed out waiting for sendVirtualKeyContext to return")
 	}
 }

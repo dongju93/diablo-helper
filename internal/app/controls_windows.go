@@ -687,8 +687,7 @@ func (a *application) startClickerFromHotkey() {
 }
 
 func (a *application) stopAllRunners(status string) {
-	stopped := a.runner.Stop()
-	stopped = a.clicker.Stop() || stopped
+	stopped := stopRuntimeRunners(a.runner, a.clicker)
 	if stopped {
 		a.setStatus(status)
 		return
