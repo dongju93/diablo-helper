@@ -170,11 +170,7 @@ func (a *application) showPendingRunnerError() {
 
 func (a *application) run() error {
 	a.configPath = defaultConfigPath()
-	if loaded, err := config.LoadFile(a.configPath); err == nil {
-		a.cfg = loaded
-	} else if !errors.Is(err, os.ErrNotExist) {
-		messageBox(0, "diablo-helper", "Failed to load "+defaultConfigFileName+". Defaults will be used.\n\n"+err.Error(), mbOK|mbIconError)
-	}
+	a.tryLoadStartupConfig()
 	a.cfg.NormalizeForUI()
 
 	instance, err := a.winapi.getModuleHandle()
@@ -328,6 +324,26 @@ func defaultConfigPath() string {
 		return defaultConfigFileName
 	}
 	return filepath.Join(filepath.Dir(executable), defaultConfigFileName)
+}
+
+// tryLoadStartupConfig loads the last-used config if one was recorded, falling back to
+// default.toml. It updates a.cfg and a.configPath on success.
+func (a *application) tryLoadStartupConfig() {
+	if lastPath := loadLastConfigPath(); lastPath != "" {
+		if cfg, err := config.LoadFile(lastPath); err == nil {
+			a.cfg = cfg
+			a.configPath = lastPath
+			return
+		} else if !errors.Is(err, os.ErrNotExist) {
+			messageBox(0, "diablo-helper", "마지막으로 사용한 설정 파일을 불러올 수 없습니다:\n\n"+err.Error()+"\n\n기본 설정 파일을 사용합니다.", mbOK|mbIconWarning)
+		}
+		// Last-used file is gone or invalid — fall through to default.toml
+	}
+	if cfg, err := config.LoadFile(a.configPath); err == nil {
+		a.cfg = cfg
+	} else if !errors.Is(err, os.ErrNotExist) {
+		messageBox(0, "diablo-helper", "Failed to load "+defaultConfigFileName+". Defaults will be used.\n\n"+err.Error(), mbOK|mbIconError)
+	}
 }
 
 type applicationWinAPI struct {

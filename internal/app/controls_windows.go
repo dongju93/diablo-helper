@@ -604,6 +604,7 @@ func (a *application) saveConfig() {
 		return
 	}
 	a.configPath = path
+	saveLastConfigPath(path)
 	a.setStatus("저장 완료: " + a.configPath)
 }
 
@@ -641,6 +642,7 @@ func (a *application) loadConfig() {
 	a.runtimeInputTarget.Store(0)
 	a.cfg = loaded
 	a.configPath = path
+	saveLastConfigPath(path)
 	previous := a.capture
 	a.capture = captureTarget{}
 	a.updateControlsFromConfig()
