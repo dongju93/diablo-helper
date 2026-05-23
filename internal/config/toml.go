@@ -12,10 +12,21 @@ import (
 	"strings"
 )
 
+// missingInputHoldMS is the sentinel value used during TOML parsing to mean
+// "the key was not present in the file". It is distinct from any explicit
+// user-supplied value, including 0 or other negatives, so that malformed
+// negative values are rejected by Validate instead of being silently replaced.
+const missingInputHoldMS = -1
+
+// SaveOptions controls validation rules used when writing config files.
 type SaveOptions struct {
+	// AllowNonTOMLExtension allows SaveFileWithOptions to write paths without
+	// a .toml extension for caller-controlled export flows.
 	AllowNonTOMLExtension bool
 }
 
+// LoadFile reads a TOML config from path after rejecting reparse points and
+// enforcing MaxConfigFileBytes.
 func LoadFile(path string) (Config, error) {
 	if err := rejectReparsePath(path); err != nil {
 		return Config{}, err
@@ -37,10 +48,12 @@ func LoadFile(path string) (Config, error) {
 	return ParseTOML(data)
 }
 
+// SaveFile writes cfg atomically to a .toml path after normalizing and validating it.
 func SaveFile(path string, cfg Config) error {
 	return SaveFileWithOptions(path, cfg, SaveOptions{})
 }
 
+// SaveFileWithOptions writes cfg atomically using opts to control path validation.
 func SaveFileWithOptions(path string, cfg Config, opts SaveOptions) error {
 	data, err := MarshalTOML(cfg)
 	if err != nil {
@@ -52,6 +65,7 @@ func SaveFileWithOptions(path string, cfg Config, opts SaveOptions) error {
 	return writeFileAtomic(path, data, 0o600)
 }
 
+// HasTOMLExtension reports whether path ends with .toml using a case-insensitive comparison.
 func HasTOMLExtension(path string) bool {
 	return strings.EqualFold(filepath.Ext(path), ".toml")
 }
@@ -104,17 +118,20 @@ func writeFileAtomic(path string, data []byte, perm os.FileMode) (err error) {
 	if err = os.Rename(tmpName, path); err != nil {
 		return err
 	}
-	return syncDir(dir)
+	syncDirBestEffort(dir)
+	return nil
 }
 
-func syncDir(dir string) error {
+// syncDirBestEffort asks the filesystem to persist parent-directory metadata
+// after rename. Directory sync is not portable, notably on Windows, and the file
+// contents have already been synced above, so failures remain non-fatal.
+func syncDirBestEffort(dir string) {
 	d, err := os.Open(dir)
 	if err != nil {
-		return nil
+		return
 	}
 	defer d.Close()
 	_ = d.Sync()
-	return nil
 }
 
 func rejectReparsePath(path string) error {
@@ -176,6 +193,8 @@ func fileInfoIsReparsePoint(info os.FileInfo) bool {
 	return attributes.Uint()&0x400 != 0
 }
 
+// MarshalTOML normalizes cfg for UI/save shape, validates it, and writes
+// canonical key_name values derived from key_vk.
 func MarshalTOML(cfg Config) ([]byte, error) {
 	cfg.NormalizeForUI()
 	if err := cfg.Validate(); err != nil {
@@ -187,36 +206,37 @@ func MarshalTOML(cfg Config) ([]byte, error) {
 	writeKey(&buf, "stop", cfg.Stop)
 	writeKey(&buf, "pause", cfg.Pause)
 	writeInt(&buf, "skill_gap_ms", cfg.SkillGapMS)
+	writeInt(&buf, "input_hold_ms", cfg.InputHoldMS)
 	buf.WriteByte('\n')
 	writeKey(&buf, "clicker_start", cfg.Clicker.Start)
 	writeKey(&buf, "clicker_stop", cfg.Clicker.Stop)
 	writeKey(&buf, "clicker", cfg.Clicker.Key)
 	writeInt(&buf, "clicker_interval_ms", cfg.Clicker.IntervalMS)
+	writeInt(&buf, "clicker_hold_ms", cfg.Clicker.InputHoldMS)
 	buf.WriteByte('\n')
-	writeKey(&buf, "menu_character", cfg.Menu.Character)
-	writeKey(&buf, "menu_skill_assign", cfg.Menu.SkillAssign)
-	writeKey(&buf, "menu_talents", cfg.Menu.Talents)
-	writeKey(&buf, "menu_map", cfg.Menu.Map)
-	writeKey(&buf, "menu_journal", cfg.Menu.Journal)
-	writeKey(&buf, "menu_social", cfg.Menu.Social)
-	writeKey(&buf, "menu_clan", cfg.Menu.Clan)
-	writeKey(&buf, "menu_town_portal", cfg.Menu.TownPortal)
-	writeKey(&buf, "menu_collection", cfg.Menu.Collection)
-	writeKey(&buf, "menu_shop", cfg.Menu.Shop)
+	for i := range menuBindingSpecs {
+		spec := menuBindingSpecs[i]
+		writeKey(&buf, "menu_"+spec.definition.ID, *spec.binding(&cfg.Menu))
+	}
 	for _, skill := range cfg.Skills {
 		buf.WriteString("\n[[skills]]\n")
 		writeString(&buf, "name", skill.Name)
 		writeString(&buf, "key_name", skill.Key.Name)
 		writeInt(&buf, "key_vk", skill.Key.VK)
 		writeInt(&buf, "interval_ms", skill.IntervalMS)
+		writeInt(&buf, "hold_ms", skill.InputHoldMS)
 		writeBool(&buf, "enabled", skill.Enabled)
 	}
 	return buf.Bytes(), nil
 }
 
+// ParseTOML parses strict config TOML, validates raw key_name/key_vk pairs
+// before NormalizeForUI rewrites names to KeyDisplayName form, and validates
+// again before returning.
 func ParseTOML(data []byte) (Config, error) {
 	cfg := Default()
 	cfg.Skills = nil
+	cfg.Clicker.InputHoldMS = missingInputHoldMS
 
 	var currentSkill *Skill
 	scanner := bufio.NewScanner(bytes.NewReader(data))
@@ -230,9 +250,10 @@ func ParseTOML(data []byte) (Config, error) {
 				return Config{}, fmt.Errorf("line %d: too many [[skills]] sections (max %d)", lineNumber, MaxSkills)
 			}
 			cfg.Skills = append(cfg.Skills, Skill{
-				Name:       fmt.Sprintf("Skill %d", len(cfg.Skills)+1),
-				IntervalMS: DefaultIntervalMS,
-				Enabled:    DefaultSkillEnabled,
+				Name:        fmt.Sprintf("Skill %d", len(cfg.Skills)+1),
+				IntervalMS:  DefaultIntervalMS,
+				InputHoldMS: missingInputHoldMS,
+				Enabled:     DefaultSkillEnabled,
 			})
 			currentSkill = &cfg.Skills[len(cfg.Skills)-1]
 			continue
@@ -265,6 +286,7 @@ func ParseTOML(data []byte) (Config, error) {
 		return Config{}, err
 	}
 
+	fillMissingInputHolds(&cfg)
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err
 	}
@@ -291,6 +313,8 @@ func setTopLevelValue(cfg *Config, key string, value string) error {
 		return setInt(&cfg.Pause.VK, value)
 	case "skill_gap_ms":
 		return setInt(&cfg.SkillGapMS, value)
+	case "input_hold_ms":
+		return setInt(&cfg.InputHoldMS, value)
 	case "clicker_start_key_name":
 		return setKeyName(&cfg.Clicker.Start.Name, key, value)
 	case "clicker_start_key_vk":
@@ -305,49 +329,29 @@ func setTopLevelValue(cfg *Config, key string, value string) error {
 		return setInt(&cfg.Clicker.Key.VK, value)
 	case "clicker_interval_ms":
 		return setInt(&cfg.Clicker.IntervalMS, value)
-	case "menu_character_key_name":
-		return setKeyName(&cfg.Menu.Character.Name, key, value)
-	case "menu_character_key_vk":
-		return setInt(&cfg.Menu.Character.VK, value)
-	case "menu_skill_assign_key_name":
-		return setKeyName(&cfg.Menu.SkillAssign.Name, key, value)
-	case "menu_skill_assign_key_vk":
-		return setInt(&cfg.Menu.SkillAssign.VK, value)
-	case "menu_talents_key_name":
-		return setKeyName(&cfg.Menu.Talents.Name, key, value)
-	case "menu_talents_key_vk":
-		return setInt(&cfg.Menu.Talents.VK, value)
-	case "menu_map_key_name":
-		return setKeyName(&cfg.Menu.Map.Name, key, value)
-	case "menu_map_key_vk":
-		return setInt(&cfg.Menu.Map.VK, value)
-	case "menu_journal_key_name":
-		return setKeyName(&cfg.Menu.Journal.Name, key, value)
-	case "menu_journal_key_vk":
-		return setInt(&cfg.Menu.Journal.VK, value)
-	case "menu_social_key_name":
-		return setKeyName(&cfg.Menu.Social.Name, key, value)
-	case "menu_social_key_vk":
-		return setInt(&cfg.Menu.Social.VK, value)
-	case "menu_clan_key_name":
-		return setKeyName(&cfg.Menu.Clan.Name, key, value)
-	case "menu_clan_key_vk":
-		return setInt(&cfg.Menu.Clan.VK, value)
-	case "menu_town_portal_key_name":
-		return setKeyName(&cfg.Menu.TownPortal.Name, key, value)
-	case "menu_town_portal_key_vk":
-		return setInt(&cfg.Menu.TownPortal.VK, value)
-	case "menu_collection_key_name":
-		return setKeyName(&cfg.Menu.Collection.Name, key, value)
-	case "menu_collection_key_vk":
-		return setInt(&cfg.Menu.Collection.VK, value)
-	case "menu_shop_key_name":
-		return setKeyName(&cfg.Menu.Shop.Name, key, value)
-	case "menu_shop_key_vk":
-		return setInt(&cfg.Menu.Shop.VK, value)
+	case "clicker_hold_ms":
+		return setInt(&cfg.Clicker.InputHoldMS, value)
 	default:
+		if handled, err := setMenuTopLevelValue(&cfg.Menu, key, value); handled {
+			return err
+		}
 		return fmt.Errorf("unknown key %q", key)
 	}
+}
+
+func setMenuTopLevelValue(menu *MenuKeys, key string, value string) (bool, error) {
+	for i := range menuBindingSpecs {
+		spec := menuBindingSpecs[i]
+		prefix := "menu_" + spec.definition.ID
+		binding := spec.binding(menu)
+		switch key {
+		case prefix + "_key_name":
+			return true, setKeyName(&binding.Name, key, value)
+		case prefix + "_key_vk":
+			return true, setInt(&binding.VK, value)
+		}
+	}
+	return false, nil
 }
 
 func setSkillValue(skill *Skill, key string, value string) error {
@@ -360,10 +364,23 @@ func setSkillValue(skill *Skill, key string, value string) error {
 		return setInt(&skill.Key.VK, value)
 	case "interval_ms":
 		return setInt(&skill.IntervalMS, value)
+	case "hold_ms":
+		return setInt(&skill.InputHoldMS, value)
 	case "enabled":
 		return setBool(&skill.Enabled, value)
 	default:
 		return fmt.Errorf("unknown skill key %q", key)
+	}
+}
+
+func fillMissingInputHolds(cfg *Config) {
+	if cfg.Clicker.InputHoldMS == missingInputHoldMS {
+		cfg.Clicker.InputHoldMS = cfg.InputHoldMS
+	}
+	for i := range cfg.Skills {
+		if cfg.Skills[i].InputHoldMS == missingInputHoldMS {
+			cfg.Skills[i].InputHoldMS = cfg.InputHoldMS
+		}
 	}
 }
 

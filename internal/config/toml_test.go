@@ -15,23 +15,27 @@ func TestMarshalParseRoundTrip(t *testing.T) {
 	cfg.Stop = KeyBinding{Name: "F6", VK: 0x75}
 	cfg.Pause = KeyBinding{Name: "Space", VK: 0x20}
 	cfg.SkillGapMS = 45
+	cfg.InputHoldMS = 25
 	cfg.Clicker.Start = KeyBinding{Name: "F7", VK: 0x76}
 	cfg.Clicker.Stop = KeyBinding{Name: "F8", VK: 0x77}
 	cfg.Clicker.Key = KeyBinding{Name: "Mouse Left", VK: MouseLeftVK}
 	cfg.Clicker.IntervalMS = 75
+	cfg.Clicker.InputHoldMS = 55
 	cfg.Menu.Map = KeyBinding{Name: "Tab", VK: 0x09}
 	cfg.Menu.Collection = KeyBinding{Name: "Y", VK: 0x59}
 	cfg.Skills[0] = Skill{
-		Name:       "Primary",
-		Key:        KeyBinding{Name: "1", VK: 0x31},
-		IntervalMS: 125,
-		Enabled:    true,
+		Name:        "Primary",
+		Key:         KeyBinding{Name: "1", VK: 0x31},
+		IntervalMS:  125,
+		InputHoldMS: 37,
+		Enabled:     true,
 	}
 	cfg.Skills[1] = Skill{
-		Name:       "Disabled",
-		Key:        KeyBinding{Name: "2", VK: 0x32},
-		IntervalMS: 2500,
-		Enabled:    false,
+		Name:        "Disabled",
+		Key:         KeyBinding{Name: "2", VK: 0x32},
+		IntervalMS:  2500,
+		InputHoldMS: 44,
+		Enabled:     false,
 	}
 
 	data, err := MarshalTOML(cfg)
@@ -55,6 +59,9 @@ func TestMarshalParseRoundTrip(t *testing.T) {
 	}
 	if parsed.SkillGapMS != cfg.SkillGapMS {
 		t.Fatalf("skill gap = %d, want %d", parsed.SkillGapMS, cfg.SkillGapMS)
+	}
+	if parsed.InputHoldMS != cfg.InputHoldMS {
+		t.Fatalf("input hold = %d, want %d", parsed.InputHoldMS, cfg.InputHoldMS)
 	}
 	if parsed.Clicker != cfg.Clicker {
 		t.Fatalf("clicker = %+v, want %+v", parsed.Clicker, cfg.Clicker)
@@ -140,6 +147,16 @@ func TestParseTOMLRejectsIntervalsAboveMaximum(t *testing.T) {
 			wantError: "clicker interval must be at most",
 		},
 		{
+			name:      "input hold",
+			input:     fmt.Sprintf("input_hold_ms = %d\n", MaximumInputHoldMS+1),
+			wantError: "input hold must be at most",
+		},
+		{
+			name:      "clicker hold",
+			input:     fmt.Sprintf("clicker_hold_ms = %d\n", MaximumInputHoldMS+1),
+			wantError: "clicker input hold must be at most",
+		},
+		{
 			name: "skill interval",
 			input: fmt.Sprintf(`[[skills]]
 name = "Too Large"
@@ -149,6 +166,18 @@ interval_ms = %d
 enabled = true
 `, MaximumIntervalMS+1),
 			wantError: "interval must be at most",
+		},
+		{
+			name: "skill hold",
+			input: fmt.Sprintf(`[[skills]]
+name = "Too Large"
+key_name = "1"
+key_vk = 49
+interval_ms = 10
+hold_ms = %d
+enabled = true
+`, MaximumInputHoldMS+1),
+			wantError: "skill 1 input hold must be at most",
 		},
 	}
 
@@ -218,11 +247,40 @@ key_vk = -1
 			wantError: "clicker interval must be at least",
 		},
 		{
+			name:      "input hold below minimum",
+			input:     "input_hold_ms = 0\n",
+			wantError: "input hold must be at least",
+		},
+		{
+			name:      "clicker hold below minimum",
+			input:     "clicker_hold_ms = 0\n",
+			wantError: "clicker input hold must be at least",
+		},
+		{
+			name:      "explicit negative clicker hold",
+			input:     "clicker_hold_ms = -5\n",
+			wantError: "clicker input hold must be at least",
+		},
+		{
+			name: "explicit negative skill hold",
+			input: `[[skills]]
+hold_ms = -3
+`,
+			wantError: "skill 1 input hold must be at least",
+		},
+		{
 			name: "skill interval below minimum",
 			input: `[[skills]]
 interval_ms = 0
 `,
 			wantError: "skill 1 interval must be at least",
+		},
+		{
+			name: "skill hold below minimum",
+			input: `[[skills]]
+hold_ms = 0
+`,
+			wantError: "skill 1 input hold must be at least",
 		},
 		{
 			name: "key name spoofing",
@@ -305,16 +363,65 @@ interval_ms = 100
 	}
 }
 
+func TestParseTOMLDefaultsMissingInputHold(t *testing.T) {
+	cfg, err := ParseTOML([]byte(`skill_gap_ms = 20
+`))
+	if err != nil {
+		t.Fatalf("ParseTOML() error = %v", err)
+	}
+	if cfg.InputHoldMS != DefaultInputHoldMS {
+		t.Fatalf("input hold = %d, want %d", cfg.InputHoldMS, DefaultInputHoldMS)
+	}
+	if cfg.Clicker.InputHoldMS != DefaultInputHoldMS {
+		t.Fatalf("clicker hold = %d, want %d", cfg.Clicker.InputHoldMS, DefaultInputHoldMS)
+	}
+	for i, skill := range cfg.Skills {
+		if skill.InputHoldMS != DefaultInputHoldMS {
+			t.Fatalf("skill %d hold = %d, want %d", i+1, skill.InputHoldMS, DefaultInputHoldMS)
+		}
+	}
+}
+
+func TestParseTOMLUsesTopLevelInputHoldForLegacyPerKeyDefaults(t *testing.T) {
+	cfg, err := ParseTOML([]byte(`input_hold_ms = 35
+
+[[skills]]
+name = "Only"
+key_name = "1"
+key_vk = 49
+interval_ms = 100
+enabled = true
+`))
+	if err != nil {
+		t.Fatalf("ParseTOML() error = %v", err)
+	}
+	if cfg.InputHoldMS != 35 {
+		t.Fatalf("input hold = %d, want 35", cfg.InputHoldMS)
+	}
+	if cfg.Clicker.InputHoldMS != 35 {
+		t.Fatalf("clicker hold = %d, want 35", cfg.Clicker.InputHoldMS)
+	}
+	if cfg.Skills[0].InputHoldMS != 35 {
+		t.Fatalf("skill 1 hold = %d, want 35", cfg.Skills[0].InputHoldMS)
+	}
+	if cfg.Skills[1].InputHoldMS != 35 {
+		t.Fatalf("padded skill hold = %d, want 35", cfg.Skills[1].InputHoldMS)
+	}
+}
+
 func TestSaveFileAndLoadFileRoundTrip(t *testing.T) {
 	cfg := Default()
 	cfg.Start = KeyBinding{Name: "F5", VK: 0x74}
 	cfg.Stop = KeyBinding{Name: "Mouse X1", VK: 0x05}
 	cfg.SkillGapMS = 25
+	cfg.InputHoldMS = 35
+	cfg.Clicker.InputHoldMS = 45
 	cfg.Skills[0] = Skill{
-		Name:       "Primary",
-		Key:        KeyBinding{Name: "1", VK: 0x31},
-		IntervalMS: 33,
-		Enabled:    true,
+		Name:        "Primary",
+		Key:         KeyBinding{Name: "1", VK: 0x31},
+		IntervalMS:  33,
+		InputHoldMS: 55,
+		Enabled:     true,
 	}
 
 	path := filepath.Join(t.TempDir(), "default.toml")
@@ -335,6 +442,9 @@ func TestSaveFileAndLoadFileRoundTrip(t *testing.T) {
 	}
 	if loaded.SkillGapMS != cfg.SkillGapMS {
 		t.Fatalf("skill gap = %d, want %d", loaded.SkillGapMS, cfg.SkillGapMS)
+	}
+	if loaded.InputHoldMS != cfg.InputHoldMS {
+		t.Fatalf("input hold = %d, want %d", loaded.InputHoldMS, cfg.InputHoldMS)
 	}
 	if loaded.Clicker != cfg.Clicker {
 		t.Fatalf("clicker = %+v, want %+v", loaded.Clicker, cfg.Clicker)
@@ -503,7 +613,9 @@ func TestMarshalTOMLNormalizesOutput(t *testing.T) {
 		`key_vk = 0`,
 		`skill_gap_ms = 0`,
 		`clicker_interval_ms = 100`,
+		`clicker_hold_ms = 10`,
 		`interval_ms = 1000`,
+		`hold_ms = 10`,
 		`enabled = false`,
 		`name = "Skill 8"`,
 	} {

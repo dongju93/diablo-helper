@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"unsafe"
 
@@ -44,6 +45,7 @@ type application struct {
 	statusText         string
 	runnerErrorMu      sync.Mutex
 	pendingRunnerError string
+	runtimeInputTarget atomic.Uintptr
 	skillEnabled       [config.MaxSkills]bool
 	winapi             applicationWinAPI
 	cleanedUp          bool
@@ -119,15 +121,16 @@ func newApplication() *application {
 	_ = ensureWinAPI()
 	a := &application{
 		cfg:        config.Default(),
-		runner:     newSkillRunner(sendVirtualKey),
 		statusText: "■ 정지.",
 		controls: controlRefs{
 			menuLabels:  make(map[string]uintptr),
 			menuButtons: make(map[string]uintptr),
 		},
-		clicker: newClickerRunner(sendVirtualKey),
-		winapi:  defaultApplicationWinAPI(),
+		winapi: defaultApplicationWinAPI(),
 	}
+	input := newSerializedContextInputSender(a.sendRuntimeInput, releaseVirtualKey)
+	a.runner = newSkillRunnerWithContextTimedSend(input.SendContext, input.Release)
+	a.clicker = newClickerRunnerWithContextTimedSend(input.SendContext, input.Release)
 	a.runner.SetErrorHandler(func(err error) {
 		a.handleRunnerError("기술 반복", err)
 	})
@@ -141,6 +144,9 @@ func (a *application) handleRunnerError(name string, err error) {
 	if a == nil || err == nil {
 		return
 	}
+	releaseInjectedInputs()
+	releaseMouseButtons()
+	a.clearRuntimeInputTargetIfIdle()
 	status := fmt.Sprintf("입력 전송 실패로 %s을 정지했습니다: %v", name, err)
 	a.runnerErrorMu.Lock()
 	a.pendingRunnerError = status
@@ -261,11 +267,8 @@ func (a *application) cleanup() {
 	}
 	a.cleanedUp = true
 
-	if a.runner != nil {
-		a.runner.Stop()
-	}
-	if a.clicker != nil {
-		a.clicker.Stop()
+	if appInstance == a {
+		appInstance = nil
 	}
 	if a.hook != 0 {
 		a.winapi.unhookWindowsHook(a.hook)
@@ -275,10 +278,11 @@ func (a *application) cleanup() {
 		a.winapi.unhookWindowsHook(a.mouseHook)
 		a.mouseHook = 0
 	}
+	stopRuntimeRunners(a.runner, a.clicker)
+	releaseInjectedInputs()
+	releaseMouseButtons()
+	a.runtimeInputTarget.Store(0)
 	a.disposeUIResources()
-	if appInstance == a {
-		appInstance = nil
-	}
 }
 
 func (a *application) handleDPIChanged(hwnd uintptr, wParam uintptr, lParam unsafe.Pointer) {
@@ -327,23 +331,24 @@ func defaultConfigPath() string {
 }
 
 type applicationWinAPI struct {
-	getModuleHandle   func() (uintptr, error)
-	loadCursor        func(instance uintptr, cursor uintptr) uintptr
-	loadIcon          func(instance uintptr, icon uintptr) uintptr
-	registerClassEx   func(wc *windowClassEx) (uintptr, error)
-	createWindowEx    createWindowExFunc
-	setWindowVisuals  func(hwnd uintptr)
-	setWindowsHookEx  func(idHook int, hookProc uintptr, instance uintptr, threadID uint32) (uintptr, error)
-	unhookWindowsHook func(hook uintptr)
-	showWindow        func(hwnd uintptr, command uintptr)
-	updateWindow      func(hwnd uintptr)
-	postMessage       func(hwnd uintptr, msg uint32, wParam uintptr, lParam uintptr) bool
-	getMessage        func(msg *message) (int32, error)
-	translateMessage  func(msg *message)
-	dispatchMessage   func(msg *message)
-	destroyWindow     func(hwnd uintptr)
-	postQuitMessage   func(exitCode int)
-	monitorMetrics    func(hwnd uintptr) monitorMetrics
+	getModuleHandle     func() (uintptr, error)
+	loadCursor          func(instance uintptr, cursor uintptr) uintptr
+	loadIcon            func(instance uintptr, icon uintptr) uintptr
+	registerClassEx     func(wc *windowClassEx) (uintptr, error)
+	createWindowEx      createWindowExFunc
+	setWindowVisuals    func(hwnd uintptr)
+	setWindowsHookEx    func(idHook int, hookProc uintptr, instance uintptr, threadID uint32) (uintptr, error)
+	unhookWindowsHook   func(hook uintptr)
+	showWindow          func(hwnd uintptr, command uintptr)
+	updateWindow        func(hwnd uintptr)
+	postMessage         func(hwnd uintptr, msg uint32, wParam uintptr, lParam uintptr) bool
+	getMessage          func(msg *message) (int32, error)
+	translateMessage    func(msg *message)
+	dispatchMessage     func(msg *message)
+	destroyWindow       func(hwnd uintptr)
+	postQuitMessage     func(exitCode int)
+	monitorMetrics      func(hwnd uintptr) monitorMetrics
+	getForegroundWindow func() uintptr
 }
 
 type createWindowExFunc func(
@@ -443,7 +448,8 @@ func defaultApplicationWinAPI() applicationWinAPI {
 		postQuitMessage: func(exitCode int) {
 			procPostQuitMessage.Call(uintptr(exitCode))
 		},
-		monitorMetrics: getMonitorMetrics,
+		monitorMetrics:      getMonitorMetrics,
+		getForegroundWindow: getForegroundWindow,
 	}
 }
 

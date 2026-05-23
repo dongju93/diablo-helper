@@ -121,6 +121,8 @@ func scaledFontHeight(base int, scale float64) int32 {
 }
 
 func createUIFont(face string, height int32, weight int) uintptr {
+	// GDI reports allocation failure as a zero handle. WM_SETFONT and paint paths
+	// already tolerate zero by falling back to system defaults.
 	font, _, _ := procCreateFontW.Call(
 		int32Arg(height),
 		0,
@@ -141,18 +143,23 @@ func createUIFont(face string, height int32, weight int) uintptr {
 }
 
 func createBrush(color uintptr) uintptr {
+	// GDI reports allocation failure as a zero handle. Drawing with a zero brush
+	// is best-effort UI degradation rather than a user-actionable failure.
 	brush, _, _ := procCreateSolidBrush.Call(color)
 	return brush
 }
 
 func createPen(color uintptr, width int) uintptr {
+	// GDI reports allocation failure as a zero handle. Drawing with a zero pen is
+	// best-effort UI degradation rather than a user-actionable failure.
 	pen, _, _ := procCreatePen.Call(psSolid, uintptr(width), color)
 	return pen
 }
 
 func deleteGDIObject(handle uintptr) {
 	if handle != 0 {
-		procDeleteObject.Call(handle)
+		// Cleanup failure is non-actionable; handles are process-local UI resources.
+		_, _, _ = procDeleteObject.Call(handle)
 	}
 }
 
@@ -203,11 +210,15 @@ func (a *application) updateControlFonts() {
 		a.controls.bulkSkillGapLbl,
 		a.controls.bulkSkillGap,
 		a.controls.bulkGapMsLabel,
+		a.controls.inputHoldLabel,
+		a.controls.inputHold,
+		a.controls.inputHoldMsLbl,
 		a.controls.applyBulk,
 		a.controls.skillUseHdr,
 		a.controls.skillNumHdr,
 		a.controls.skillKeyHdr,
 		a.controls.skillIntHdr,
+		a.controls.skillHoldHdr,
 		a.controls.pauseLabel,
 		a.controls.clickerStartLabel,
 		a.controls.clickerStartButton,
@@ -218,6 +229,9 @@ func (a *application) updateControlFonts() {
 		a.controls.clickerIntervalLabel,
 		a.controls.clickerInterval,
 		a.controls.clickerMsLabel,
+		a.controls.clickerHoldLabel,
+		a.controls.clickerHold,
+		a.controls.clickerHoldMsLabel,
 		a.controls.statusLabel,
 		a.controls.status,
 	} {
@@ -242,6 +256,12 @@ func (a *application) updateControlFonts() {
 		setControlFont(hwnd, a.font)
 	}
 	for _, hwnd := range a.controls.skillMsLbls {
+		setControlFont(hwnd, a.font)
+	}
+	for _, hwnd := range a.controls.skillHold {
+		setControlFont(hwnd, a.font)
+	}
+	for _, hwnd := range a.controls.skillHoldMsLbls {
 		setControlFont(hwnd, a.font)
 	}
 }
@@ -291,10 +311,13 @@ func (a *application) paint(hwnd uintptr) {
 	// Input frames
 	a.drawInputFrame(hdc, lo.bulkEditX-lo.w(8), lo.y(bulkIntervalEditY-6), lo.w(inputFrameWidth(bulkEditW)), lo.h(32))
 	a.drawInputFrame(hdc, lo.bulkEditX-lo.w(8), lo.y(bulkSkillGapEditY-6), lo.w(inputFrameWidth(bulkEditW)), lo.h(32))
+	a.drawInputFrame(hdc, lo.bulkEditX-lo.w(8), lo.y(inputHoldEditY-6), lo.w(inputFrameWidth(bulkEditW)), lo.h(32))
 	for y := skillFirstRowY; y < skillFirstRowY+config.MaxSkills*skillRowGap; y += skillRowGap {
 		a.drawInputFrame(hdc, lo.skillIntervalX-lo.w(8), lo.y(y+1), lo.w(inputFrameWidth(skillEditW)), lo.h(32))
+		a.drawInputFrame(hdc, lo.skillHoldX-lo.w(8), lo.y(y+1), lo.w(inputFrameWidth(skillHoldEditW)), lo.h(32))
 	}
 	a.drawInputFrame(hdc, lo.clickerIntEditX-lo.w(8), lo.y(clickerSettingY+1), lo.w(inputFrameWidth(clickerIntEditW)), lo.h(32))
+	a.drawInputFrame(hdc, lo.clickerHoldEditX-lo.w(8), lo.y(clickerSettingY+1), lo.w(inputFrameWidth(clickerHoldEditW)), lo.h(32))
 
 	a.drawStatusDot(hdc, lo.statusDotX, lo.y(statusBarY+19), lo.s(10))
 

@@ -49,6 +49,7 @@ var (
 	procGetDlgItem               *syscall.LazyProc
 	procGetDpiForSystem          *syscall.LazyProc
 	procGetDpiForWindow          *syscall.LazyProc
+	procGetForegroundWindow      *syscall.LazyProc
 	procGetMessageW              *syscall.LazyProc
 	procGetMonitorInfoW          *syscall.LazyProc
 	procGetSystemMetrics         *syscall.LazyProc
@@ -68,7 +69,6 @@ var (
 	procSetWindowPos             *syscall.LazyProc
 	procSetWindowsHookExW        *syscall.LazyProc
 	procSetWindowTextW           *syscall.LazyProc
-	procMoveWindow               *syscall.LazyProc
 	procShowWindow               *syscall.LazyProc
 	procTranslateMessage         *syscall.LazyProc
 	procUnhookWindowsHook        *syscall.LazyProc
@@ -138,6 +138,7 @@ func loadWinAPIProcs() {
 	procGetDlgItem = user32.NewProc("GetDlgItem")
 	procGetDpiForSystem = user32.NewProc("GetDpiForSystem")
 	procGetDpiForWindow = user32.NewProc("GetDpiForWindow")
+	procGetForegroundWindow = user32.NewProc("GetForegroundWindow")
 	procGetMessageW = user32.NewProc("GetMessageW")
 	procGetMonitorInfoW = user32.NewProc("GetMonitorInfoW")
 	procGetSystemMetrics = user32.NewProc("GetSystemMetrics")
@@ -157,7 +158,6 @@ func loadWinAPIProcs() {
 	procSetWindowPos = user32.NewProc("SetWindowPos")
 	procSetWindowsHookExW = user32.NewProc("SetWindowsHookExW")
 	procSetWindowTextW = user32.NewProc("SetWindowTextW")
-	procMoveWindow = user32.NewProc("MoveWindow")
 	procShowWindow = user32.NewProc("ShowWindow")
 	procTranslateMessage = user32.NewProc("TranslateMessage")
 	procUnhookWindowsHook = user32.NewProc("UnhookWindowsHookEx")

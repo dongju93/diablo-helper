@@ -20,25 +20,19 @@ const (
 	idClickerStopKey  = 104
 	idClickerKey      = 105
 	idClickerInterval = 106
+	idClickerHold     = 107
 
 	idBulkInterval = 110
 	idApplyBulk    = 111
 	idBulkSkillGap = 112
+	idInputHold    = 113
 
-	idMenuCharacter   = 120
-	idMenuSkillAssign = 121
-	idMenuTalents     = 122
-	idMenuMap         = 123
-	idMenuJournal     = 124
-	idMenuSocial      = 125
-	idMenuClan        = 126
-	idMenuTownPortal  = 127
-	idMenuCollection  = 128
-	idMenuShop        = 129
+	idMenuBase = 120
 
 	idSkillEnabledBase  = 200
 	idSkillKeyBase      = 300
 	idSkillIntervalBase = 400
+	idSkillHoldBase     = 450
 
 	idSave = 500
 	idLoad = 501
@@ -49,10 +43,12 @@ const (
 	bulkIntervalEditY  = 126
 	bulkSkillGapLabelY = 158
 	bulkSkillGapEditY  = 159
+	inputHoldLabelY    = 191
+	inputHoldEditY     = 192
 	bulkApplyY         = 124
 	bulkApplyH         = 64
-	skillHeaderY       = 204
-	skillFirstRowY     = 234
+	skillHeaderY       = 232
+	skillFirstRowY     = 262
 	skillRowGap        = 39
 	menuPanelY         = 234
 	menuPanelH         = 466
@@ -91,20 +87,26 @@ type controlRefs struct {
 	bulkSkillGapLbl uintptr
 	bulkSkillGap    uintptr
 	bulkGapMsLabel  uintptr
+	inputHoldLabel  uintptr
+	inputHold       uintptr
+	inputHoldMsLbl  uintptr
 	applyBulk       uintptr
 
 	// Right column – skill grid headers
-	skillUseHdr uintptr
-	skillNumHdr uintptr
-	skillKeyHdr uintptr
-	skillIntHdr uintptr
+	skillUseHdr  uintptr
+	skillNumHdr  uintptr
+	skillKeyHdr  uintptr
+	skillIntHdr  uintptr
+	skillHoldHdr uintptr
 
 	// Right column – skill rows
-	skillEnabled  [config.MaxSkills]uintptr
-	skillNums     [config.MaxSkills]uintptr
-	skillButtons  [config.MaxSkills]uintptr
-	skillInterval [config.MaxSkills]uintptr
-	skillMsLbls   [config.MaxSkills]uintptr
+	skillEnabled    [config.MaxSkills]uintptr
+	skillNums       [config.MaxSkills]uintptr
+	skillButtons    [config.MaxSkills]uintptr
+	skillInterval   [config.MaxSkills]uintptr
+	skillMsLbls     [config.MaxSkills]uintptr
+	skillHold       [config.MaxSkills]uintptr
+	skillHoldMsLbls [config.MaxSkills]uintptr
 
 	// Right column – pause section
 	pauseLabel uintptr
@@ -119,6 +121,9 @@ type controlRefs struct {
 	clickerIntervalLabel uintptr
 	clickerInterval      uintptr
 	clickerMsLabel       uintptr
+	clickerHoldLabel     uintptr
+	clickerHold          uintptr
+	clickerHoldMsLabel   uintptr
 
 	// Status bar
 	statusLabel uintptr
@@ -132,19 +137,39 @@ type menuControl struct {
 }
 
 var (
-	menuControls = []menuControl{
-		{id: "character", label: "캐릭터", control: idMenuCharacter},
-		{id: "skill_assign", label: "스킬 배치", control: idMenuSkillAssign},
-		{id: "talents", label: "능력치", control: idMenuTalents},
-		{id: "map", label: "지도", control: idMenuMap},
-		{id: "journal", label: "일지", control: idMenuJournal},
-		{id: "social", label: "소셜", control: idMenuSocial},
-		{id: "clan", label: "클랜", control: idMenuClan},
-		{id: "town_portal", label: "차원문", control: idMenuTownPortal},
-		{id: "collection", label: "컬렉션", control: idMenuCollection},
-		{id: "shop", label: "상점", control: idMenuShop},
-	}
+	menuControls = buildMenuControls()
 )
+
+func buildMenuControls() []menuControl {
+	definitions := config.MenuBindingDefinitions()
+	controls := make([]menuControl, 0, len(definitions))
+	for i, definition := range definitions {
+		controls = append(controls, menuControl{
+			id:      definition.ID,
+			label:   definition.UILabel,
+			control: idMenuBase + i,
+		})
+	}
+	return controls
+}
+
+func menuControlByID(id string) (menuControl, bool) {
+	for _, menu := range menuControls {
+		if menu.id == id {
+			return menu, true
+		}
+	}
+	return menuControl{}, false
+}
+
+func menuControlByControl(control int) (menuControl, bool) {
+	for _, menu := range menuControls {
+		if menu.control == control {
+			return menu, true
+		}
+	}
+	return menuControl{}, false
+}
 
 func (a *application) isPrimaryButton(id int) bool {
 	return id == idSave || id == idApplyBulk
@@ -162,12 +187,8 @@ func (a *application) isBindingButton(id int) bool {
 	if id >= idSkillKeyBase && id < idSkillKeyBase+config.MaxSkills {
 		return true
 	}
-	for _, menu := range menuControls {
-		if id == menu.control {
-			return true
-		}
-	}
-	return false
+	_, ok := menuControlByControl(id)
+	return ok
 }
 
 func (a *application) captureControlID(target captureTarget) int {
@@ -189,10 +210,8 @@ func (a *application) captureControlID(target captureTarget) int {
 			return idSkillKeyBase + target.index
 		}
 	case captureMenu:
-		for _, menu := range menuControls {
-			if menu.id == target.menuID {
-				return menu.control
-			}
+		if menu, ok := menuControlByID(target.menuID); ok {
+			return menu.control
 		}
 	}
 	return 0
@@ -239,6 +258,9 @@ func (a *application) createControls(hwnd uintptr) {
 	a.controls.bulkSkillGapLbl = a.createStatic(hwnd, "키별 간격", lo.bulkLabelX, lo.y(bulkSkillGapLabelY), lo.w(78), lo.h(24))
 	a.controls.bulkSkillGap = a.createEdit(hwnd, idBulkSkillGap, strconv.Itoa(config.DefaultSkillGapMS), lo.bulkEditX, lo.y(bulkSkillGapEditY), lo.w(bulkEditW), lo.h(22))
 	a.controls.bulkGapMsLabel = a.createStatic(hwnd, "ms", lo.bulkMsX, lo.y(bulkSkillGapLabelY), lo.w(bulkMsW), lo.h(24))
+	a.controls.inputHoldLabel = a.createStatic(hwnd, "일괄 눌림", lo.bulkLabelX, lo.y(inputHoldLabelY), lo.w(78), lo.h(24))
+	a.controls.inputHold = a.createEdit(hwnd, idInputHold, strconv.Itoa(config.DefaultInputHoldMS), lo.bulkEditX, lo.y(inputHoldEditY), lo.w(bulkEditW), lo.h(22))
+	a.controls.inputHoldMsLbl = a.createStatic(hwnd, "ms", lo.bulkMsX, lo.y(inputHoldLabelY), lo.w(bulkMsW), lo.h(24))
 	a.controls.applyBulk = a.createButton(hwnd, idApplyBulk, "일괄 적용", lo.bulkApplyX, lo.y(bulkApplyY), lo.w(bulkApplyW), lo.h(bulkApplyH))
 
 	// Right column – skill grid headers
@@ -246,6 +268,7 @@ func (a *application) createControls(hwnd uintptr) {
 	a.controls.skillNumHdr = a.createStatic(hwnd, "기술", lo.skillNumHdrX, lo.y(skillHeaderY), lo.w(55), lo.h(24))
 	a.controls.skillKeyHdr = a.createStatic(hwnd, "키", lo.skillKeyHdrX, lo.y(skillHeaderY), lo.w(35), lo.h(24))
 	a.controls.skillIntHdr = a.createStatic(hwnd, "실행 간격", lo.skillIntHdrX, lo.y(skillHeaderY), lo.w(80), lo.h(24))
+	a.controls.skillHoldHdr = a.createStatic(hwnd, "눌림", lo.skillHoldHdrX, lo.y(skillHeaderY), lo.w(50), lo.h(24))
 
 	// Right column – skill rows
 	y := skillFirstRowY
@@ -255,6 +278,8 @@ func (a *application) createControls(hwnd uintptr) {
 		a.controls.skillButtons[i] = a.createButton(hwnd, idSkillKeyBase+i, "", lo.skillBtnX, lo.y(y), lo.skillBtnW, lo.h(34))
 		a.controls.skillInterval[i] = a.createEdit(hwnd, idSkillIntervalBase+i, "", lo.skillIntervalX, lo.y(y+7), lo.w(skillEditW), lo.h(22))
 		a.controls.skillMsLbls[i] = a.createStatic(hwnd, "ms", lo.skillMsX, lo.y(y+6), lo.w(skillMsW), lo.h(22))
+		a.controls.skillHold[i] = a.createEdit(hwnd, idSkillHoldBase+i, "", lo.skillHoldX, lo.y(y+7), lo.w(skillHoldEditW), lo.h(22))
+		a.controls.skillHoldMsLbls[i] = a.createStatic(hwnd, "ms", lo.skillHoldMsX, lo.y(y+6), lo.w(skillMsW), lo.h(22))
 		y += skillRowGap
 	}
 
@@ -272,6 +297,9 @@ func (a *application) createControls(hwnd uintptr) {
 	a.controls.clickerIntervalLabel = a.createStatic(hwnd, "간격", lo.clickerIntLabelX, lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
 	a.controls.clickerInterval = a.createEdit(hwnd, idClickerInterval, strconv.Itoa(config.DefaultClickerIntervalMS), lo.clickerIntEditX, lo.y(clickerSettingY+7), lo.w(clickerIntEditW), lo.h(22))
 	a.controls.clickerMsLabel = a.createStatic(hwnd, "ms", lo.clickerMsLabelX, lo.y(clickerSettingY+6), lo.w(32), lo.h(24))
+	a.controls.clickerHoldLabel = a.createStatic(hwnd, "눌림", lo.clickerHoldLabelX, lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
+	a.controls.clickerHold = a.createEdit(hwnd, idClickerHold, strconv.Itoa(config.DefaultInputHoldMS), lo.clickerHoldEditX, lo.y(clickerSettingY+7), lo.w(clickerHoldEditW), lo.h(22))
+	a.controls.clickerHoldMsLabel = a.createStatic(hwnd, "ms", lo.clickerHoldMsX, lo.y(clickerSettingY+6), lo.w(32), lo.h(24))
 
 	// Status bar
 	a.controls.statusLabel = a.createStatic(hwnd, "상태", lo.x(layoutLX+24), lo.y(statusBarY+11), lo.w(55), lo.h(24))
@@ -306,12 +334,16 @@ func (a *application) repositionControls() {
 	moveControl(a.controls.bulkSkillGapLbl, lo.bulkLabelX, lo.y(bulkSkillGapLabelY), lo.w(78), lo.h(24))
 	moveControl(a.controls.bulkSkillGap, lo.bulkEditX, lo.y(bulkSkillGapEditY), lo.w(bulkEditW), lo.h(22))
 	moveControl(a.controls.bulkGapMsLabel, lo.bulkMsX, lo.y(bulkSkillGapLabelY), lo.w(bulkMsW), lo.h(24))
+	moveControl(a.controls.inputHoldLabel, lo.bulkLabelX, lo.y(inputHoldLabelY), lo.w(78), lo.h(24))
+	moveControl(a.controls.inputHold, lo.bulkEditX, lo.y(inputHoldEditY), lo.w(bulkEditW), lo.h(22))
+	moveControl(a.controls.inputHoldMsLbl, lo.bulkMsX, lo.y(inputHoldLabelY), lo.w(bulkMsW), lo.h(24))
 	moveControl(a.controls.applyBulk, lo.bulkApplyX, lo.y(bulkApplyY), lo.w(bulkApplyW), lo.h(bulkApplyH))
 
 	moveControl(a.controls.skillUseHdr, lo.skillUseHdrX, lo.y(skillHeaderY), lo.w(55), lo.h(24))
 	moveControl(a.controls.skillNumHdr, lo.skillNumHdrX, lo.y(skillHeaderY), lo.w(55), lo.h(24))
 	moveControl(a.controls.skillKeyHdr, lo.skillKeyHdrX, lo.y(skillHeaderY), lo.w(35), lo.h(24))
 	moveControl(a.controls.skillIntHdr, lo.skillIntHdrX, lo.y(skillHeaderY), lo.w(80), lo.h(24))
+	moveControl(a.controls.skillHoldHdr, lo.skillHoldHdrX, lo.y(skillHeaderY), lo.w(50), lo.h(24))
 
 	y := skillFirstRowY
 	for i := range config.MaxSkills {
@@ -320,6 +352,8 @@ func (a *application) repositionControls() {
 		moveControl(a.controls.skillButtons[i], lo.skillBtnX, lo.y(y), lo.skillBtnW, lo.h(34))
 		moveControl(a.controls.skillInterval[i], lo.skillIntervalX, lo.y(y+7), lo.w(skillEditW), lo.h(22))
 		moveControl(a.controls.skillMsLbls[i], lo.skillMsX, lo.y(y+6), lo.w(skillMsW), lo.h(22))
+		moveControl(a.controls.skillHold[i], lo.skillHoldX, lo.y(y+7), lo.w(skillHoldEditW), lo.h(22))
+		moveControl(a.controls.skillHoldMsLbls[i], lo.skillHoldMsX, lo.y(y+6), lo.w(skillMsW), lo.h(22))
 		y += skillRowGap
 	}
 
@@ -335,6 +369,9 @@ func (a *application) repositionControls() {
 	moveControl(a.controls.clickerIntervalLabel, lo.clickerIntLabelX, lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
 	moveControl(a.controls.clickerInterval, lo.clickerIntEditX, lo.y(clickerSettingY+7), lo.w(clickerIntEditW), lo.h(22))
 	moveControl(a.controls.clickerMsLabel, lo.clickerMsLabelX, lo.y(clickerSettingY+6), lo.w(32), lo.h(24))
+	moveControl(a.controls.clickerHoldLabel, lo.clickerHoldLabelX, lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
+	moveControl(a.controls.clickerHold, lo.clickerHoldEditX, lo.y(clickerSettingY+7), lo.w(clickerHoldEditW), lo.h(22))
+	moveControl(a.controls.clickerHoldMsLabel, lo.clickerHoldMsX, lo.y(clickerSettingY+6), lo.w(32), lo.h(24))
 
 	moveControl(a.controls.statusLabel, lo.x(layoutLX+24), lo.y(statusBarY+11), lo.w(55), lo.h(24))
 	moveControl(a.controls.status, lo.statusTextX, lo.y(statusBarY+11), lo.statusTextW, lo.h(24))
@@ -348,10 +385,6 @@ func (a *application) createStatic(parent uintptr, text string, x int, y int, wi
 
 func (a *application) createButton(parent uintptr, id int, text string, x int, y int, width int, height int) uintptr {
 	return a.createControl(parent, "BUTTON", text, wsChild|wsVisible|wsTabStop|bsOwnerDraw, x, y, width, height, id)
-}
-
-func (a *application) createCheckbox(parent uintptr, id int, text string, x int, y int, width int, height int) uintptr {
-	return a.createControl(parent, "BUTTON", text, wsChild|wsVisible|wsTabStop|bsAutoCheckbox, x, y, width, height, id)
 }
 
 func (a *application) createEdit(parent uintptr, id int, text string, x int, y int, width int, height int) uintptr {
@@ -417,11 +450,9 @@ func (a *application) handleCommand(wParam uintptr) bool {
 	case id == idLoad:
 		a.loadConfig()
 	default:
-		for _, menu := range menuControls {
-			if id == menu.control {
-				a.startCapture(captureTarget{kind: captureMenu, menuID: menu.id})
-				return true
-			}
+		if menu, ok := menuControlByControl(id); ok {
+			a.startCapture(captureTarget{kind: captureMenu, menuID: menu.id})
+			return true
 		}
 		return false
 	}
@@ -430,26 +461,29 @@ func (a *application) handleCommand(wParam uintptr) bool {
 
 func (a *application) updateControlsFromConfig() {
 	a.cfg.NormalizeForUI()
-	setWindowText(a.controls.startButton, bindingText(a.cfg.Start))
-	setWindowText(a.controls.stopButton, bindingText(a.cfg.Stop))
-	setWindowText(a.controls.pauseButton, bindingText(a.cfg.Pause))
-	setWindowText(a.controls.clickerStartButton, bindingText(a.cfg.Clicker.Start))
-	setWindowText(a.controls.clickerStopButton, bindingText(a.cfg.Clicker.Stop))
-	setWindowText(a.controls.clickerKeyButton, bindingText(a.cfg.Clicker.Key))
-	setWindowText(a.controls.clickerInterval, strconv.Itoa(a.cfg.Clicker.IntervalMS))
+	ignoreSetWindowText(a.controls.startButton, bindingText(a.cfg.Start))
+	ignoreSetWindowText(a.controls.stopButton, bindingText(a.cfg.Stop))
+	ignoreSetWindowText(a.controls.pauseButton, bindingText(a.cfg.Pause))
+	ignoreSetWindowText(a.controls.clickerStartButton, bindingText(a.cfg.Clicker.Start))
+	ignoreSetWindowText(a.controls.clickerStopButton, bindingText(a.cfg.Clicker.Stop))
+	ignoreSetWindowText(a.controls.clickerKeyButton, bindingText(a.cfg.Clicker.Key))
+	ignoreSetWindowText(a.controls.clickerInterval, strconv.Itoa(a.cfg.Clicker.IntervalMS))
+	ignoreSetWindowText(a.controls.clickerHold, strconv.Itoa(a.cfg.Clicker.InputHoldMS))
+	ignoreSetWindowText(a.controls.inputHold, strconv.Itoa(a.cfg.InputHoldMS))
 	for _, menu := range a.cfg.MenuBindings() {
 		if hwnd := a.controls.menuButtons[menu.ID]; hwnd != 0 {
-			setWindowText(hwnd, bindingText(menu.Binding))
+			ignoreSetWindowText(hwnd, bindingText(menu.Binding))
 		}
 	}
-	setWindowText(a.controls.bulkSkillGap, strconv.Itoa(a.cfg.SkillGapMS))
+	ignoreSetWindowText(a.controls.bulkSkillGap, strconv.Itoa(a.cfg.SkillGapMS))
 	for i := range config.MaxSkills {
 		a.skillEnabled[i] = a.cfg.Skills[i].Enabled
 		if hwnd := a.controls.skillEnabled[i]; hwnd != 0 {
 			invalidateRect(hwnd, true)
 		}
-		setWindowText(a.controls.skillButtons[i], bindingText(a.cfg.Skills[i].Key))
-		setWindowText(a.controls.skillInterval[i], strconv.Itoa(a.cfg.Skills[i].IntervalMS))
+		ignoreSetWindowText(a.controls.skillButtons[i], bindingText(a.cfg.Skills[i].Key))
+		ignoreSetWindowText(a.controls.skillInterval[i], strconv.Itoa(a.cfg.Skills[i].IntervalMS))
+		ignoreSetWindowText(a.controls.skillHold[i], strconv.Itoa(a.cfg.Skills[i].InputHoldMS))
 	}
 	a.updateRuntimeStatus()
 }
@@ -475,21 +509,34 @@ func (a *application) applyBulkInterval() {
 		messageBox(a.hwnd, "잘못된 키별 간격", err.Error(), mbOK|mbIconError)
 		return
 	}
+	holdText, err := getWindowText(a.controls.inputHold)
+	if err != nil {
+		messageBox(a.hwnd, "잘못된 눌림 시간", err.Error(), mbOK|mbIconError)
+		return
+	}
+	inputHold, err := parseInputHold(holdText)
+	if err != nil {
+		messageBox(a.hwnd, "잘못된 눌림 시간", err.Error(), mbOK|mbIconError)
+		return
+	}
 	a.cfg.SkillGapMS = skillGap
-	setWindowText(a.controls.bulkSkillGap, strconv.Itoa(skillGap))
+	a.cfg.InputHoldMS = inputHold
+	ignoreSetWindowText(a.controls.bulkSkillGap, strconv.Itoa(skillGap))
+	ignoreSetWindowText(a.controls.inputHold, strconv.Itoa(inputHold))
 	for i := range config.MaxSkills {
 		skillInterval, err := bulkIntervalForSkill(interval, skillGap, i)
 		if err != nil {
 			messageBox(a.hwnd, "잘못된 간격", err.Error(), mbOK|mbIconError)
 			return
 		}
-		setWindowText(a.controls.skillInterval[i], strconv.Itoa(skillInterval))
+		ignoreSetWindowText(a.controls.skillInterval[i], strconv.Itoa(skillInterval))
+		ignoreSetWindowText(a.controls.skillHold[i], strconv.Itoa(inputHold))
 	}
 	if skillGap > 0 {
-		a.setStatus("일괄 간격을 키별 간격만큼 벌려 적용했습니다.")
+		a.setStatus("일괄 간격은 키별 간격만큼 벌리고 눌림 시간을 적용했습니다.")
 		return
 	}
-	a.setStatus("일괄 간격을 적용했습니다.")
+	a.setStatus("일괄 간격과 눌림 시간을 적용했습니다.")
 }
 
 func bulkIntervalForSkill(baseInterval int, skillGap int, index int) (int, error) {
@@ -588,8 +635,10 @@ func (a *application) loadConfig() {
 		messageBox(a.hwnd, "설정 파일 경고", "올바른 diablo-helper 설정 파일이 아닙니다.\n\n"+err.Error(), mbOK|mbIconWarning)
 		return
 	}
-	a.runner.Stop()
-	a.clicker.Stop()
+	stopRuntimeRunners(a.runner, a.clicker)
+	releaseInjectedInputs()
+	releaseMouseButtons()
+	a.runtimeInputTarget.Store(0)
 	a.cfg = loaded
 	a.configPath = path
 	previous := a.capture
@@ -612,10 +661,14 @@ func (a *application) startRunnerFromHotkey() {
 		a.setStatus("실행할 기술이 없습니다. 기술 사용을 켜고 키를 지정하세요.")
 		return
 	}
+	if !a.clicker.Running() {
+		a.captureRuntimeInputTarget()
+	}
 	if a.runner.Start(a.cfg) {
 		a.updateRuntimeStatus()
 		return
 	}
+	a.clearRuntimeInputTargetIfIdle()
 	a.updateRuntimeStatus()
 }
 
@@ -629,27 +682,25 @@ func (a *application) startClickerFromHotkey() {
 		return
 	}
 	if !clickerRunnable(a.cfg.Clicker) {
-		a.setStatus("클릭 반복에 사용할 입력 키와 간격을 지정하세요.")
+		a.setStatus("클릭 반복에 사용할 입력 키, 간격, 눌림 시간을 지정하세요.")
 		return
+	}
+	if !a.runner.Running() {
+		a.captureRuntimeInputTarget()
 	}
 	if a.clicker.Start(a.cfg.Clicker) {
 		a.updateRuntimeStatus()
 		return
 	}
-	a.updateRuntimeStatus()
-}
-
-func (a *application) stopRunner(status string) {
-	if a.runner.Stop() {
-		a.setStatus(status)
-		return
-	}
+	a.clearRuntimeInputTargetIfIdle()
 	a.updateRuntimeStatus()
 }
 
 func (a *application) stopAllRunners(status string) {
-	stopped := a.runner.Stop()
-	stopped = a.clicker.Stop() || stopped
+	stopped := stopRuntimeRunners(a.runner, a.clicker)
+	releaseInjectedInputs()
+	releaseMouseButtons()
+	a.clearRuntimeInputTargetIfIdle()
 	if stopped {
 		a.setStatus(status)
 		return
@@ -668,6 +719,15 @@ func (a *application) syncConfigFromControls() error {
 		return fmt.Errorf("키별 간격: %w", err)
 	}
 	a.cfg.SkillGapMS = skillGap
+	holdText, err := getWindowText(a.controls.inputHold)
+	if err != nil {
+		return fmt.Errorf("눌림 시간: %w", err)
+	}
+	inputHold, err := parseInputHold(holdText)
+	if err != nil {
+		return fmt.Errorf("눌림 시간: %w", err)
+	}
+	a.cfg.InputHoldMS = inputHold
 	clickerText, err := getWindowText(a.controls.clickerInterval)
 	if err != nil {
 		return fmt.Errorf("클릭 반복: %w", err)
@@ -677,6 +737,15 @@ func (a *application) syncConfigFromControls() error {
 		return fmt.Errorf("클릭 반복: %w", err)
 	}
 	a.cfg.Clicker.IntervalMS = clickerInterval
+	clickerHoldText, err := getWindowText(a.controls.clickerHold)
+	if err != nil {
+		return fmt.Errorf("클릭 반복 눌림 시간: %w", err)
+	}
+	clickerHold, err := parseInputHold(clickerHoldText)
+	if err != nil {
+		return fmt.Errorf("클릭 반복 눌림 시간: %w", err)
+	}
+	a.cfg.Clicker.InputHoldMS = clickerHold
 	for i := range config.MaxSkills {
 		skillText, err := getWindowText(a.controls.skillInterval[i])
 		if err != nil {
@@ -687,6 +756,15 @@ func (a *application) syncConfigFromControls() error {
 			return fmt.Errorf("기술 %d: %w", i+1, err)
 		}
 		a.cfg.Skills[i].IntervalMS = interval
+		holdText, err := getWindowText(a.controls.skillHold[i])
+		if err != nil {
+			return fmt.Errorf("기술 %d 눌림 시간: %w", i+1, err)
+		}
+		hold, err := parseInputHold(holdText)
+		if err != nil {
+			return fmt.Errorf("기술 %d 눌림 시간: %w", i+1, err)
+		}
+		a.cfg.Skills[i].InputHoldMS = hold
 		a.cfg.Skills[i].Enabled = a.skillEnabled[i]
 	}
 	a.cfg.NormalizeForUI()
@@ -719,7 +797,7 @@ func (a *application) updateRuntimeStatus() {
 func (a *application) setStatus(text string) {
 	a.statusText = text
 	if a.controls.status != 0 {
-		setWindowText(a.controls.status, text)
+		ignoreSetWindowText(a.controls.status, text)
 	}
 	if a.hwnd != 0 {
 		invalidateRect(a.hwnd, false)

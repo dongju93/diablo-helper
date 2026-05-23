@@ -9,6 +9,15 @@ import (
 	"github.com/dongju93/diablo-helper/internal/config"
 )
 
+func mustMenuControl(t *testing.T, id string) menuControl {
+	t.Helper()
+	menu, ok := menuControlByID(id)
+	if !ok {
+		t.Fatalf("menu control %q not found", id)
+	}
+	return menu
+}
+
 func TestApplicationControlClassification(t *testing.T) {
 	a := newApplication()
 
@@ -22,14 +31,45 @@ func TestApplicationControlClassification(t *testing.T) {
 		t.Fatal("idLoad should not be primary")
 	}
 
-	for _, id := range []int{idStartKey, idStopKey, idPauseKey, idClickerStartKey, idClickerStopKey, idClickerKey, idSkillKeyBase, idSkillKeyBase + config.MaxSkills - 1, idMenuCharacter, idMenuShop} {
+	bindingIDs := []int{
+		idStartKey,
+		idStopKey,
+		idPauseKey,
+		idClickerStartKey,
+		idClickerStopKey,
+		idClickerKey,
+		idSkillKeyBase,
+		idSkillKeyBase + config.MaxSkills - 1,
+		mustMenuControl(t, "character").control,
+		mustMenuControl(t, "shop").control,
+	}
+	for _, id := range bindingIDs {
 		if !a.isBindingButton(id) {
 			t.Fatalf("id %d should be a binding button", id)
 		}
 	}
-	for _, id := range []int{idSave, idApplyBulk, idClickerInterval, idSkillKeyBase + config.MaxSkills} {
+	for _, id := range []int{idSave, idApplyBulk, idInputHold, idClickerInterval, idClickerHold, idSkillHoldBase, idSkillKeyBase + config.MaxSkills} {
 		if a.isBindingButton(id) {
 			t.Fatalf("id %d should not be a binding button", id)
+		}
+	}
+}
+
+func TestMenuControlsFollowConfigDefinitions(t *testing.T) {
+	definitions := config.MenuBindingDefinitions()
+	if len(menuControls) != len(definitions) {
+		t.Fatalf("menuControls length = %d, want %d", len(menuControls), len(definitions))
+	}
+	for i, definition := range definitions {
+		menu := menuControls[i]
+		if menu.id != definition.ID {
+			t.Fatalf("menuControls[%d].id = %q, want %q", i, menu.id, definition.ID)
+		}
+		if menu.label != definition.UILabel {
+			t.Fatalf("menuControls[%d].label = %q, want %q", i, menu.label, definition.UILabel)
+		}
+		if menu.control != idMenuBase+i {
+			t.Fatalf("menuControls[%d].control = %d, want %d", i, menu.control, idMenuBase+i)
 		}
 	}
 }
@@ -103,7 +143,7 @@ func TestHandleCommandStartsKeyCapture(t *testing.T) {
 		{name: "clicker stop", id: idClickerStopKey, want: captureTarget{kind: captureClickerStop}},
 		{name: "clicker key", id: idClickerKey, want: captureTarget{kind: captureClickerKey}},
 		{name: "skill", id: idSkillKeyBase + 2, want: captureTarget{kind: captureSkill, index: 2}},
-		{name: "menu", id: idMenuTownPortal, want: captureTarget{kind: captureMenu, menuID: "town_portal"}},
+		{name: "menu", id: mustMenuControl(t, "town_portal").control, want: captureTarget{kind: captureMenu, menuID: "town_portal"}},
 	}
 
 	for _, tt := range tests {

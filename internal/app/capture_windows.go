@@ -110,7 +110,7 @@ func (a *application) handleKeyEvent(vk uint16, down bool) bool {
 		}
 		if vk == vkLButton && captureRejectsMouseLeft(a.capture.kind) {
 			a.rejectCapturedKey(a.capture, "Mouse Left")
-			return true
+			return false
 		}
 		a.assignCapturedKey(vk)
 		return true
@@ -147,14 +147,21 @@ func (a *application) shouldTrackPressedKey(vk uint16) bool {
 }
 
 func (a *application) handleRuntimeControlKey(vk uint16) bool {
+	stopRunner := a.runner.Running() && sameKey(vk, a.cfg.Stop)
+	stopClicker := a.clicker.Running() && sameKey(vk, a.cfg.Clicker.Stop)
 	stopped := false
-	if a.runner.Running() && sameKey(vk, a.cfg.Stop) {
+	switch {
+	case stopRunner && stopClicker:
+		stopped = stopRuntimeRunners(a.runner, a.clicker)
+	case stopRunner:
 		stopped = a.runner.Stop()
-	}
-	if a.clicker.Running() && sameKey(vk, a.cfg.Clicker.Stop) {
-		stopped = a.clicker.Stop() || stopped
+	case stopClicker:
+		stopped = a.clicker.Stop()
 	}
 	if stopped {
+		releaseInjectedInputs()
+		releaseMouseButtons()
+		a.clearRuntimeInputTargetIfIdle()
 		a.setStatus("종료 키 입력으로 정지했습니다.")
 		return true
 	}
@@ -237,40 +244,32 @@ func (a *application) clearCapturedKey() {
 func (a *application) updateBindingControl(target captureTarget) {
 	switch target.kind {
 	case captureStart:
-		setWindowText(a.controls.startButton, bindingText(a.cfg.Start))
+		ignoreSetWindowText(a.controls.startButton, bindingText(a.cfg.Start))
 	case captureStop:
-		setWindowText(a.controls.stopButton, bindingText(a.cfg.Stop))
+		ignoreSetWindowText(a.controls.stopButton, bindingText(a.cfg.Stop))
 	case capturePause:
-		setWindowText(a.controls.pauseButton, bindingText(a.cfg.Pause))
+		ignoreSetWindowText(a.controls.pauseButton, bindingText(a.cfg.Pause))
 	case captureSkill:
 		if target.index >= 0 && target.index < len(a.cfg.Skills) {
-			setWindowText(a.controls.skillButtons[target.index], bindingText(a.cfg.Skills[target.index].Key))
+			ignoreSetWindowText(a.controls.skillButtons[target.index], bindingText(a.cfg.Skills[target.index].Key))
 		}
 	case captureClickerStart:
-		setWindowText(a.controls.clickerStartButton, bindingText(a.cfg.Clicker.Start))
+		ignoreSetWindowText(a.controls.clickerStartButton, bindingText(a.cfg.Clicker.Start))
 	case captureClickerStop:
-		setWindowText(a.controls.clickerStopButton, bindingText(a.cfg.Clicker.Stop))
+		ignoreSetWindowText(a.controls.clickerStopButton, bindingText(a.cfg.Clicker.Stop))
 	case captureClickerKey:
-		setWindowText(a.controls.clickerKeyButton, bindingText(a.cfg.Clicker.Key))
+		ignoreSetWindowText(a.controls.clickerKeyButton, bindingText(a.cfg.Clicker.Key))
 	case captureMenu:
 		if hwnd := a.controls.menuButtons[target.menuID]; hwnd != 0 {
-			for _, menu := range a.cfg.MenuBindings() {
-				if menu.ID == target.menuID {
-					setWindowText(hwnd, bindingText(menu.Binding))
-					return
-				}
+			if b, ok := a.cfg.Menu.BindingByID(target.menuID); ok {
+				ignoreSetWindowText(hwnd, bindingText(b))
 			}
 		}
 	}
 }
 
 func (a *application) menuKeyMatches(vk uint16) bool {
-	for _, menu := range a.cfg.MenuBindings() {
-		if sameKey(vk, menu.Binding) {
-			return true
-		}
-	}
-	return false
+	return a.cfg.Menu.Matches(vk)
 }
 
 func captureRejectsMouseLeft(kind captureKind) bool {
@@ -363,4 +362,28 @@ func parseSkillGap(value string) (int, error) {
 		return 0, fmt.Errorf("키별 간격이 너무 큽니다")
 	}
 	return gap, nil
+}
+
+func parseInputHold(value string) (int, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return 0, fmt.Errorf("눌림 시간은 필수입니다")
+	}
+	if len(trimmed) > maxEditTextLen {
+		return 0, fmt.Errorf("눌림 시간 입력이 너무 깁니다")
+	}
+	hold, err := strconv.Atoi(trimmed)
+	if err != nil {
+		return 0, fmt.Errorf("눌림 시간은 숫자여야 합니다")
+	}
+	if hold < config.MinimumInputHoldMS {
+		return 0, fmt.Errorf("눌림 시간은 최소 %dms 이상이어야 합니다", config.MinimumInputHoldMS)
+	}
+	if hold > config.MaximumInputHoldMS {
+		return 0, fmt.Errorf("눌림 시간은 최대 %dms 이하여야 합니다", config.MaximumInputHoldMS)
+	}
+	if !config.MillisecondsFitDuration(hold) {
+		return 0, fmt.Errorf("눌림 시간이 너무 큽니다")
+	}
+	return hold, nil
 }
