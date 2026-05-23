@@ -257,6 +257,18 @@ key_vk = -1
 			wantError: "clicker input hold must be at least",
 		},
 		{
+			name:      "explicit negative clicker hold",
+			input:     "clicker_hold_ms = -5\n",
+			wantError: "clicker input hold must be at least",
+		},
+		{
+			name: "explicit negative skill hold",
+			input: `[[skills]]
+hold_ms = -3
+`,
+			wantError: "skill 1 input hold must be at least",
+		},
+		{
 			name: "skill interval below minimum",
 			input: `[[skills]]
 interval_ms = 0

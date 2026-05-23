@@ -12,6 +12,12 @@ import (
 	"strings"
 )
 
+// missingInputHoldMS is the sentinel value used during TOML parsing to mean
+// "the key was not present in the file". It is distinct from any explicit
+// user-supplied value, including 0 or other negatives, so that malformed
+// negative values are rejected by Validate instead of being silently replaced.
+const missingInputHoldMS = -1
+
 // SaveOptions controls validation rules used when writing config files.
 type SaveOptions struct {
 	// AllowNonTOMLExtension allows SaveFileWithOptions to write paths without
@@ -230,7 +236,7 @@ func MarshalTOML(cfg Config) ([]byte, error) {
 func ParseTOML(data []byte) (Config, error) {
 	cfg := Default()
 	cfg.Skills = nil
-	cfg.Clicker.InputHoldMS = -1
+	cfg.Clicker.InputHoldMS = missingInputHoldMS
 
 	var currentSkill *Skill
 	scanner := bufio.NewScanner(bytes.NewReader(data))
@@ -246,7 +252,7 @@ func ParseTOML(data []byte) (Config, error) {
 			cfg.Skills = append(cfg.Skills, Skill{
 				Name:        fmt.Sprintf("Skill %d", len(cfg.Skills)+1),
 				IntervalMS:  DefaultIntervalMS,
-				InputHoldMS: -1,
+				InputHoldMS: missingInputHoldMS,
 				Enabled:     DefaultSkillEnabled,
 			})
 			currentSkill = &cfg.Skills[len(cfg.Skills)-1]
@@ -368,11 +374,11 @@ func setSkillValue(skill *Skill, key string, value string) error {
 }
 
 func fillMissingInputHolds(cfg *Config) {
-	if cfg.Clicker.InputHoldMS < 0 {
+	if cfg.Clicker.InputHoldMS == missingInputHoldMS {
 		cfg.Clicker.InputHoldMS = cfg.InputHoldMS
 	}
 	for i := range cfg.Skills {
-		if cfg.Skills[i].InputHoldMS < 0 {
+		if cfg.Skills[i].InputHoldMS == missingInputHoldMS {
 			cfg.Skills[i].InputHoldMS = cfg.InputHoldMS
 		}
 	}
