@@ -3,6 +3,7 @@
 package app
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,7 +26,13 @@ func lastConfigStatePath() string {
 // loadLastConfigPath reads the config path stored in last-config.txt.
 // Returns "" if the file is absent, unreadable, oversized, or contains a relative path.
 func loadLastConfigPath() string {
-	data, err := os.ReadFile(lastConfigStatePath())
+	f, err := os.Open(lastConfigStatePath())
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	data, err := io.ReadAll(io.LimitReader(f, maxLastConfigPathBytes+1))
 	if err != nil {
 		return ""
 	}
