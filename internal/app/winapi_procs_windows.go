@@ -32,6 +32,7 @@ var (
 	dwmapi   *syscall.LazyDLL
 	uxtheme  *syscall.LazyDLL
 	comdlg32 *syscall.LazyDLL
+	advapi32 *syscall.LazyDLL
 
 	procAdjustWindowRectEx       *syscall.LazyProc
 	procAdjustWindowRectExForDpi *syscall.LazyProc
@@ -95,6 +96,11 @@ var (
 	procCommDlgExtendedError *syscall.LazyProc
 	procGetOpenFileNameW     *syscall.LazyProc
 	procGetSaveFileNameW     *syscall.LazyProc
+
+	procRegGetValueW    *syscall.LazyProc
+	procRegCreateKeyExW *syscall.LazyProc
+	procRegSetValueExW  *syscall.LazyProc
+	procRegCloseKey     *syscall.LazyProc
 )
 
 func ensureWinAPI() error {
@@ -184,6 +190,12 @@ func loadWinAPIProcs() {
 	procCommDlgExtendedError = comdlg32.NewProc("CommDlgExtendedError")
 	procGetOpenFileNameW = comdlg32.NewProc("GetOpenFileNameW")
 	procGetSaveFileNameW = comdlg32.NewProc("GetSaveFileNameW")
+
+	advapi32 = system32LazyDLL("advapi32.dll")
+	procRegGetValueW = advapi32.NewProc("RegGetValueW")
+	procRegCreateKeyExW = advapi32.NewProc("RegCreateKeyExW")
+	procRegSetValueExW = advapi32.NewProc("RegSetValueExW")
+	procRegCloseKey = advapi32.NewProc("RegCloseKey")
 }
 
 func system32LazyDLL(name string) *syscall.LazyDLL {

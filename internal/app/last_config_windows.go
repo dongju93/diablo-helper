@@ -3,51 +3,103 @@
 package app
 
 import (
-	"io"
-	"os"
 	"path/filepath"
-	"strings"
+	"syscall"
+	"unsafe"
 )
 
 const (
-	lastConfigFileName     = "last-config.txt"
+	regAppSubKey           = `Software\diablo-helper`
+	regLastConfigValue     = `LastConfigPath`
 	maxLastConfigPathBytes = 32 * 1024
 )
 
-// lastConfigStatePath returns the path to the last-used config state file next to the executable.
-func lastConfigStatePath() string {
-	executable, err := os.Executable()
-	if err != nil {
-		return lastConfigFileName
-	}
-	return filepath.Join(filepath.Dir(executable), lastConfigFileName)
-}
-
-// loadLastConfigPath reads the config path stored in last-config.txt.
-// Returns "" if the file is absent, unreadable, oversized, or contains a relative path.
+// loadLastConfigPath reads the last-used config path from the registry.
+// Returns "" if the key is absent, unreadable, oversized, or contains a relative path.
 func loadLastConfigPath() string {
-	f, err := os.Open(lastConfigStatePath())
+	subKey, err := syscall.UTF16PtrFromString(regAppSubKey)
 	if err != nil {
 		return ""
 	}
-	defer f.Close()
+	valueName, err := syscall.UTF16PtrFromString(regLastConfigValue)
+	if err != nil {
+		return ""
+	}
 
-	data, err := io.ReadAll(io.LimitReader(f, maxLastConfigPathBytes+1))
-	if err != nil {
+	var cbData uint32
+	ret, _, _ := procRegGetValueW.Call(
+		hkeyCurrentUser,
+		uintptr(unsafe.Pointer(subKey)),
+		uintptr(unsafe.Pointer(valueName)),
+		rrfRtRegSz,
+		0,
+		0,
+		uintptr(unsafe.Pointer(&cbData)),
+	)
+	if ret != 0 || cbData == 0 || cbData > maxLastConfigPathBytes {
 		return ""
 	}
-	if len(data) > maxLastConfigPathBytes {
+
+	buf := make([]uint16, (cbData+1)/2)
+	ret, _, _ = procRegGetValueW.Call(
+		hkeyCurrentUser,
+		uintptr(unsafe.Pointer(subKey)),
+		uintptr(unsafe.Pointer(valueName)),
+		rrfRtRegSz,
+		0,
+		uintptr(unsafe.Pointer(&buf[0])),
+		uintptr(unsafe.Pointer(&cbData)),
+	)
+	if ret != 0 {
 		return ""
 	}
-	path := strings.TrimSpace(string(data))
+	path := syscall.UTF16ToString(buf)
 	if !filepath.IsAbs(path) {
 		return ""
 	}
 	return path
 }
 
-// saveLastConfigPath persists configPath to last-config.txt.
+// saveLastConfigPath persists configPath to HKCU\Software\diablo-helper.
 // Errors are silently discarded — this is best-effort state.
 func saveLastConfigPath(configPath string) {
-	_ = os.WriteFile(lastConfigStatePath(), []byte(configPath), 0o600)
+	subKey, err := syscall.UTF16PtrFromString(regAppSubKey)
+	if err != nil {
+		return
+	}
+	valueName, err := syscall.UTF16PtrFromString(regLastConfigValue)
+	if err != nil {
+		return
+	}
+	data, err := syscall.UTF16FromString(configPath)
+	if err != nil {
+		return
+	}
+
+	var hKey uintptr
+	ret, _, _ := procRegCreateKeyExW.Call(
+		hkeyCurrentUser,
+		uintptr(unsafe.Pointer(subKey)),
+		0,
+		0,
+		regOptionNonVolatile,
+		keySetValue,
+		0,
+		uintptr(unsafe.Pointer(&hKey)),
+		0,
+	)
+	if ret != 0 {
+		return
+	}
+	defer procRegCloseKey.Call(hKey)
+
+	cbData := uint32(len(data) * 2)
+	procRegSetValueExW.Call(
+		hKey,
+		uintptr(unsafe.Pointer(valueName)),
+		0,
+		regSz,
+		uintptr(unsafe.Pointer(&data[0])),
+		uintptr(cbData),
+	)
 }

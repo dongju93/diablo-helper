@@ -122,4 +122,10 @@ const (
 	ofnFileMustExist    = 0x00001000
 	ofnNoReadonlyReturn = 0x00008000
 	ofnExplorer         = 0x00080000
+
+	hkeyCurrentUser      = 0x80000001
+	rrfRtRegSz           = 0x00000002
+	regSz                = 1
+	regOptionNonVolatile = 0
+	keySetValue          = 0x0002
 )
