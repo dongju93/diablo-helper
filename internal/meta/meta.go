@@ -3,7 +3,7 @@ package meta
 
 var (
 	// Version is the semantic application version shown in the UI and binary metadata.
-	Version = "0.3.1"
+	Version = "0.4.0"
 	// Commit is the source revision stamped into release builds.
 	Commit = "none"
 	// BuildDate is the UTC build timestamp stamped into release builds.
