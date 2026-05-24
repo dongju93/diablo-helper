@@ -109,7 +109,7 @@ func (a *application) handleKeyEvent(vk uint16, down bool) bool {
 			return true
 		}
 		if vk == vkLButton && captureRejectsMouseLeft(a.capture.kind) {
-			a.rejectCapturedKey(a.capture, "Mouse Left")
+			a.setStatus(captureRejectionMessage(a.capture, "Mouse Left"))
 			return false
 		}
 		a.assignCapturedKey(vk)
@@ -288,6 +288,10 @@ func (a *application) rejectCapturedKey(target captureTarget, keyName string) {
 	message := captureRejectionMessage(target, keyName)
 	a.setStatus(message)
 	if a.hwnd != 0 {
+		// Clear capture before the blocking modal so that keys pressed to dismiss
+		// the dialog are not processed as new binding assignments while the
+		// low-level hook keeps firing during the nested message loop.
+		a.capture = captureTarget{}
 		_ = messageBox(a.hwnd, "키 할당 불가", message, mbOK|mbIconWarning)
 	}
 }

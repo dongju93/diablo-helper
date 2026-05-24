@@ -194,6 +194,8 @@ func (r *skillRunner) fail(err error) {
 
 	cancel()
 	releaseOutputKeys(release, active)
+	releaseInjectedInputs()
+	releaseMouseButtons()
 	if onError != nil {
 		go onError(err)
 	}
@@ -401,6 +403,8 @@ func (r *clickerRunner) fail(err error) {
 
 	cancel()
 	releaseOutputKeys(release, []uint16{active})
+	releaseInjectedInputs()
+	releaseMouseButtons()
 	if onError != nil {
 		go onError(err)
 	}

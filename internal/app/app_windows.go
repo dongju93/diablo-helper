@@ -144,8 +144,6 @@ func (a *application) handleRunnerError(name string, err error) {
 	if a == nil || err == nil {
 		return
 	}
-	releaseInjectedInputs()
-	releaseMouseButtons()
 	a.clearRuntimeInputTargetIfIdle()
 	status := fmt.Sprintf("입력 전송 실패로 %s을 정지했습니다: %v", name, err)
 	a.runnerErrorMu.Lock()

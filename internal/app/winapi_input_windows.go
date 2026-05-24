@@ -71,6 +71,9 @@ func sendVirtualKeyContext(ctx context.Context, vk uint16, hold time.Duration) e
 	if isMouse || err != nil {
 		return err
 	}
+	if injectedInputs.has(vk) {
+		_ = releaseVirtualKey(vk)
+	}
 	down := newKeyboardInput(vk, 0)
 	if err := sendSingleInput(down, "keyboard down", vk); err != nil {
 		return err
@@ -120,6 +123,7 @@ func sendMouseButtonContext(ctx context.Context, vk uint16, hold time.Duration) 
 		return true, err
 	}
 	markInjectedInputUp(vk)
+	// Keep this final release as defensive cleanup after a successful mouse up.
 	_ = releaseVirtualKey(vk)
 	return true, holdErr
 }
