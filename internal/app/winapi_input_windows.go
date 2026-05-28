@@ -170,6 +170,11 @@ func releaseInjectedInputs() {
 	}
 }
 
+func isMouseButton(vk uint16) bool {
+	_, _, _, ok := mouseButtonInput(vk)
+	return ok
+}
+
 func mouseButtonInput(vk uint16) (downFlags, upFlags, data uint32, ok bool) {
 	switch vk {
 	case vkLButton:
