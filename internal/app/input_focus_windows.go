@@ -30,7 +30,6 @@ func (a *application) clearRuntimeInputTargetIfIdle() {
 func (a *application) sendRuntimeInput(ctx context.Context, vk uint16, hold time.Duration) error {
 	if !a.runtimeInputTargetIsForeground() {
 		releaseInjectedInputs()
-		releaseMouseButtons()
 		return nil
 	}
 	return sendVirtualKeyContext(ctx, vk, hold)

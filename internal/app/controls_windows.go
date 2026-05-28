@@ -638,7 +638,6 @@ func (a *application) loadConfig() {
 	}
 	stopRuntimeRunners(a.runner, a.clicker)
 	releaseInjectedInputs()
-	releaseMouseButtons()
 	a.runtimeInputTarget.Store(0)
 	a.cfg = loaded
 	a.configPath = path
@@ -701,7 +700,6 @@ func (a *application) startClickerFromHotkey() {
 func (a *application) stopAllRunners(status string) {
 	stopped := stopRuntimeRunners(a.runner, a.clicker)
 	releaseInjectedInputs()
-	releaseMouseButtons()
 	a.clearRuntimeInputTargetIfIdle()
 	if stopped {
 		a.setStatus(status)

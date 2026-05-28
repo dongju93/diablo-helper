@@ -170,12 +170,6 @@ func releaseInjectedInputs() {
 	}
 }
 
-func releaseMouseButtons() {
-	for _, vk := range []uint16{vkLButton, vkRButton, vkMButton, vkXButton1, vkXButton2} {
-		_ = releaseVirtualKey(vk)
-	}
-}
-
 func mouseButtonInput(vk uint16) (downFlags, upFlags, data uint32, ok bool) {
 	switch vk {
 	case vkLButton:

@@ -83,11 +83,12 @@ func TestRuntimeInputTargetMismatchReleasesTrackedInput(t *testing.T) {
 		injectedInputs.reset()
 	}()
 
-	var released, sent int
-	sendInputCall = func(_ input, label string, _ uint16) error {
+	var released []uint16
+	var sent int
+	sendInputCall = func(_ input, label string, vk uint16) error {
 		switch label {
 		case "mouse up release":
-			released++
+			released = append(released, vk)
 		case "keyboard down", "keyboard up":
 			sent++
 		}
@@ -106,8 +107,8 @@ func TestRuntimeInputTargetMismatchReleasesTrackedInput(t *testing.T) {
 	if err := a.sendRuntimeInput(context.Background(), 'A', 0); err != nil {
 		t.Fatalf("sendRuntimeInput() error = %v", err)
 	}
-	if released != 6 {
-		t.Fatalf("released count = %d, want 6", released)
+	if len(released) != 1 || released[0] != vkLButton {
+		t.Fatalf("released keys = %v, want [%d]", released, vkLButton)
 	}
 	if sent != 0 {
 		t.Fatalf("sent keyboard events = %d, want 0", sent)

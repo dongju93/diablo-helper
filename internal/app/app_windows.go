@@ -274,7 +274,6 @@ func (a *application) cleanup() {
 	}
 	stopRuntimeRunners(a.runner, a.clicker)
 	releaseInjectedInputs()
-	releaseMouseButtons()
 	a.runtimeInputTarget.Store(0)
 	a.disposeUIResources()
 }
