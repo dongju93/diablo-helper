@@ -208,6 +208,38 @@ func TestSendMouseButtonPreReleasesMouseButtons(t *testing.T) {
 	}
 }
 
+func TestReleaseMouseButtonsReleasesEveryButtonRegardlessOfTracking(t *testing.T) {
+	injectedInputs.reset()
+	oldSendInputCall := sendInputCall
+	defer func() {
+		sendInputCall = oldSendInputCall
+		injectedInputs.reset()
+	}()
+
+	var released []uint16
+	sendInputCall = func(_ input, label string, vk uint16) error {
+		if label == "mouse up release" {
+			released = append(released, vk)
+		}
+		return nil
+	}
+
+	// Nothing is tracked as injected-down, yet a stop-path catch-all must still
+	// emit an up for every mouse button so a button left pressed in the game
+	// (after the tracker was already cleared) is released.
+	releaseMouseButtons()
+
+	want := []uint16{vkLButton, vkRButton, vkMButton, vkXButton1, vkXButton2}
+	if len(released) != len(want) {
+		t.Fatalf("released = %v, want %v", released, want)
+	}
+	for i := range want {
+		if released[i] != want[i] {
+			t.Fatalf("released = %v, want %v", released, want)
+		}
+	}
+}
+
 func TestInjectedInputTrackerIgnoresOutOfRangeVK(t *testing.T) {
 	injectedInputs.reset()
 	defer injectedInputs.reset()

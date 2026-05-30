@@ -160,6 +160,7 @@ func (a *application) handleRuntimeControlKey(vk uint16) bool {
 	}
 	if stopped {
 		releaseInjectedInputs()
+		releaseMouseButtons()
 		a.clearRuntimeInputTargetIfIdle()
 		a.setStatus("종료 키 입력으로 정지했습니다.")
 		return true

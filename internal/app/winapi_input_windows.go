@@ -170,6 +170,20 @@ func releaseInjectedInputs() {
 	}
 }
 
+// releaseMouseButtons unconditionally emits a button-up for every mouse button.
+// Unlike releaseInjectedInputs (which only releases buttons still tracked as
+// injected-down), this is a catch-all that also clears a button left pressed in
+// the game after the injected-input tracker has already been cleared — e.g.
+// when a button-up was delivered while the game briefly lost foreground. Used on
+// stop paths only, never on program exit: releasing a still-pressed button
+// registers as a click in-game, which is acceptable when stopping but is the
+// "phantom click right after exit" deliberately avoided in cleanup().
+func releaseMouseButtons() {
+	for _, vk := range []uint16{vkLButton, vkRButton, vkMButton, vkXButton1, vkXButton2} {
+		_ = releaseVirtualKey(vk)
+	}
+}
+
 func isMouseButton(vk uint16) bool {
 	_, _, _, ok := mouseButtonInput(vk)
 	return ok
