@@ -3,14 +3,17 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"sync"
 	"sync/atomic"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/dongju93/diablo-helper/internal/config"
@@ -45,9 +48,19 @@ type application struct {
 	statusText         string
 	runnerErrorMu      sync.Mutex
 	pendingRunnerError string
+	runtimeStopMu      sync.Mutex
+	pendingStopStatus  string
 	runtimeInputTarget atomic.Uintptr
 	skillEnabled       [config.MaxSkills]bool
 	winapi             applicationWinAPI
+	ctx                context.Context
+	cancel             context.CancelFunc
+	shuttingDown       atomic.Bool
+	shutdownOnce       sync.Once
+	shutdownWatchdog   sync.Once
+	shutdownDone       chan struct{}
+	signalStop         context.CancelFunc
+	cleanupMu          sync.Mutex
 	cleanedUp          bool
 }
 
@@ -70,6 +83,12 @@ func Run() error {
 	}
 
 	app := newApplication()
+	defer func() {
+		if value := recover(); value != nil {
+			app.shutdownForRunExit("panic")
+			panic(value)
+		}
+	}()
 	return app.run()
 }
 
@@ -119,9 +138,13 @@ func fallbackMessageBox(title string, text string, flags uintptr) error {
 
 func newApplication() *application {
 	_ = ensureWinAPI()
+	ctx, cancel := context.WithCancel(context.Background())
 	a := &application{
-		cfg:        config.Default(),
-		statusText: "■ 정지.",
+		cfg:          config.Default(),
+		statusText:   "■ 정지.",
+		ctx:          ctx,
+		cancel:       cancel,
+		shutdownDone: make(chan struct{}),
 		controls: controlRefs{
 			menuLabels:  make(map[string]uintptr),
 			menuButtons: make(map[string]uintptr),
@@ -142,6 +165,9 @@ func newApplication() *application {
 
 func (a *application) handleRunnerError(name string, err error) {
 	if a == nil || err == nil {
+		return
+	}
+	if a.shuttingDown.Load() {
 		return
 	}
 	a.clearRuntimeInputTargetIfIdle()
@@ -202,13 +228,14 @@ func (a *application) run() error {
 	}
 	a.hwnd = hwnd
 	a.winapi.setWindowVisuals(hwnd)
+	a.startSignalHandler()
 
 	hook, err := a.winapi.setWindowsHookEx(whKeyboardLL, keyboardHookProc, a.instance, 0)
 	if hook == 0 {
 		return fmt.Errorf("SetWindowsHookExW failed: %w", err)
 	}
 	a.hook = hook
-	defer a.cleanup()
+	defer a.shutdownForRunExit("message loop exit")
 
 	mouseHook, err := a.winapi.setWindowsHookEx(whMouseLL, mouseHookProc, a.instance, 0)
 	if mouseHook == 0 {
@@ -256,6 +283,9 @@ func (a *application) registerWindowClass() error {
 }
 
 func (a *application) cleanup() {
+	a.unregisterHooks()
+	a.cleanupMu.Lock()
+	defer a.cleanupMu.Unlock()
 	if a.cleanedUp {
 		return
 	}
@@ -264,18 +294,37 @@ func (a *application) cleanup() {
 	if appInstance == a {
 		appInstance = nil
 	}
-	if a.hook != 0 {
-		a.winapi.unhookWindowsHook(a.hook)
-		a.hook = 0
-	}
-	if a.mouseHook != 0 {
-		a.winapi.unhookWindowsHook(a.mouseHook)
-		a.mouseHook = 0
-	}
-	stopRuntimeRunners(a.runner, a.clicker)
-	releaseInjectedInputs()
 	a.runtimeInputTarget.Store(0)
 	a.disposeUIResources()
+}
+
+func (a *application) startSignalHandler() {
+	if a == nil || a.ctx == nil {
+		return
+	}
+	signalCtx, stop := signal.NotifyContext(a.ctx, os.Interrupt, syscall.SIGTERM)
+	a.signalStop = stop
+	go func() {
+		<-signalCtx.Done()
+		if a.ctx.Err() != nil || a.shuttingDown.Load() {
+			return
+		}
+		a.beginShutdown("signal", true)
+	}()
+}
+
+func (a *application) shutdownForRunExit(reason string) {
+	if a == nil {
+		return
+	}
+	done := a.startShutdown(reason)
+	select {
+	case <-done:
+	case <-time.After(shutdownTimeout):
+		logShutdownEvent("shutdown timeout: reason=%s", reason)
+		logShutdownStackDump()
+	}
+	a.cleanup()
 }
 
 func (a *application) handleDPIChanged(hwnd uintptr, wParam uintptr, lParam unsafe.Pointer) {

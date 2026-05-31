@@ -75,6 +75,9 @@ func (a *application) startCapture(target captureTarget) {
 }
 
 func (a *application) handleKeyEvent(vk uint16, down bool) bool {
+	if a.shuttingDown.Load() {
+		return false
+	}
 	if down {
 		if a.pressed.has(vk) {
 			return false
@@ -150,18 +153,10 @@ func (a *application) handleRuntimeControlKey(vk uint16) bool {
 	stopRunner := a.runner.Running() && sameKey(vk, a.cfg.Stop)
 	stopClicker := a.clicker.Running() && sameKey(vk, a.cfg.Clicker.Stop)
 	stopped := false
-	switch {
-	case stopRunner && stopClicker:
-		stopped = stopRuntimeRunners(a.runner, a.clicker)
-	case stopRunner:
-		stopped = a.runner.Stop()
-	case stopClicker:
-		stopped = a.clicker.Stop()
+	if stopRunner || stopClicker {
+		stopped = a.requestRuntimeStop("종료 키 입력으로 정지했습니다.")
 	}
 	if stopped {
-		releaseInjectedInputs()
-		releaseMouseButtons()
-		a.clearRuntimeInputTargetIfIdle()
 		a.setStatus("종료 키 입력으로 정지했습니다.")
 		return true
 	}

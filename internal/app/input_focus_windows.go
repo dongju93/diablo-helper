@@ -28,6 +28,15 @@ func (a *application) clearRuntimeInputTargetIfIdle() {
 }
 
 func (a *application) sendRuntimeInput(ctx context.Context, vk uint16, hold time.Duration) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if a != nil && a.shuttingDown.Load() {
+		return context.Canceled
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if !a.runtimeInputTargetIsForeground() {
 		// Target window lost foreground: suspend input. Anything still held in
 		// the target (a button whose up landed on another window after a

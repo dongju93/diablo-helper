@@ -862,6 +862,15 @@ func TestHandleRuntimeControlKeyStopsSharedStopRunnersConcurrently(t *testing.T)
 		done <- a.handleRuntimeControlKey(vkF1)
 	}()
 
+	select {
+	case handled := <-done:
+		if !handled {
+			t.Fatal("handleRuntimeControlKey() = false, want true")
+		}
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("handleRuntimeControlKey() blocked while a send was in flight")
+	}
+
 	waitForRunnerCondition(t, func() bool {
 		return !a.runner.Running()
 	})
@@ -873,16 +882,17 @@ func TestHandleRuntimeControlKeyStopsSharedStopRunnersConcurrently(t *testing.T)
 		t.Fatal("clicker sent queued input after concurrent shared stop")
 	default:
 	}
-
 	release()
-	select {
-	case handled := <-done:
-		if !handled {
-			t.Fatal("handleRuntimeControlKey() = false, want true")
-		}
-	case <-time.After(200 * time.Millisecond):
-		t.Fatal("timed out waiting for shared stop to finish")
-	}
+	waitForRunnerCondition(t, func() bool {
+		a.runner.mu.Lock()
+		defer a.runner.mu.Unlock()
+		return a.runner.cancel == nil
+	})
+	waitForRunnerCondition(t, func() bool {
+		a.clicker.mu.Lock()
+		defer a.clicker.mu.Unlock()
+		return a.clicker.cancel == nil
+	})
 }
 
 func enableRunnableTestSkill(cfg *config.Config) {

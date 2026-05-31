@@ -49,6 +49,16 @@ func (r *skillRunner) SetErrorHandler(onError func(error)) {
 }
 
 func (r *skillRunner) Start(cfg config.Config) bool {
+	return r.StartContext(context.Background(), cfg)
+}
+
+func (r *skillRunner) StartContext(parent context.Context, cfg config.Config) bool {
+	if parent == nil {
+		parent = context.Background()
+	}
+	if parent.Err() != nil {
+		return false
+	}
 	cfg.NormalizeForUI()
 	skills := runnableSkills(cfg)
 	if len(skills) == 0 {
@@ -65,7 +75,7 @@ func (r *skillRunner) Start(cfg config.Config) bool {
 		return false
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(parent)
 	done := make(chan struct{})
 	r.cancel = cancel
 	r.done = done
@@ -88,16 +98,25 @@ func (r *skillRunner) Start(cfg config.Config) bool {
 }
 
 func (r *skillRunner) Stop() bool {
+	stop := r.RequestStop()
+	if stop.done == nil {
+		return false
+	}
+	<-stop.done
+	stop.releaseActive()
+	return stop.requested
+}
+
+func (r *skillRunner) RequestStop() runtimeStopHandle {
 	r.mu.Lock()
 	if r.cancel == nil {
 		r.mu.Unlock()
-		return false
+		return runtimeStopHandle{}
 	}
 	if r.stopping {
 		done := r.done
 		r.mu.Unlock()
-		<-done
-		return false
+		return runtimeStopHandle{name: "skill runner", done: done}
 	}
 	cancel := r.cancel
 	done := r.done
@@ -109,9 +128,14 @@ func (r *skillRunner) Stop() bool {
 	r.mu.Unlock()
 
 	cancel()
-	<-done
-	releaseOutputKeys(release, active)
-	return true
+	return runtimeStopHandle{
+		name:      "skill runner",
+		requested: true,
+		done:      done,
+		release: func() {
+			releaseOutputKeys(release, active)
+		},
+	}
 }
 
 func (r *skillRunner) SetPaused(paused bool) {
@@ -269,6 +293,16 @@ func (r *clickerRunner) SetErrorHandler(onError func(error)) {
 }
 
 func (r *clickerRunner) Start(clicker config.Clicker) bool {
+	return r.StartContext(context.Background(), clicker)
+}
+
+func (r *clickerRunner) StartContext(parent context.Context, clicker config.Clicker) bool {
+	if parent == nil {
+		parent = context.Background()
+	}
+	if parent.Err() != nil {
+		return false
+	}
 	if !clickerRunnable(clicker) {
 		return false
 	}
@@ -279,7 +313,7 @@ func (r *clickerRunner) Start(clicker config.Clicker) bool {
 		return false
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(parent)
 	done := make(chan struct{})
 	r.cancel = cancel
 	r.done = done
@@ -302,16 +336,25 @@ func (r *clickerRunner) Start(clicker config.Clicker) bool {
 }
 
 func (r *clickerRunner) Stop() bool {
+	stop := r.RequestStop()
+	if stop.done == nil {
+		return false
+	}
+	<-stop.done
+	stop.releaseActive()
+	return stop.requested
+}
+
+func (r *clickerRunner) RequestStop() runtimeStopHandle {
 	r.mu.Lock()
 	if r.cancel == nil {
 		r.mu.Unlock()
-		return false
+		return runtimeStopHandle{}
 	}
 	if r.stopping {
 		done := r.done
 		r.mu.Unlock()
-		<-done
-		return false
+		return runtimeStopHandle{name: "clicker runner", done: done}
 	}
 	cancel := r.cancel
 	done := r.done
@@ -323,9 +366,14 @@ func (r *clickerRunner) Stop() bool {
 	r.mu.Unlock()
 
 	cancel()
-	<-done
-	releaseOutputKeys(release, []uint16{active})
-	return true
+	return runtimeStopHandle{
+		name:      "clicker runner",
+		requested: true,
+		done:      done,
+		release: func() {
+			releaseOutputKeys(release, []uint16{active})
+		},
+	}
 }
 
 func (r *clickerRunner) SetPaused(paused bool) {
@@ -457,20 +505,51 @@ func releaseOutputKeys(release func(vk uint16) error, keys []uint16) {
 }
 
 func stopRuntimeRunners(runner *skillRunner, clicker *clickerRunner) bool {
-	stopped := make(chan bool, 2)
-	var wg sync.WaitGroup
+	handles := requestRuntimeRunnersStop(runner, clicker)
+	return waitRuntimeStopHandles(handles)
+}
+
+type runtimeStopHandle struct {
+	name      string
+	requested bool
+	done      <-chan struct{}
+	release   func()
+}
+
+func (h runtimeStopHandle) releaseActive() {
+	if h.release != nil {
+		h.release()
+	}
+}
+
+func requestRuntimeRunnersStop(runner *skillRunner, clicker *clickerRunner) []runtimeStopHandle {
+	handles := make([]runtimeStopHandle, 0, 2)
 	if runner != nil {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			stopped <- runner.Stop()
-		}()
+		if handle := runner.RequestStop(); handle.done != nil {
+			handles = append(handles, handle)
+		}
 	}
 	if clicker != nil {
+		if handle := clicker.RequestStop(); handle.done != nil {
+			handles = append(handles, handle)
+		}
+	}
+	return handles
+}
+
+func waitRuntimeStopHandles(handles []runtimeStopHandle) bool {
+	stopped := make(chan bool, len(handles))
+	var wg sync.WaitGroup
+	for _, handle := range handles {
+		handle := handle
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			stopped <- clicker.Stop()
+			if handle.done != nil {
+				<-handle.done
+			}
+			handle.releaseActive()
+			stopped <- handle.requested
 		}()
 	}
 	wg.Wait()

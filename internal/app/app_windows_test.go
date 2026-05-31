@@ -5,6 +5,7 @@ package app
 import (
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -103,6 +104,104 @@ func TestApplicationCleanupIsIdempotent(t *testing.T) {
 	if appInstance == a {
 		t.Fatal("appInstance still points at cleaned up application")
 	}
+}
+
+func TestWindowCloseStartsShutdownWithoutBlockingOnRuntimeWorkers(t *testing.T) {
+	runnerEntered := make(chan struct{}, 1)
+	clickerEntered := make(chan struct{}, 1)
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	releaseBlockedSend := func() {
+		releaseOnce.Do(func() {
+			close(release)
+		})
+	}
+	defer releaseBlockedSend()
+
+	a := newApplication()
+	a.winapi = stubApplicationWinAPI()
+	a.hwnd = 123
+	a.hook = 11
+	a.mouseHook = 22
+	a.runner = newSkillRunner(func(uint16, time.Duration) error {
+		select {
+		case runnerEntered <- struct{}{}:
+		default:
+		}
+		<-release
+		return nil
+	})
+	a.clicker = newClickerRunner(func(uint16, time.Duration) error {
+		select {
+		case clickerEntered <- struct{}{}:
+		default:
+		}
+		<-release
+		return nil
+	})
+
+	cfg := config.Default()
+	enableRunnableTestSkill(&cfg)
+	if !a.runner.Start(cfg) {
+		t.Fatal("runner did not start")
+	}
+	if !a.clicker.Start(config.Clicker{
+		Key:         config.KeyBinding{Name: "Mouse Left", VK: vkLButton},
+		IntervalMS:  config.MinimumIntervalMS,
+		InputHoldMS: config.DefaultInputHoldMS,
+	}) {
+		t.Fatal("clicker did not start")
+	}
+
+	select {
+	case <-runnerEntered:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timed out waiting for runner send")
+	}
+	select {
+	case <-clickerEntered:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timed out waiting for clicker send")
+	}
+
+	oldSendInputCall := sendInputCall
+	sendInputCall = func(input, string, uint16) error {
+		return nil
+	}
+	defer func() {
+		sendInputCall = oldSendInputCall
+	}()
+
+	oldAppInstance := appInstance
+	appInstance = a
+	defer func() {
+		appInstance = oldAppInstance
+	}()
+
+	done := make(chan uintptr, 1)
+	go func() {
+		done <- wndProc(a.hwnd, wmClose, 0, nil)
+	}()
+
+	select {
+	case got := <-done:
+		if got != 0 {
+			t.Fatalf("wndProc(WM_CLOSE) = %d, want 0", got)
+		}
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("WM_CLOSE blocked while runtime sends were in flight")
+	}
+	if !a.shuttingDown.Load() {
+		t.Fatal("shuttingDown = false after WM_CLOSE")
+	}
+
+	releaseBlockedSend()
+	select {
+	case <-a.shutdownDone:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for shutdown to finish after releasing runner")
+	}
+	a.cleanup()
 }
 
 func TestApplicationRunnerErrorPostsAndUpdatesStatus(t *testing.T) {

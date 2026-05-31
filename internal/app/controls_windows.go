@@ -636,9 +636,7 @@ func (a *application) loadConfig() {
 		messageBox(a.hwnd, "설정 파일 경고", "올바른 diablo-helper 설정 파일이 아닙니다.\n\n"+err.Error(), mbOK|mbIconWarning)
 		return
 	}
-	stopRuntimeRunners(a.runner, a.clicker)
-	releaseInjectedInputs()
-	releaseMouseButtons()
+	a.requestRuntimeStop("")
 	a.runtimeInputTarget.Store(0)
 	a.cfg = loaded
 	a.configPath = path
@@ -651,6 +649,9 @@ func (a *application) loadConfig() {
 }
 
 func (a *application) startRunnerFromHotkey() {
+	if a.shuttingDown.Load() {
+		return
+	}
 	if a.runner.Running() {
 		a.updateRuntimeStatus()
 		return
@@ -666,7 +667,7 @@ func (a *application) startRunnerFromHotkey() {
 	if !a.clicker.Running() {
 		a.captureRuntimeInputTarget()
 	}
-	if a.runner.Start(a.cfg) {
+	if a.runner.StartContext(a.ctx, a.cfg) {
 		a.updateRuntimeStatus()
 		return
 	}
@@ -675,6 +676,9 @@ func (a *application) startRunnerFromHotkey() {
 }
 
 func (a *application) startClickerFromHotkey() {
+	if a.shuttingDown.Load() {
+		return
+	}
 	if a.clicker.Running() {
 		a.updateRuntimeStatus()
 		return
@@ -690,7 +694,7 @@ func (a *application) startClickerFromHotkey() {
 	if !a.runner.Running() {
 		a.captureRuntimeInputTarget()
 	}
-	if a.clicker.Start(a.cfg.Clicker) {
+	if a.clicker.StartContext(a.ctx, a.cfg.Clicker) {
 		a.updateRuntimeStatus()
 		return
 	}
@@ -699,11 +703,51 @@ func (a *application) startClickerFromHotkey() {
 }
 
 func (a *application) stopAllRunners(status string) {
-	stopped := stopRuntimeRunners(a.runner, a.clicker)
-	releaseInjectedInputs()
-	releaseMouseButtons()
-	a.clearRuntimeInputTargetIfIdle()
-	if stopped {
+	if a.requestRuntimeStop(status) {
+		a.setStatus(status)
+		return
+	}
+	a.updateRuntimeStatus()
+}
+
+func (a *application) requestRuntimeStop(status string) bool {
+	handles := requestRuntimeRunnersStop(a.runner, a.clicker)
+	if len(handles) == 0 {
+		go func() {
+			releaseInjectedInputs()
+			releaseMouseButtons()
+			a.clearRuntimeInputTargetIfIdle()
+		}()
+		return false
+	}
+
+	if status != "" {
+		a.runtimeStopMu.Lock()
+		a.pendingStopStatus = status
+		a.runtimeStopMu.Unlock()
+	}
+
+	go func() {
+		releaseInjectedInputs()
+		releaseMouseButtons()
+		waitRuntimeStopHandles(handles)
+		releaseInjectedInputs()
+		releaseMouseButtons()
+		a.clearRuntimeInputTargetIfIdle()
+		if a.shuttingDown.Load() || status == "" || a.hwnd == 0 || a.winapi.postMessage == nil {
+			return
+		}
+		a.winapi.postMessage(a.hwnd, wmRuntimeStopComplete, 0, 0)
+	}()
+	return true
+}
+
+func (a *application) finishAsyncRuntimeStop() {
+	a.runtimeStopMu.Lock()
+	status := a.pendingStopStatus
+	a.pendingStopStatus = ""
+	a.runtimeStopMu.Unlock()
+	if status != "" {
 		a.setStatus(status)
 		return
 	}

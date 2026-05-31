@@ -58,13 +58,34 @@ func wndProc(hwnd uintptr, msg uint32, wParam uintptr, lParam unsafe.Pointer) ui
 			return 0
 		}
 	case wmRunnerError:
+		if appInstance.shuttingDown.Load() {
+			return 0
+		}
 		appInstance.showPendingRunnerError()
 		return 0
+	case wmRuntimeStopComplete:
+		appInstance.finishAsyncRuntimeStop()
+		return 0
 	case wmClose:
+		appInstance.setStatus("종료 중입니다. 실행 중인 입력 작업을 정리합니다.")
+		appInstance.beginShutdown("WM_CLOSE", false)
+		return 0
+	case wmQueryEndSession:
+		appInstance.beginShutdown("WM_QUERYENDSESSION", true)
+		return 1
+	case wmEndSession:
+		if wParam != 0 {
+			appInstance.beginShutdown("WM_ENDSESSION", true)
+		}
+		return 0
+	case wmShutdownComplete:
 		appInstance.winapi.destroyWindow(hwnd)
 		return 0
 	case wmDestroy:
 		app := appInstance
+		if !app.shuttingDown.Load() {
+			app.beginShutdown("WM_DESTROY", true)
+		}
 		app.cleanup()
 		app.winapi.postQuitMessage(0)
 		return 0
@@ -73,7 +94,7 @@ func wndProc(hwnd uintptr, msg uint32, wParam uintptr, lParam unsafe.Pointer) ui
 }
 
 func lowLevelKeyboardProc(code int, wParam uintptr, lParam unsafe.Pointer) uintptr {
-	if code < 0 || appInstance == nil || lParam == nil {
+	if code < 0 || appInstance == nil || appInstance.shuttingDown.Load() || lParam == nil {
 		return callNextHookEx(code, wParam, lParam)
 	}
 
@@ -101,7 +122,7 @@ func lowLevelKeyboardProc(code int, wParam uintptr, lParam unsafe.Pointer) uintp
 }
 
 func lowLevelMouseProc(code int, wParam uintptr, lParam unsafe.Pointer) uintptr {
-	if code < 0 || appInstance == nil || lParam == nil {
+	if code < 0 || appInstance == nil || appInstance.shuttingDown.Load() || lParam == nil {
 		return callNextHookEx(code, wParam, lParam)
 	}
 

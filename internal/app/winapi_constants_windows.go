@@ -83,12 +83,16 @@ const (
 	wmGetMinMaxInfo         = 0x0024
 	wmDpiChanged            = 0x02E0
 	wmClose                 = 0x0010
+	wmQueryEndSession       = 0x0011
+	wmEndSession            = 0x0016
 	wmEraseBkgnd            = 0x0014
 	wmDrawItem              = 0x002B
 	wmCommand               = 0x0111
 	wmSetFont               = 0x0030
 	wmApp                   = 0x8000
 	wmRunnerError           = wmApp + 1
+	wmRuntimeStopComplete   = wmApp + 2
+	wmShutdownComplete      = wmApp + 3
 	wmKeyDown               = 0x0100
 	wmKeyUp                 = 0x0101
 	wmSysKeyDown            = 0x0104
