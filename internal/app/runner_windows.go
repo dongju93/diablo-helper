@@ -11,61 +11,34 @@ import (
 	"github.com/dongju93/diablo-helper/internal/config"
 )
 
-type skillRunner struct {
+type runnerCore struct {
+	name     string
 	mu       sync.Mutex
 	cancel   context.CancelFunc
 	done     chan struct{}
 	stopping bool
 	running  atomic.Bool
 	paused   atomic.Bool
-	sendKey  contextTimedKeySender
 	release  func(vk uint16) error
 	onError  func(error)
 	active   []uint16
 }
 
-func newSkillRunner(sendKey func(vk uint16, hold time.Duration) error) *skillRunner {
-	return newSkillRunnerWithRelease(sendKey, nil)
+func newRunnerCore(name string, release func(vk uint16) error) runnerCore {
+	return runnerCore{name: name, release: release}
 }
 
-func newSkillRunnerWithRelease(sendKey func(vk uint16, hold time.Duration) error, release func(vk uint16) error) *skillRunner {
-	return newSkillRunnerWithTimedSend(wrapTimedKeySender(sendKey), release)
-}
-
-func newSkillRunnerWithTimedSend(sendKey timedKeySender, release func(vk uint16) error) *skillRunner {
-	return newSkillRunnerWithContextTimedSend(func(_ context.Context, vk uint16, hold time.Duration) (time.Time, error) {
-		return sendKey(vk, hold)
-	}, release)
-}
-
-func newSkillRunnerWithContextTimedSend(sendKey contextTimedKeySender, release func(vk uint16) error) *skillRunner {
-	return &skillRunner{sendKey: sendKey, release: release}
-}
-
-func (r *skillRunner) SetErrorHandler(onError func(error)) {
+func (r *runnerCore) SetErrorHandler(onError func(error)) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.onError = onError
 }
 
-func (r *skillRunner) Start(cfg config.Config) bool {
-	return r.StartContext(context.Background(), cfg)
-}
-
-func (r *skillRunner) StartContext(parent context.Context, cfg config.Config) bool {
+func (r *runnerCore) start(parent context.Context, active []uint16, loop func(context.Context) error) bool {
 	if parent == nil {
 		parent = context.Background()
 	}
 	if parent.Err() != nil {
-		return false
-	}
-	cfg.NormalizeForUI()
-	skills := runnableSkills(cfg)
-	if len(skills) == 0 {
-		return false
-	}
-	skillGap, ok := skillGapDuration(cfg.SkillGapMS)
-	if !ok {
 		return false
 	}
 
@@ -80,7 +53,7 @@ func (r *skillRunner) StartContext(parent context.Context, cfg config.Config) bo
 	r.cancel = cancel
 	r.done = done
 	r.stopping = false
-	r.active = skillOutputKeys(skills)
+	r.active = append([]uint16(nil), active...)
 	r.running.Store(true)
 	r.paused.Store(false)
 
@@ -88,7 +61,9 @@ func (r *skillRunner) StartContext(parent context.Context, cfg config.Config) bo
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		r.run(ctx, skills, skillGap)
+		if err := loop(ctx); err != nil && ctx.Err() == nil {
+			r.fail(err)
+		}
 	}()
 	go func() {
 		wg.Wait()
@@ -97,7 +72,7 @@ func (r *skillRunner) StartContext(parent context.Context, cfg config.Config) bo
 	return true
 }
 
-func (r *skillRunner) Stop() bool {
+func (r *runnerCore) Stop() bool {
 	stop := r.RequestStop()
 	if stop.done == nil {
 		return false
@@ -107,7 +82,7 @@ func (r *skillRunner) Stop() bool {
 	return stop.requested
 }
 
-func (r *skillRunner) RequestStop() runtimeStopHandle {
+func (r *runnerCore) RequestStop() runtimeStopHandle {
 	r.mu.Lock()
 	if r.cancel == nil {
 		r.mu.Unlock()
@@ -116,7 +91,7 @@ func (r *skillRunner) RequestStop() runtimeStopHandle {
 	if r.stopping {
 		done := r.done
 		r.mu.Unlock()
-		return runtimeStopHandle{name: "skill runner", done: done}
+		return runtimeStopHandle{name: r.name, done: done}
 	}
 	cancel := r.cancel
 	done := r.done
@@ -129,7 +104,7 @@ func (r *skillRunner) RequestStop() runtimeStopHandle {
 
 	cancel()
 	return runtimeStopHandle{
-		name:      "skill runner",
+		name:      r.name,
 		requested: true,
 		done:      done,
 		release: func() {
@@ -138,7 +113,7 @@ func (r *skillRunner) RequestStop() runtimeStopHandle {
 	}
 }
 
-func (r *skillRunner) SetPaused(paused bool) {
+func (r *runnerCore) SetPaused(paused bool) {
 	if !r.running.Load() {
 		r.paused.Store(false)
 		return
@@ -146,62 +121,15 @@ func (r *skillRunner) SetPaused(paused bool) {
 	r.paused.Store(paused)
 }
 
-func (r *skillRunner) Running() bool {
+func (r *runnerCore) Running() bool {
 	return r.running.Load()
 }
 
-func (r *skillRunner) Paused() bool {
+func (r *runnerCore) Paused() bool {
 	return r.running.Load() && r.paused.Load()
 }
 
-func (r *skillRunner) run(ctx context.Context, skills []config.Skill, skillGap time.Duration) {
-	scheduled := scheduledSkills(skills, skillGap)
-	if len(scheduled) == 0 {
-		return
-	}
-	timer := newStoppedTimer()
-	defer timer.Stop()
-	var lastStarted time.Time
-
-	for {
-		index := nextScheduledSkillIndex(scheduled)
-		next := scheduled[index].next
-		if !lastStarted.IsZero() && skillGap > 0 {
-			minNext := lastStarted.Add(skillGap)
-			if next.Before(minNext) {
-				next = minNext
-			}
-		}
-		if !waitForScheduledInput(ctx, timer, next) {
-			return
-		}
-		if ctx.Err() != nil {
-			return
-		}
-		if r.paused.Load() {
-			scheduled[index].next = time.Now().Add(scheduled[index].interval)
-			continue
-		}
-		if ctx.Err() != nil {
-			return
-		}
-		startedAt, err := r.sendKey(ctx, uint16(scheduled[index].skill.Key.VK), scheduled[index].hold)
-		if err != nil {
-			if ctx.Err() != nil {
-				return
-			}
-			r.fail(err)
-			return
-		}
-		if ctx.Err() != nil {
-			return
-		}
-		lastStarted = startedAt
-		scheduled[index].next = nextScheduledInput(startedAt, scheduled[index].interval)
-	}
-}
-
-func (r *skillRunner) fail(err error) {
+func (r *runnerCore) fail(err error) {
 	r.mu.Lock()
 	if r.cancel == nil || r.stopping {
 		r.mu.Unlock()
@@ -225,7 +153,7 @@ func (r *skillRunner) fail(err error) {
 	}
 }
 
-func (r *skillRunner) finish(done chan struct{}) {
+func (r *runnerCore) finish(done chan struct{}) {
 	r.mu.Lock()
 	if r.done == done {
 		r.cancel = nil
@@ -237,6 +165,98 @@ func (r *skillRunner) finish(done chan struct{}) {
 	}
 	close(done)
 	r.mu.Unlock()
+}
+
+type skillRunner struct {
+	runnerCore
+	sendKey contextTimedKeySender
+}
+
+func newSkillRunner(sendKey func(vk uint16, hold time.Duration) error) *skillRunner {
+	return newSkillRunnerWithRelease(sendKey, nil)
+}
+
+func newSkillRunnerWithRelease(sendKey func(vk uint16, hold time.Duration) error, release func(vk uint16) error) *skillRunner {
+	return newSkillRunnerWithTimedSend(wrapTimedKeySender(sendKey), release)
+}
+
+func newSkillRunnerWithTimedSend(sendKey timedKeySender, release func(vk uint16) error) *skillRunner {
+	return newSkillRunnerWithContextTimedSend(func(_ context.Context, vk uint16, hold time.Duration) (time.Time, error) {
+		return sendKey(vk, hold)
+	}, release)
+}
+
+func newSkillRunnerWithContextTimedSend(sendKey contextTimedKeySender, release func(vk uint16) error) *skillRunner {
+	return &skillRunner{
+		runnerCore: newRunnerCore("skill runner", release),
+		sendKey:    sendKey,
+	}
+}
+
+func (r *skillRunner) Start(cfg config.Config) bool {
+	return r.StartContext(context.Background(), cfg)
+}
+
+func (r *skillRunner) StartContext(parent context.Context, cfg config.Config) bool {
+	cfg.NormalizeForUI()
+	skills := runnableSkills(cfg)
+	if len(skills) == 0 {
+		return false
+	}
+	skillGap, ok := skillGapDuration(cfg.SkillGapMS)
+	if !ok {
+		return false
+	}
+
+	return r.start(parent, skillOutputKeys(skills), func(ctx context.Context) error {
+		return r.run(ctx, skills, skillGap)
+	})
+}
+
+func (r *skillRunner) run(ctx context.Context, skills []config.Skill, skillGap time.Duration) error {
+	scheduled := scheduledSkills(skills, skillGap)
+	if len(scheduled) == 0 {
+		return nil
+	}
+	timer := newStoppedTimer()
+	defer timer.Stop()
+	var lastStarted time.Time
+
+	for {
+		index := nextScheduledSkillIndex(scheduled)
+		next := scheduled[index].next
+		if !lastStarted.IsZero() && skillGap > 0 {
+			minNext := lastStarted.Add(skillGap)
+			if next.Before(minNext) {
+				next = minNext
+			}
+		}
+		if !waitForScheduledInput(ctx, timer, next) {
+			return nil
+		}
+		if ctx.Err() != nil {
+			return nil
+		}
+		if r.paused.Load() {
+			scheduled[index].next = time.Now().Add(scheduled[index].interval)
+			continue
+		}
+		if ctx.Err() != nil {
+			return nil
+		}
+		startedAt, err := r.sendKey(ctx, uint16(scheduled[index].skill.Key.VK), scheduled[index].hold)
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil
+			}
+			return err
+		}
+		if ctx.Err() != nil {
+			return nil
+		}
+		lastStarted = startedAt
+		scheduled[index].next = nextScheduledInput(startedAt, scheduled[index].interval)
+	}
 }
 
 func runnableSkills(cfg config.Config) []config.Skill {
@@ -256,16 +276,8 @@ func skillRunnable(skill config.Skill) bool {
 }
 
 type clickerRunner struct {
-	mu       sync.Mutex
-	cancel   context.CancelFunc
-	done     chan struct{}
-	stopping bool
-	running  atomic.Bool
-	paused   atomic.Bool
-	sendKey  contextTimedKeySender
-	release  func(vk uint16) error
-	onError  func(error)
-	active   uint16
+	runnerCore
+	sendKey contextTimedKeySender
 }
 
 func newClickerRunner(sendKey func(vk uint16, hold time.Duration) error) *clickerRunner {
@@ -283,13 +295,10 @@ func newClickerRunnerWithTimedSend(sendKey timedKeySender, release func(vk uint1
 }
 
 func newClickerRunnerWithContextTimedSend(sendKey contextTimedKeySender, release func(vk uint16) error) *clickerRunner {
-	return &clickerRunner{sendKey: sendKey, release: release}
-}
-
-func (r *clickerRunner) SetErrorHandler(onError func(error)) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.onError = onError
+	return &clickerRunner{
+		runnerCore: newRunnerCore("clicker runner", release),
+		sendKey:    sendKey,
+	}
 }
 
 func (r *clickerRunner) Start(clicker config.Clicker) bool {
@@ -297,109 +306,23 @@ func (r *clickerRunner) Start(clicker config.Clicker) bool {
 }
 
 func (r *clickerRunner) StartContext(parent context.Context, clicker config.Clicker) bool {
-	if parent == nil {
-		parent = context.Background()
-	}
-	if parent.Err() != nil {
-		return false
-	}
 	if !clickerRunnable(clicker) {
 		return false
 	}
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.cancel != nil {
-		return false
-	}
-
-	ctx, cancel := context.WithCancel(parent)
-	done := make(chan struct{})
-	r.cancel = cancel
-	r.done = done
-	r.stopping = false
-	r.active = uint16(clicker.Key.VK)
-	r.running.Store(true)
-	r.paused.Store(false)
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		r.run(ctx, clicker)
-	}()
-	go func() {
-		wg.Wait()
-		r.finish(done)
-	}()
-	return true
+	return r.start(parent, []uint16{uint16(clicker.Key.VK)}, func(ctx context.Context) error {
+		return r.run(ctx, clicker)
+	})
 }
 
-func (r *clickerRunner) Stop() bool {
-	stop := r.RequestStop()
-	if stop.done == nil {
-		return false
-	}
-	<-stop.done
-	stop.releaseActive()
-	return stop.requested
-}
-
-func (r *clickerRunner) RequestStop() runtimeStopHandle {
-	r.mu.Lock()
-	if r.cancel == nil {
-		r.mu.Unlock()
-		return runtimeStopHandle{}
-	}
-	if r.stopping {
-		done := r.done
-		r.mu.Unlock()
-		return runtimeStopHandle{name: "clicker runner", done: done}
-	}
-	cancel := r.cancel
-	done := r.done
-	release := r.release
-	active := r.active
-	r.stopping = true
-	r.running.Store(false)
-	r.paused.Store(false)
-	r.mu.Unlock()
-
-	cancel()
-	return runtimeStopHandle{
-		name:      "clicker runner",
-		requested: true,
-		done:      done,
-		release: func() {
-			releaseOutputKeys(release, []uint16{active})
-		},
-	}
-}
-
-func (r *clickerRunner) SetPaused(paused bool) {
-	if !r.running.Load() {
-		r.paused.Store(false)
-		return
-	}
-	r.paused.Store(paused)
-}
-
-func (r *clickerRunner) Paused() bool {
-	return r.running.Load() && r.paused.Load()
-}
-
-func (r *clickerRunner) Running() bool {
-	return r.running.Load()
-}
-
-func (r *clickerRunner) run(ctx context.Context, clicker config.Clicker) {
+func (r *clickerRunner) run(ctx context.Context, clicker config.Clicker) error {
 	interval, ok := intervalDuration(clicker.IntervalMS)
 	if !ok {
-		return
+		return nil
 	}
 	hold, ok := inputHoldDuration(clicker.InputHoldMS)
 	if !ok {
-		return
+		return nil
 	}
 	timer := newStoppedTimer()
 	defer timer.Stop()
@@ -407,69 +330,30 @@ func (r *clickerRunner) run(ctx context.Context, clicker config.Clicker) {
 
 	for {
 		if !waitForScheduledInput(ctx, timer, next) {
-			return
+			return nil
 		}
 		if ctx.Err() != nil {
-			return
+			return nil
 		}
 		if r.paused.Load() {
 			next = time.Now().Add(interval)
 			continue
 		}
 		if ctx.Err() != nil {
-			return
+			return nil
 		}
 		startedAt, err := r.sendKey(ctx, uint16(clicker.Key.VK), hold)
 		if err != nil {
 			if ctx.Err() != nil {
-				return
+				return nil
 			}
-			r.fail(err)
-			return
+			return err
 		}
 		if ctx.Err() != nil {
-			return
+			return nil
 		}
 		next = nextScheduledInput(startedAt, interval)
 	}
-}
-
-func (r *clickerRunner) fail(err error) {
-	r.mu.Lock()
-	if r.cancel == nil || r.stopping {
-		r.mu.Unlock()
-		return
-	}
-	cancel := r.cancel
-	onError := r.onError
-	release := r.release
-	active := r.active
-	r.stopping = true
-	r.running.Store(false)
-	r.paused.Store(false)
-	r.mu.Unlock()
-
-	cancel()
-	releaseOutputKeys(release, []uint16{active})
-	releaseInjectedInputs()
-	releaseMouseButtons()
-	if onError != nil {
-		go onError(err)
-	}
-}
-
-func (r *clickerRunner) finish(done chan struct{}) {
-	r.mu.Lock()
-	if r.done == done {
-		r.cancel = nil
-		r.done = nil
-		r.stopping = false
-		r.active = 0
-		r.running.Store(false)
-		r.paused.Store(false)
-	}
-	close(done)
-	r.mu.Unlock()
 }
 
 func clickerRunnable(clicker config.Clicker) bool {
