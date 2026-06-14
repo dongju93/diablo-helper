@@ -209,15 +209,16 @@ func (a *application) run() error {
 
 	appInstance = a
 	bounds := a.currentWindowBounds(0)
+	placement := a.initialWindowPlacement(bounds)
 	hwnd, err := a.winapi.createWindowEx(
 		mainWindowExStyle,
 		utf16Ptr("DiabloHelperWindow"),
 		utf16Ptr(meta.Title()),
 		mainWindowStyle,
-		cwUseDefault,
-		cwUseDefault,
-		uintptr(bounds.maxW),
-		uintptr(bounds.maxH),
+		placement.x,
+		placement.y,
+		placement.width,
+		placement.height,
 		0,
 		0,
 		a.instance,
@@ -243,7 +244,9 @@ func (a *application) run() error {
 	}
 	a.mouseHook = mouseHook
 
-	a.winapi.showWindow(hwnd, swShow)
+	if !placement.hasRestore || !a.restoreWindowPlacement(hwnd, placement.restore) {
+		a.winapi.showWindow(hwnd, swShow)
+	}
 	a.winapi.updateWindow(hwnd)
 
 	var msg message
@@ -411,6 +414,10 @@ type applicationWinAPI struct {
 	postQuitMessage     func(exitCode int)
 	monitorMetrics      func(hwnd uintptr) monitorMetrics
 	getForegroundWindow func() uintptr
+	getWindowPlacement  func(hwnd uintptr) (savedWindowPlacement, bool)
+	setWindowPlacement  func(hwnd uintptr, placement *windowPlacementInfo) bool
+	loadWindowPlacement func() (savedWindowPlacement, bool)
+	saveWindowPlacement func(savedWindowPlacement)
 }
 
 type createWindowExFunc func(
@@ -512,6 +519,13 @@ func defaultApplicationWinAPI() applicationWinAPI {
 		},
 		monitorMetrics:      getMonitorMetrics,
 		getForegroundWindow: getForegroundWindow,
+		getWindowPlacement:  captureWindowPlacement,
+		setWindowPlacement: func(hwnd uintptr, placement *windowPlacementInfo) bool {
+			ret, _, _ := procSetWindowPlacement.Call(hwnd, uintptr(unsafe.Pointer(placement)))
+			return ret != 0
+		},
+		loadWindowPlacement: loadSavedWindowPlacement,
+		saveWindowPlacement: saveSavedWindowPlacement,
 	}
 }
 

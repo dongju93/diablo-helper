@@ -56,6 +56,7 @@ var (
 	procGetSystemMetrics         *syscall.LazyProc
 	procGetWindowTextW           *syscall.LazyProc
 	procGetWindowTextLenW        *syscall.LazyProc
+	procGetWindowPlacement       *syscall.LazyProc
 	procInvalidateRect           *syscall.LazyProc
 	procLoadCursorW              *syscall.LazyProc
 	procLoadIconW                *syscall.LazyProc
@@ -68,6 +69,7 @@ var (
 	procSendInput                *syscall.LazyProc
 	procSendMessageW             *syscall.LazyProc
 	procSetWindowPos             *syscall.LazyProc
+	procSetWindowPlacement       *syscall.LazyProc
 	procSetWindowsHookExW        *syscall.LazyProc
 	procSetWindowTextW           *syscall.LazyProc
 	procShowWindow               *syscall.LazyProc
@@ -150,6 +152,7 @@ func loadWinAPIProcs() {
 	procGetSystemMetrics = user32.NewProc("GetSystemMetrics")
 	procGetWindowTextW = user32.NewProc("GetWindowTextW")
 	procGetWindowTextLenW = user32.NewProc("GetWindowTextLengthW")
+	procGetWindowPlacement = user32.NewProc("GetWindowPlacement")
 	procInvalidateRect = user32.NewProc("InvalidateRect")
 	procLoadCursorW = user32.NewProc("LoadCursorW")
 	procLoadIconW = user32.NewProc("LoadIconW")
@@ -162,6 +165,7 @@ func loadWinAPIProcs() {
 	procSendInput = user32.NewProc("SendInput")
 	procSendMessageW = user32.NewProc("SendMessageW")
 	procSetWindowPos = user32.NewProc("SetWindowPos")
+	procSetWindowPlacement = user32.NewProc("SetWindowPlacement")
 	procSetWindowsHookExW = user32.NewProc("SetWindowsHookExW")
 	procSetWindowTextW = user32.NewProc("SetWindowTextW")
 	procShowWindow = user32.NewProc("ShowWindow")

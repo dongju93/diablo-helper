@@ -131,6 +131,15 @@ type minMaxInfo struct {
 	MaxTrackSize point
 }
 
+type windowPlacementInfo struct {
+	Length         uint32
+	Flags          uint32
+	ShowCmd        uint32
+	MinPosition    point
+	MaxPosition    point
+	NormalPosition rect
+}
+
 type monitorInfo struct {
 	Size    uint32
 	Monitor rect

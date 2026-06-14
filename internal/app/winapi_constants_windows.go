@@ -73,9 +73,12 @@ const (
 	swpNoZOrder             = 0x0004
 	swpNoRedraw             = 0x0008
 	swpNoActivate           = 0x0010
+	swShowNormal            = 1
+	swShowMaximized         = 3
 	swShow                  = 5
 	whKeyboardLL            = 13
 	whMouseLL               = 14
+	wpfRestoreToMaximized   = 0x0002
 	wmCreate                = 0x0001
 	wmDestroy               = 0x0002
 	wmPaint                 = 0x000F

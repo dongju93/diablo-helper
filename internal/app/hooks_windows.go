@@ -67,22 +67,27 @@ func wndProc(hwnd uintptr, msg uint32, wParam uintptr, lParam unsafe.Pointer) ui
 		appInstance.finishAsyncRuntimeStop()
 		return 0
 	case wmClose:
+		appInstance.saveCurrentWindowPlacement()
 		appInstance.setStatus("종료 중입니다. 실행 중인 입력 작업을 정리합니다.")
 		appInstance.beginShutdown("WM_CLOSE", false)
 		return 0
 	case wmQueryEndSession:
+		appInstance.saveCurrentWindowPlacement()
 		appInstance.beginShutdown("WM_QUERYENDSESSION", true)
 		return 1
 	case wmEndSession:
 		if wParam != 0 {
+			appInstance.saveCurrentWindowPlacement()
 			appInstance.beginShutdown("WM_ENDSESSION", true)
 		}
 		return 0
 	case wmShutdownComplete:
+		appInstance.saveCurrentWindowPlacement()
 		appInstance.winapi.destroyWindow(hwnd)
 		return 0
 	case wmDestroy:
 		app := appInstance
+		app.saveCurrentWindowPlacement()
 		if !app.shuttingDown.Load() {
 			app.beginShutdown("WM_DESTROY", true)
 		}
