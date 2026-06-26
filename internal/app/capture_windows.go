@@ -316,73 +316,43 @@ func bindingText(binding config.KeyBinding) string {
 }
 
 func parseInterval(value string) (int, error) {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return 0, fmt.Errorf("실행 간격은 필수입니다")
-	}
-	if len(trimmed) > maxEditTextLen {
-		return 0, fmt.Errorf("실행 간격 입력이 너무 깁니다")
-	}
-	interval, err := strconv.Atoi(trimmed)
-	if err != nil {
-		return 0, fmt.Errorf("실행 간격은 숫자여야 합니다")
-	}
-	if interval < config.MinimumIntervalMS {
-		return 0, fmt.Errorf("실행 간격은 최소 %dms 이상이어야 합니다", config.MinimumIntervalMS)
-	}
-	if interval > config.MaximumIntervalMS {
-		return 0, fmt.Errorf("실행 간격은 최대 %dms 이하여야 합니다", config.MaximumIntervalMS)
-	}
-	if !config.MillisecondsFitDuration(interval) {
-		return 0, fmt.Errorf("실행 간격이 너무 큽니다")
-	}
-	return interval, nil
+	return parseBoundedMS(value, "실행 간격", config.MinimumIntervalMS, config.MaximumIntervalMS, false, 0)
 }
 
 func parseSkillGap(value string) (int, error) {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return config.DefaultSkillGapMS, nil
-	}
-	if len(trimmed) > maxEditTextLen {
-		return 0, fmt.Errorf("키별 간격 입력이 너무 깁니다")
-	}
-	gap, err := strconv.Atoi(trimmed)
-	if err != nil {
-		return 0, fmt.Errorf("키별 간격은 숫자여야 합니다")
-	}
-	if gap < 0 {
-		return 0, fmt.Errorf("키별 간격은 0ms 이상이어야 합니다")
-	}
-	if gap > config.MaximumSkillGapMS {
-		return 0, fmt.Errorf("키별 간격은 최대 %dms 이하여야 합니다", config.MaximumSkillGapMS)
-	}
-	if !config.MillisecondsFitDuration(gap) {
-		return 0, fmt.Errorf("키별 간격이 너무 큽니다")
-	}
-	return gap, nil
+	return parseBoundedMS(value, "키별 간격", 0, config.MaximumSkillGapMS, true, config.DefaultSkillGapMS)
 }
 
 func parseInputHold(value string) (int, error) {
+	return parseBoundedMS(value, "눌림 시간", config.MinimumInputHoldMS, config.MaximumInputHoldMS, false, 0)
+}
+
+func parseBoundedMS(value, label string, min, max int, allowEmpty bool, emptyDefault int) (int, error) {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
-		return 0, fmt.Errorf("눌림 시간은 필수입니다")
+		if allowEmpty {
+			return emptyDefault, nil
+		}
+		return 0, fmt.Errorf("%s은 필수입니다", label)
 	}
 	if len(trimmed) > maxEditTextLen {
-		return 0, fmt.Errorf("눌림 시간 입력이 너무 깁니다")
+		return 0, fmt.Errorf("%s 입력이 너무 깁니다", label)
 	}
-	hold, err := strconv.Atoi(trimmed)
+	ms, err := strconv.Atoi(trimmed)
 	if err != nil {
-		return 0, fmt.Errorf("눌림 시간은 숫자여야 합니다")
+		return 0, fmt.Errorf("%s은 숫자여야 합니다", label)
 	}
-	if hold < config.MinimumInputHoldMS {
-		return 0, fmt.Errorf("눌림 시간은 최소 %dms 이상이어야 합니다", config.MinimumInputHoldMS)
+	if ms < min {
+		if min == 0 {
+			return 0, fmt.Errorf("%s은 0ms 이상이어야 합니다", label)
+		}
+		return 0, fmt.Errorf("%s은 최소 %dms 이상이어야 합니다", label, min)
 	}
-	if hold > config.MaximumInputHoldMS {
-		return 0, fmt.Errorf("눌림 시간은 최대 %dms 이하여야 합니다", config.MaximumInputHoldMS)
+	if ms > max {
+		return 0, fmt.Errorf("%s은 최대 %dms 이하여야 합니다", label, max)
 	}
-	if !config.MillisecondsFitDuration(hold) {
-		return 0, fmt.Errorf("눌림 시간이 너무 큽니다")
+	if !config.MillisecondsFitDuration(ms) {
+		return 0, fmt.Errorf("%s이 너무 큽니다", label)
 	}
-	return hold, nil
+	return ms, nil
 }
