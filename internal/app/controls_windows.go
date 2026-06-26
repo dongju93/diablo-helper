@@ -137,8 +137,396 @@ type menuControl struct {
 	control int
 }
 
+type controlPlacementGroup int
+
+const (
+	controlGroupHeaderAndBindings controlPlacementGroup = iota
+	controlGroupBulk
+	controlGroupSkillHeaders
+	controlGroupPause
+	controlGroupClicker
+	controlGroupStatus
+)
+
+type controlKind int
+
+const (
+	controlKindStatic controlKind = iota
+	controlKindButton
+	controlKindEdit
+)
+
+type controlRect struct {
+	x      int
+	y      int
+	width  int
+	height int
+}
+
+type controlPlacement struct {
+	group controlPlacementGroup
+	kind  controlKind
+	ref   func(*controlRefs) *uintptr
+	id    int
+	text  string
+	rect  func(uiLayout) controlRect
+}
+
+type skillRowRects struct {
+	enabled     controlRect
+	num         controlRect
+	button      controlRect
+	interval    controlRect
+	msLabel     controlRect
+	hold        controlRect
+	holdMsLabel controlRect
+}
+
 var (
-	menuControls = buildMenuControls()
+	menuControls           = buildMenuControls()
+	fixedControlPlacements = []controlPlacement{
+		{
+			group: controlGroupHeaderAndBindings,
+			kind:  controlKindButton,
+			ref:   func(c *controlRefs) *uintptr { return &c.loadButton },
+			id:    idLoad,
+			text:  "불러오기",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.loadX, lo.y(26), lo.w(headerBtnW), lo.h(34)}
+			},
+		},
+		{
+			group: controlGroupHeaderAndBindings,
+			kind:  controlKindButton,
+			ref:   func(c *controlRefs) *uintptr { return &c.saveButton },
+			id:    idSave,
+			text:  "저장하기",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.saveX, lo.y(26), lo.w(headerBtnW), lo.h(34)}
+			},
+		},
+		{
+			group: controlGroupHeaderAndBindings,
+			kind:  controlKindStatic,
+			ref:   func(c *controlRefs) *uintptr { return &c.startLabel },
+			text:  "시작 키",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.x(layoutLX + 24), lo.y(139), lo.w(95), lo.h(24)}
+			},
+		},
+		{
+			group: controlGroupHeaderAndBindings,
+			kind:  controlKindButton,
+			ref:   func(c *controlRefs) *uintptr { return &c.startButton },
+			id:    idStartKey,
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.x(layoutLX + 130), lo.y(134), lo.w(190), lo.h(34)}
+			},
+		},
+		{
+			group: controlGroupHeaderAndBindings,
+			kind:  controlKindStatic,
+			ref:   func(c *controlRefs) *uintptr { return &c.stopLabel },
+			text:  "종료 키",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.x(layoutLX + 24), lo.y(181), lo.w(95), lo.h(24)}
+			},
+		},
+		{
+			group: controlGroupHeaderAndBindings,
+			kind:  controlKindButton,
+			ref:   func(c *controlRefs) *uintptr { return &c.stopButton },
+			id:    idStopKey,
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.x(layoutLX + 130), lo.y(176), lo.w(190), lo.h(34)}
+			},
+		},
+		{
+			group: controlGroupBulk,
+			kind:  controlKindStatic,
+			ref:   func(c *controlRefs) *uintptr { return &c.bulkLabel },
+			text:  "일괄 간격",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.bulkLabelX, lo.y(bulkIntervalLabelY), lo.w(78), lo.h(24)}
+			},
+		},
+		{
+			group: controlGroupBulk,
+			kind:  controlKindEdit,
+			ref:   func(c *controlRefs) *uintptr { return &c.bulkInterval },
+			id:    idBulkInterval,
+			text:  strconv.Itoa(config.DefaultIntervalMS),
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.bulkEditX, lo.y(bulkIntervalEditY), lo.w(bulkEditW), lo.h(22)}
+			},
+		},
+		{
+			group: controlGroupBulk,
+			kind:  controlKindStatic,
+			ref:   func(c *controlRefs) *uintptr { return &c.bulkMsLabel },
+			text:  "ms",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.bulkMsX, lo.y(bulkIntervalLabelY), lo.w(bulkMsW), lo.h(24)}
+			},
+		},
+		{
+			group: controlGroupBulk,
+			kind:  controlKindStatic,
+			ref:   func(c *controlRefs) *uintptr { return &c.bulkSkillGapLbl },
+			text:  "키별 간격",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.bulkLabelX, lo.y(bulkSkillGapLabelY), lo.w(78), lo.h(24)}
+			},
+		},
+		{
+			group: controlGroupBulk,
+			kind:  controlKindEdit,
+			ref:   func(c *controlRefs) *uintptr { return &c.bulkSkillGap },
+			id:    idBulkSkillGap,
+			text:  strconv.Itoa(config.DefaultSkillGapMS),
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.bulkEditX, lo.y(bulkSkillGapEditY), lo.w(bulkEditW), lo.h(22)}
+			},
+		},
+		{
+			group: controlGroupBulk,
+			kind:  controlKindStatic,
+			ref:   func(c *controlRefs) *uintptr { return &c.bulkGapMsLabel },
+			text:  "ms",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.bulkMsX, lo.y(bulkSkillGapLabelY), lo.w(bulkMsW), lo.h(24)}
+			},
+		},
+		{
+			group: controlGroupBulk,
+			kind:  controlKindStatic,
+			ref:   func(c *controlRefs) *uintptr { return &c.inputHoldLabel },
+			text:  "일괄 눌림",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.bulkLabelX, lo.y(inputHoldLabelY), lo.w(78), lo.h(24)}
+			},
+		},
+		{
+			group: controlGroupBulk,
+			kind:  controlKindEdit,
+			ref:   func(c *controlRefs) *uintptr { return &c.inputHold },
+			id:    idInputHold,
+			text:  strconv.Itoa(config.DefaultInputHoldMS),
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.bulkEditX, lo.y(inputHoldEditY), lo.w(bulkEditW), lo.h(22)}
+			},
+		},
+		{
+			group: controlGroupBulk,
+			kind:  controlKindStatic,
+			ref:   func(c *controlRefs) *uintptr { return &c.inputHoldMsLbl },
+			text:  "ms",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.bulkMsX, lo.y(inputHoldLabelY), lo.w(bulkMsW), lo.h(24)}
+			},
+		},
+		{
+			group: controlGroupBulk,
+			kind:  controlKindButton,
+			ref:   func(c *controlRefs) *uintptr { return &c.applyBulk },
+			id:    idApplyBulk,
+			text:  "일괄 적용",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.bulkApplyX, lo.y(bulkApplyY), lo.w(bulkApplyW), lo.h(bulkApplyH)}
+			},
+		},
+		{
+			group: controlGroupSkillHeaders,
+			kind:  controlKindStatic,
+			ref:   func(c *controlRefs) *uintptr { return &c.skillUseHdr },
+			text:  "사용",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.skillUseHdrX, lo.y(skillHeaderY), lo.w(55), lo.h(24)}
+			},
+		},
+		{
+			group: controlGroupSkillHeaders,
+			kind:  controlKindStatic,
+			ref:   func(c *controlRefs) *uintptr { return &c.skillNumHdr },
+			text:  "기술",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.skillNumHdrX, lo.y(skillHeaderY), lo.w(55), lo.h(24)}
+			},
+		},
+		{
+			group: controlGroupSkillHeaders,
+			kind:  controlKindStatic,
+			ref:   func(c *controlRefs) *uintptr { return &c.skillKeyHdr },
+			text:  "키",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.skillKeyHdrX, lo.y(skillHeaderY), lo.w(35), lo.h(24)}
+			},
+		},
+		{
+			group: controlGroupSkillHeaders,
+			kind:  controlKindStatic,
+			ref:   func(c *controlRefs) *uintptr { return &c.skillIntHdr },
+			text:  "실행 간격",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.skillIntHdrX, lo.y(skillHeaderY), lo.w(80), lo.h(24)}
+			},
+		},
+		{
+			group: controlGroupSkillHeaders,
+			kind:  controlKindStatic,
+			ref:   func(c *controlRefs) *uintptr { return &c.skillHoldHdr },
+			text:  "눌림",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.skillHoldHdrX, lo.y(skillHeaderY), lo.w(50), lo.h(24)}
+			},
+		},
+		{
+			group: controlGroupPause,
+			kind:  controlKindStatic,
+			ref:   func(c *controlRefs) *uintptr { return &c.pauseLabel },
+			text:  "키",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.pauseLabelX, lo.y(pauseRowY + 6), lo.w(45), lo.h(24)}
+			},
+		},
+		{
+			group: controlGroupPause,
+			kind:  controlKindButton,
+			ref:   func(c *controlRefs) *uintptr { return &c.pauseButton },
+			id:    idPauseKey,
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.pauseBtnX, lo.y(pauseRowY), lo.pauseBtnW, lo.h(34)}
+			},
+		},
+		{
+			group: controlGroupClicker,
+			kind:  controlKindStatic,
+			ref:   func(c *controlRefs) *uintptr { return &c.clickerStartLabel },
+			text:  "시작",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.clickerStartLabelX, lo.y(clickerHotkeyY + 6), lo.w(44), lo.h(24)}
+			},
+		},
+		{
+			group: controlGroupClicker,
+			kind:  controlKindButton,
+			ref:   func(c *controlRefs) *uintptr { return &c.clickerStartButton },
+			id:    idClickerStartKey,
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.clickerStartBtnX, lo.y(clickerHotkeyY), lo.w(clickerStartBtnW), lo.h(34)}
+			},
+		},
+		{
+			group: controlGroupClicker,
+			kind:  controlKindStatic,
+			ref:   func(c *controlRefs) *uintptr { return &c.clickerStopLabel },
+			text:  "종료",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.clickerStopLabelX, lo.y(clickerHotkeyY + 6), lo.w(44), lo.h(24)}
+			},
+		},
+		{
+			group: controlGroupClicker,
+			kind:  controlKindButton,
+			ref:   func(c *controlRefs) *uintptr { return &c.clickerStopButton },
+			id:    idClickerStopKey,
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.clickerStopBtnX, lo.y(clickerHotkeyY), lo.w(clickerStopBtnW), lo.h(34)}
+			},
+		},
+		{
+			group: controlGroupClicker,
+			kind:  controlKindStatic,
+			ref:   func(c *controlRefs) *uintptr { return &c.clickerKeyLabel },
+			text:  "입력",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.clickerKeyLabelX, lo.y(clickerSettingY + 6), lo.w(44), lo.h(24)}
+			},
+		},
+		{
+			group: controlGroupClicker,
+			kind:  controlKindButton,
+			ref:   func(c *controlRefs) *uintptr { return &c.clickerKeyButton },
+			id:    idClickerKey,
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.clickerKeyBtnX, lo.y(clickerSettingY), lo.w(clickerKeyBtnW), lo.h(34)}
+			},
+		},
+		{
+			group: controlGroupClicker,
+			kind:  controlKindStatic,
+			ref:   func(c *controlRefs) *uintptr { return &c.clickerIntervalLabel },
+			text:  "간격",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.clickerIntLabelX, lo.y(clickerSettingY + 6), lo.w(44), lo.h(24)}
+			},
+		},
+		{
+			group: controlGroupClicker,
+			kind:  controlKindEdit,
+			ref:   func(c *controlRefs) *uintptr { return &c.clickerInterval },
+			id:    idClickerInterval,
+			text:  strconv.Itoa(config.DefaultClickerIntervalMS),
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.clickerIntEditX, lo.y(clickerSettingY + 7), lo.w(clickerIntEditW), lo.h(22)}
+			},
+		},
+		{
+			group: controlGroupClicker,
+			kind:  controlKindStatic,
+			ref:   func(c *controlRefs) *uintptr { return &c.clickerMsLabel },
+			text:  "ms",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.clickerMsLabelX, lo.y(clickerSettingY + 6), lo.w(32), lo.h(24)}
+			},
+		},
+		{
+			group: controlGroupClicker,
+			kind:  controlKindStatic,
+			ref:   func(c *controlRefs) *uintptr { return &c.clickerHoldLabel },
+			text:  "눌림",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.clickerHoldLabelX, lo.y(clickerSettingY + 6), lo.w(44), lo.h(24)}
+			},
+		},
+		{
+			group: controlGroupClicker,
+			kind:  controlKindEdit,
+			ref:   func(c *controlRefs) *uintptr { return &c.clickerHold },
+			id:    idClickerHold,
+			text:  strconv.Itoa(config.DefaultInputHoldMS),
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.clickerHoldEditX, lo.y(clickerSettingY + 7), lo.w(clickerHoldEditW), lo.h(22)}
+			},
+		},
+		{
+			group: controlGroupClicker,
+			kind:  controlKindStatic,
+			ref:   func(c *controlRefs) *uintptr { return &c.clickerHoldMsLabel },
+			text:  "ms",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.clickerHoldMsX, lo.y(clickerSettingY + 6), lo.w(32), lo.h(24)}
+			},
+		},
+		{
+			group: controlGroupStatus,
+			kind:  controlKindStatic,
+			ref:   func(c *controlRefs) *uintptr { return &c.statusLabel },
+			text:  "상태",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.x(layoutLX + 24), lo.y(statusBarY + 11), lo.w(55), lo.h(24)}
+			},
+		},
+		{
+			group: controlGroupStatus,
+			kind:  controlKindStatic,
+			ref:   func(c *controlRefs) *uintptr { return &c.status },
+			text:  "■ 정지.",
+			rect: func(lo uiLayout) controlRect {
+				return controlRect{lo.statusTextX, lo.y(statusBarY + 11), lo.statusTextW, lo.h(24)}
+			},
+		},
+	}
 )
 
 func buildMenuControls() []menuControl {
@@ -230,81 +618,103 @@ func (a *application) invalidateCaptureControls(targets ...captureTarget) {
 	}
 }
 
+func (a *application) createControlPlacements(hwnd uintptr, lo uiLayout, group controlPlacementGroup) {
+	for _, placement := range fixedControlPlacements {
+		if placement.group != group {
+			continue
+		}
+		*placement.ref(&a.controls) = a.createPlacedControl(hwnd, lo, placement)
+	}
+}
+
+func (a *application) createPlacedControl(hwnd uintptr, lo uiLayout, placement controlPlacement) uintptr {
+	rect := placement.rect(lo)
+	switch placement.kind {
+	case controlKindStatic:
+		return a.createStatic(hwnd, placement.text, rect.x, rect.y, rect.width, rect.height)
+	case controlKindButton:
+		return a.createButton(hwnd, placement.id, placement.text, rect.x, rect.y, rect.width, rect.height)
+	case controlKindEdit:
+		return a.createEdit(hwnd, placement.id, placement.text, rect.x, rect.y, rect.width, rect.height)
+	default:
+		return 0
+	}
+}
+
+func (a *application) repositionControlPlacements(lo uiLayout, group controlPlacementGroup) {
+	for _, placement := range fixedControlPlacements {
+		if placement.group != group {
+			continue
+		}
+		moveControlRect(*placement.ref(&a.controls), placement.rect(lo))
+	}
+}
+
+func moveControlRect(hwnd uintptr, rect controlRect) {
+	moveControl(hwnd, rect.x, rect.y, rect.width, rect.height)
+}
+
+func menuControlRects(lo uiLayout, y int) (controlRect, controlRect) {
+	return controlRect{lo.x(layoutLX + 24), lo.y(y + 5), lo.w(120), lo.h(24)},
+		controlRect{lo.x(layoutLX + 150), lo.y(y), lo.w(170), lo.h(34)}
+}
+
+func skillRowControlRects(lo uiLayout, y int) skillRowRects {
+	return skillRowRects{
+		enabled:     controlRect{lo.skillChkX, lo.y(y + 4), lo.w(52), lo.h(26)},
+		num:         controlRect{lo.skillNumX, lo.y(y + 7), lo.w(skillNumW), lo.h(22)},
+		button:      controlRect{lo.skillBtnX, lo.y(y), lo.skillBtnW, lo.h(34)},
+		interval:    controlRect{lo.skillIntervalX, lo.y(y + 7), lo.w(skillEditW), lo.h(22)},
+		msLabel:     controlRect{lo.skillMsX, lo.y(y + 6), lo.w(skillMsW), lo.h(22)},
+		hold:        controlRect{lo.skillHoldX, lo.y(y + 7), lo.w(skillHoldEditW), lo.h(22)},
+		holdMsLabel: controlRect{lo.skillHoldMsX, lo.y(y + 6), lo.w(skillMsW), lo.h(22)},
+	}
+}
+
 func (a *application) createControls(hwnd uintptr) {
 	cw, ch := getClientSize(hwnd)
 	lo := computeLayout(cw, ch, a.currentDPI(hwnd))
 	a.applyUIScale(lo.uiScale())
 
-	// Header buttons (right-anchored)
-	a.controls.loadButton = a.createButton(hwnd, idLoad, "불러오기", lo.loadX, lo.y(26), lo.w(headerBtnW), lo.h(34))
-	a.controls.saveButton = a.createButton(hwnd, idSave, "저장하기", lo.saveX, lo.y(26), lo.w(headerBtnW), lo.h(34))
-
-	// Left column – key bindings
-	a.controls.startLabel = a.createStatic(hwnd, "시작 키", lo.x(layoutLX+24), lo.y(139), lo.w(95), lo.h(24))
-	a.controls.startButton = a.createButton(hwnd, idStartKey, "", lo.x(layoutLX+130), lo.y(134), lo.w(190), lo.h(34))
-	a.controls.stopLabel = a.createStatic(hwnd, "종료 키", lo.x(layoutLX+24), lo.y(181), lo.w(95), lo.h(24))
-	a.controls.stopButton = a.createButton(hwnd, idStopKey, "", lo.x(layoutLX+130), lo.y(176), lo.w(190), lo.h(34))
+	// Header buttons and left column key bindings
+	a.createControlPlacements(hwnd, lo, controlGroupHeaderAndBindings)
 
 	menuY := menuFirstY
 	for _, menu := range menuControls {
-		a.controls.menuLabels[menu.id] = a.createStatic(hwnd, menu.label, lo.x(layoutLX+24), lo.y(menuY+5), lo.w(120), lo.h(24))
-		a.controls.menuButtons[menu.id] = a.createButton(hwnd, menu.control, "", lo.x(layoutLX+150), lo.y(menuY), lo.w(170), lo.h(34))
+		labelRect, buttonRect := menuControlRects(lo, menuY)
+		a.controls.menuLabels[menu.id] = a.createStatic(hwnd, menu.label, labelRect.x, labelRect.y, labelRect.width, labelRect.height)
+		a.controls.menuButtons[menu.id] = a.createButton(hwnd, menu.control, "", buttonRect.x, buttonRect.y, buttonRect.width, buttonRect.height)
 		menuY += 40
 	}
 
 	// Right column – bulk interval section
-	a.controls.bulkLabel = a.createStatic(hwnd, "일괄 간격", lo.bulkLabelX, lo.y(bulkIntervalLabelY), lo.w(78), lo.h(24))
-	a.controls.bulkInterval = a.createEdit(hwnd, idBulkInterval, strconv.Itoa(config.DefaultIntervalMS), lo.bulkEditX, lo.y(bulkIntervalEditY), lo.w(bulkEditW), lo.h(22))
-	a.controls.bulkMsLabel = a.createStatic(hwnd, "ms", lo.bulkMsX, lo.y(bulkIntervalLabelY), lo.w(bulkMsW), lo.h(24))
-	a.controls.bulkSkillGapLbl = a.createStatic(hwnd, "키별 간격", lo.bulkLabelX, lo.y(bulkSkillGapLabelY), lo.w(78), lo.h(24))
-	a.controls.bulkSkillGap = a.createEdit(hwnd, idBulkSkillGap, strconv.Itoa(config.DefaultSkillGapMS), lo.bulkEditX, lo.y(bulkSkillGapEditY), lo.w(bulkEditW), lo.h(22))
-	a.controls.bulkGapMsLabel = a.createStatic(hwnd, "ms", lo.bulkMsX, lo.y(bulkSkillGapLabelY), lo.w(bulkMsW), lo.h(24))
-	a.controls.inputHoldLabel = a.createStatic(hwnd, "일괄 눌림", lo.bulkLabelX, lo.y(inputHoldLabelY), lo.w(78), lo.h(24))
-	a.controls.inputHold = a.createEdit(hwnd, idInputHold, strconv.Itoa(config.DefaultInputHoldMS), lo.bulkEditX, lo.y(inputHoldEditY), lo.w(bulkEditW), lo.h(22))
-	a.controls.inputHoldMsLbl = a.createStatic(hwnd, "ms", lo.bulkMsX, lo.y(inputHoldLabelY), lo.w(bulkMsW), lo.h(24))
-	a.controls.applyBulk = a.createButton(hwnd, idApplyBulk, "일괄 적용", lo.bulkApplyX, lo.y(bulkApplyY), lo.w(bulkApplyW), lo.h(bulkApplyH))
+	a.createControlPlacements(hwnd, lo, controlGroupBulk)
 
 	// Right column – skill grid headers
-	a.controls.skillUseHdr = a.createStatic(hwnd, "사용", lo.skillUseHdrX, lo.y(skillHeaderY), lo.w(55), lo.h(24))
-	a.controls.skillNumHdr = a.createStatic(hwnd, "기술", lo.skillNumHdrX, lo.y(skillHeaderY), lo.w(55), lo.h(24))
-	a.controls.skillKeyHdr = a.createStatic(hwnd, "키", lo.skillKeyHdrX, lo.y(skillHeaderY), lo.w(35), lo.h(24))
-	a.controls.skillIntHdr = a.createStatic(hwnd, "실행 간격", lo.skillIntHdrX, lo.y(skillHeaderY), lo.w(80), lo.h(24))
-	a.controls.skillHoldHdr = a.createStatic(hwnd, "눌림", lo.skillHoldHdrX, lo.y(skillHeaderY), lo.w(50), lo.h(24))
+	a.createControlPlacements(hwnd, lo, controlGroupSkillHeaders)
 
 	// Right column – skill rows
 	y := skillFirstRowY
 	for i := range config.MaxSkills {
-		a.controls.skillEnabled[i] = a.createButton(hwnd, idSkillEnabledBase+i, "", lo.skillChkX, lo.y(y+4), lo.w(52), lo.h(26))
-		a.controls.skillNums[i] = a.createStatic(hwnd, strconv.Itoa(i+1), lo.skillNumX, lo.y(y+7), lo.w(skillNumW), lo.h(22))
-		a.controls.skillButtons[i] = a.createButton(hwnd, idSkillKeyBase+i, "", lo.skillBtnX, lo.y(y), lo.skillBtnW, lo.h(34))
-		a.controls.skillInterval[i] = a.createEdit(hwnd, idSkillIntervalBase+i, "", lo.skillIntervalX, lo.y(y+7), lo.w(skillEditW), lo.h(22))
-		a.controls.skillMsLbls[i] = a.createStatic(hwnd, "ms", lo.skillMsX, lo.y(y+6), lo.w(skillMsW), lo.h(22))
-		a.controls.skillHold[i] = a.createEdit(hwnd, idSkillHoldBase+i, "", lo.skillHoldX, lo.y(y+7), lo.w(skillHoldEditW), lo.h(22))
-		a.controls.skillHoldMsLbls[i] = a.createStatic(hwnd, "ms", lo.skillHoldMsX, lo.y(y+6), lo.w(skillMsW), lo.h(22))
+		rects := skillRowControlRects(lo, y)
+		a.controls.skillEnabled[i] = a.createButton(hwnd, idSkillEnabledBase+i, "", rects.enabled.x, rects.enabled.y, rects.enabled.width, rects.enabled.height)
+		a.controls.skillNums[i] = a.createStatic(hwnd, strconv.Itoa(i+1), rects.num.x, rects.num.y, rects.num.width, rects.num.height)
+		a.controls.skillButtons[i] = a.createButton(hwnd, idSkillKeyBase+i, "", rects.button.x, rects.button.y, rects.button.width, rects.button.height)
+		a.controls.skillInterval[i] = a.createEdit(hwnd, idSkillIntervalBase+i, "", rects.interval.x, rects.interval.y, rects.interval.width, rects.interval.height)
+		a.controls.skillMsLbls[i] = a.createStatic(hwnd, "ms", rects.msLabel.x, rects.msLabel.y, rects.msLabel.width, rects.msLabel.height)
+		a.controls.skillHold[i] = a.createEdit(hwnd, idSkillHoldBase+i, "", rects.hold.x, rects.hold.y, rects.hold.width, rects.hold.height)
+		a.controls.skillHoldMsLbls[i] = a.createStatic(hwnd, "ms", rects.holdMsLabel.x, rects.holdMsLabel.y, rects.holdMsLabel.width, rects.holdMsLabel.height)
 		y += skillRowGap
 	}
 
 	// Right column – pause section
-	a.controls.pauseLabel = a.createStatic(hwnd, "키", lo.pauseLabelX, lo.y(pauseRowY+6), lo.w(45), lo.h(24))
-	a.controls.pauseButton = a.createButton(hwnd, idPauseKey, "", lo.pauseBtnX, lo.y(pauseRowY), lo.pauseBtnW, lo.h(34))
+	a.createControlPlacements(hwnd, lo, controlGroupPause)
 
 	// Right column – single-key clicker section
-	a.controls.clickerStartLabel = a.createStatic(hwnd, "시작", lo.clickerStartLabelX, lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
-	a.controls.clickerStartButton = a.createButton(hwnd, idClickerStartKey, "", lo.clickerStartBtnX, lo.y(clickerHotkeyY), lo.w(clickerStartBtnW), lo.h(34))
-	a.controls.clickerStopLabel = a.createStatic(hwnd, "종료", lo.clickerStopLabelX, lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
-	a.controls.clickerStopButton = a.createButton(hwnd, idClickerStopKey, "", lo.clickerStopBtnX, lo.y(clickerHotkeyY), lo.w(clickerStopBtnW), lo.h(34))
-	a.controls.clickerKeyLabel = a.createStatic(hwnd, "입력", lo.clickerKeyLabelX, lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
-	a.controls.clickerKeyButton = a.createButton(hwnd, idClickerKey, "", lo.clickerKeyBtnX, lo.y(clickerSettingY), lo.w(clickerKeyBtnW), lo.h(34))
-	a.controls.clickerIntervalLabel = a.createStatic(hwnd, "간격", lo.clickerIntLabelX, lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
-	a.controls.clickerInterval = a.createEdit(hwnd, idClickerInterval, strconv.Itoa(config.DefaultClickerIntervalMS), lo.clickerIntEditX, lo.y(clickerSettingY+7), lo.w(clickerIntEditW), lo.h(22))
-	a.controls.clickerMsLabel = a.createStatic(hwnd, "ms", lo.clickerMsLabelX, lo.y(clickerSettingY+6), lo.w(32), lo.h(24))
-	a.controls.clickerHoldLabel = a.createStatic(hwnd, "눌림", lo.clickerHoldLabelX, lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
-	a.controls.clickerHold = a.createEdit(hwnd, idClickerHold, strconv.Itoa(config.DefaultInputHoldMS), lo.clickerHoldEditX, lo.y(clickerSettingY+7), lo.w(clickerHoldEditW), lo.h(22))
-	a.controls.clickerHoldMsLabel = a.createStatic(hwnd, "ms", lo.clickerHoldMsX, lo.y(clickerSettingY+6), lo.w(32), lo.h(24))
+	a.createControlPlacements(hwnd, lo, controlGroupClicker)
 
 	// Status bar
-	a.controls.statusLabel = a.createStatic(hwnd, "상태", lo.x(layoutLX+24), lo.y(statusBarY+11), lo.w(55), lo.h(24))
-	a.controls.status = a.createStatic(hwnd, "■ 정지.", lo.statusTextX, lo.y(statusBarY+11), lo.statusTextW, lo.h(24))
+	a.createControlPlacements(hwnd, lo, controlGroupStatus)
 
 	a.updateControlsFromConfig()
 }
@@ -314,68 +724,35 @@ func (a *application) repositionControls() {
 	lo := computeLayout(cw, ch, a.currentDPI(a.hwnd))
 	a.applyUIScale(lo.uiScale())
 
-	moveControl(a.controls.loadButton, lo.loadX, lo.y(26), lo.w(headerBtnW), lo.h(34))
-	moveControl(a.controls.saveButton, lo.saveX, lo.y(26), lo.w(headerBtnW), lo.h(34))
-
-	moveControl(a.controls.startLabel, lo.x(layoutLX+24), lo.y(139), lo.w(95), lo.h(24))
-	moveControl(a.controls.startButton, lo.x(layoutLX+130), lo.y(134), lo.w(190), lo.h(34))
-	moveControl(a.controls.stopLabel, lo.x(layoutLX+24), lo.y(181), lo.w(95), lo.h(24))
-	moveControl(a.controls.stopButton, lo.x(layoutLX+130), lo.y(176), lo.w(190), lo.h(34))
+	a.repositionControlPlacements(lo, controlGroupHeaderAndBindings)
 
 	menuY := menuFirstY
 	for _, menu := range menuControls {
-		moveControl(a.controls.menuLabels[menu.id], lo.x(layoutLX+24), lo.y(menuY+5), lo.w(120), lo.h(24))
-		moveControl(a.controls.menuButtons[menu.id], lo.x(layoutLX+150), lo.y(menuY), lo.w(170), lo.h(34))
+		labelRect, buttonRect := menuControlRects(lo, menuY)
+		moveControlRect(a.controls.menuLabels[menu.id], labelRect)
+		moveControlRect(a.controls.menuButtons[menu.id], buttonRect)
 		menuY += 40
 	}
 
-	moveControl(a.controls.bulkLabel, lo.bulkLabelX, lo.y(bulkIntervalLabelY), lo.w(78), lo.h(24))
-	moveControl(a.controls.bulkInterval, lo.bulkEditX, lo.y(bulkIntervalEditY), lo.w(bulkEditW), lo.h(22))
-	moveControl(a.controls.bulkMsLabel, lo.bulkMsX, lo.y(bulkIntervalLabelY), lo.w(bulkMsW), lo.h(24))
-	moveControl(a.controls.bulkSkillGapLbl, lo.bulkLabelX, lo.y(bulkSkillGapLabelY), lo.w(78), lo.h(24))
-	moveControl(a.controls.bulkSkillGap, lo.bulkEditX, lo.y(bulkSkillGapEditY), lo.w(bulkEditW), lo.h(22))
-	moveControl(a.controls.bulkGapMsLabel, lo.bulkMsX, lo.y(bulkSkillGapLabelY), lo.w(bulkMsW), lo.h(24))
-	moveControl(a.controls.inputHoldLabel, lo.bulkLabelX, lo.y(inputHoldLabelY), lo.w(78), lo.h(24))
-	moveControl(a.controls.inputHold, lo.bulkEditX, lo.y(inputHoldEditY), lo.w(bulkEditW), lo.h(22))
-	moveControl(a.controls.inputHoldMsLbl, lo.bulkMsX, lo.y(inputHoldLabelY), lo.w(bulkMsW), lo.h(24))
-	moveControl(a.controls.applyBulk, lo.bulkApplyX, lo.y(bulkApplyY), lo.w(bulkApplyW), lo.h(bulkApplyH))
-
-	moveControl(a.controls.skillUseHdr, lo.skillUseHdrX, lo.y(skillHeaderY), lo.w(55), lo.h(24))
-	moveControl(a.controls.skillNumHdr, lo.skillNumHdrX, lo.y(skillHeaderY), lo.w(55), lo.h(24))
-	moveControl(a.controls.skillKeyHdr, lo.skillKeyHdrX, lo.y(skillHeaderY), lo.w(35), lo.h(24))
-	moveControl(a.controls.skillIntHdr, lo.skillIntHdrX, lo.y(skillHeaderY), lo.w(80), lo.h(24))
-	moveControl(a.controls.skillHoldHdr, lo.skillHoldHdrX, lo.y(skillHeaderY), lo.w(50), lo.h(24))
+	a.repositionControlPlacements(lo, controlGroupBulk)
+	a.repositionControlPlacements(lo, controlGroupSkillHeaders)
 
 	y := skillFirstRowY
 	for i := range config.MaxSkills {
-		moveControl(a.controls.skillEnabled[i], lo.skillChkX, lo.y(y+4), lo.w(52), lo.h(26))
-		moveControl(a.controls.skillNums[i], lo.skillNumX, lo.y(y+7), lo.w(skillNumW), lo.h(22))
-		moveControl(a.controls.skillButtons[i], lo.skillBtnX, lo.y(y), lo.skillBtnW, lo.h(34))
-		moveControl(a.controls.skillInterval[i], lo.skillIntervalX, lo.y(y+7), lo.w(skillEditW), lo.h(22))
-		moveControl(a.controls.skillMsLbls[i], lo.skillMsX, lo.y(y+6), lo.w(skillMsW), lo.h(22))
-		moveControl(a.controls.skillHold[i], lo.skillHoldX, lo.y(y+7), lo.w(skillHoldEditW), lo.h(22))
-		moveControl(a.controls.skillHoldMsLbls[i], lo.skillHoldMsX, lo.y(y+6), lo.w(skillMsW), lo.h(22))
+		rects := skillRowControlRects(lo, y)
+		moveControlRect(a.controls.skillEnabled[i], rects.enabled)
+		moveControlRect(a.controls.skillNums[i], rects.num)
+		moveControlRect(a.controls.skillButtons[i], rects.button)
+		moveControlRect(a.controls.skillInterval[i], rects.interval)
+		moveControlRect(a.controls.skillMsLbls[i], rects.msLabel)
+		moveControlRect(a.controls.skillHold[i], rects.hold)
+		moveControlRect(a.controls.skillHoldMsLbls[i], rects.holdMsLabel)
 		y += skillRowGap
 	}
 
-	moveControl(a.controls.pauseLabel, lo.pauseLabelX, lo.y(pauseRowY+6), lo.w(45), lo.h(24))
-	moveControl(a.controls.pauseButton, lo.pauseBtnX, lo.y(pauseRowY), lo.pauseBtnW, lo.h(34))
-
-	moveControl(a.controls.clickerStartLabel, lo.clickerStartLabelX, lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
-	moveControl(a.controls.clickerStartButton, lo.clickerStartBtnX, lo.y(clickerHotkeyY), lo.w(clickerStartBtnW), lo.h(34))
-	moveControl(a.controls.clickerStopLabel, lo.clickerStopLabelX, lo.y(clickerHotkeyY+6), lo.w(44), lo.h(24))
-	moveControl(a.controls.clickerStopButton, lo.clickerStopBtnX, lo.y(clickerHotkeyY), lo.w(clickerStopBtnW), lo.h(34))
-	moveControl(a.controls.clickerKeyLabel, lo.clickerKeyLabelX, lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
-	moveControl(a.controls.clickerKeyButton, lo.clickerKeyBtnX, lo.y(clickerSettingY), lo.w(clickerKeyBtnW), lo.h(34))
-	moveControl(a.controls.clickerIntervalLabel, lo.clickerIntLabelX, lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
-	moveControl(a.controls.clickerInterval, lo.clickerIntEditX, lo.y(clickerSettingY+7), lo.w(clickerIntEditW), lo.h(22))
-	moveControl(a.controls.clickerMsLabel, lo.clickerMsLabelX, lo.y(clickerSettingY+6), lo.w(32), lo.h(24))
-	moveControl(a.controls.clickerHoldLabel, lo.clickerHoldLabelX, lo.y(clickerSettingY+6), lo.w(44), lo.h(24))
-	moveControl(a.controls.clickerHold, lo.clickerHoldEditX, lo.y(clickerSettingY+7), lo.w(clickerHoldEditW), lo.h(22))
-	moveControl(a.controls.clickerHoldMsLabel, lo.clickerHoldMsX, lo.y(clickerSettingY+6), lo.w(32), lo.h(24))
-
-	moveControl(a.controls.statusLabel, lo.x(layoutLX+24), lo.y(statusBarY+11), lo.w(55), lo.h(24))
-	moveControl(a.controls.status, lo.statusTextX, lo.y(statusBarY+11), lo.statusTextW, lo.h(24))
+	a.repositionControlPlacements(lo, controlGroupPause)
+	a.repositionControlPlacements(lo, controlGroupClicker)
+	a.repositionControlPlacements(lo, controlGroupStatus)
 
 	invalidateRect(a.hwnd, false)
 }
