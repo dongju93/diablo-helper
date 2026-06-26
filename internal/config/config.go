@@ -143,6 +143,33 @@ type MenuBinding struct {
 	Binding KeyBinding
 }
 
+// KeyUsageKind classifies whether a configured key controls automation state
+// or is emitted as automated output.
+type KeyUsageKind int
+
+const (
+	// KeyUsageControl is a hotkey that starts, stops, pauses, or opens a menu.
+	KeyUsageControl KeyUsageKind = iota
+	// KeyUsageOutput is a key emitted by skill or click repeat automation.
+	KeyUsageOutput
+)
+
+// KeyUsage describes one configured use of a key.
+type KeyUsage struct {
+	// Label is the user-facing label for this use.
+	Label string
+	// Kind is the broad runtime role for this use.
+	Kind KeyUsageKind
+}
+
+// KeyConflict describes one non-fatal key collision.
+type KeyConflict struct {
+	// Key is the duplicated key, with Name derived from VK.
+	Key KeyBinding
+	// Usages lists the configured uses that share Key.
+	Usages []KeyUsage
+}
+
 // MenuBindingDefinition describes a supported game menu action.
 type MenuBindingDefinition struct {
 	// ID is the stable menu action identifier used by config and UI code.
@@ -404,7 +431,8 @@ func (c Config) MenuBindings() []MenuBinding {
 
 // Validate checks config invariants without repairing values, including that
 // each stored key_name matches key_vk or an accepted legacy alias before
-// NormalizeForUI rewrites names from KeyDisplayName.
+// NormalizeForUI rewrites names from KeyDisplayName. Non-fatal key collisions
+// are reported by KeyConflicts instead of being rejected here.
 func (c Config) Validate() error {
 	if len(c.Skills) > MaxSkills {
 		return fmt.Errorf("skills must not exceed %d entries", MaxSkills)
@@ -507,6 +535,71 @@ func (c Config) Validate() error {
 		}
 	}
 	return nil
+}
+
+// KeyConflicts reports non-fatal key collisions that can make runtime behavior
+// ambiguous. Control-control duplicates and control-output duplicates are
+// reported; output-output duplicates are left alone because they can be useful
+// for deliberate multi-slot timing.
+func (c Config) KeyConflicts() []KeyConflict {
+	usagesByVK := make(map[int][]KeyUsage)
+	order := make([]int, 0)
+	add := func(binding KeyBinding, usage KeyUsage) {
+		if !binding.Assigned() {
+			return
+		}
+		if _, ok := usagesByVK[binding.VK]; !ok {
+			order = append(order, binding.VK)
+		}
+		usagesByVK[binding.VK] = append(usagesByVK[binding.VK], usage)
+	}
+
+	add(c.Start, KeyUsage{Label: "시작 키", Kind: KeyUsageControl})
+	add(c.Stop, KeyUsage{Label: "종료 키", Kind: KeyUsageControl})
+	add(c.Pause, KeyUsage{Label: "일시정지 키", Kind: KeyUsageControl})
+	add(c.Clicker.Start, KeyUsage{Label: "클릭 시작 키", Kind: KeyUsageControl})
+	add(c.Clicker.Stop, KeyUsage{Label: "클릭 종료 키", Kind: KeyUsageControl})
+	for i := range menuBindingSpecs {
+		spec := menuBindingSpecs[i]
+		add(spec.value(c.Menu), KeyUsage{Label: "메뉴 " + spec.definition.UILabel + " 키", Kind: KeyUsageControl})
+	}
+	for i, skill := range c.Skills {
+		if !skill.Enabled {
+			continue
+		}
+		add(skill.Key, KeyUsage{Label: fmt.Sprintf("기술 %d 출력 키", i+1), Kind: KeyUsageOutput})
+	}
+	add(c.Clicker.Key, KeyUsage{Label: "클릭 반복 출력 키", Kind: KeyUsageOutput})
+
+	conflicts := make([]KeyConflict, 0)
+	for _, vk := range order {
+		usages := usagesByVK[vk]
+		if !keyUsagesConflict(usages) {
+			continue
+		}
+		conflicts = append(conflicts, KeyConflict{
+			Key:    KeyBinding{Name: KeyDisplayName(vk), VK: vk},
+			Usages: append([]KeyUsage(nil), usages...),
+		})
+	}
+	return conflicts
+}
+
+func keyUsagesConflict(usages []KeyUsage) bool {
+	if len(usages) < 2 {
+		return false
+	}
+	controls := 0
+	outputs := 0
+	for _, usage := range usages {
+		switch usage.Kind {
+		case KeyUsageControl:
+			controls++
+		case KeyUsageOutput:
+			outputs++
+		}
+	}
+	return controls >= 2 || (controls >= 1 && outputs >= 1)
 }
 
 // MillisecondsFitDuration reports whether ms can be represented as a nonnegative time.Duration.

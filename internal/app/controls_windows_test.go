@@ -74,6 +74,28 @@ func TestMenuControlsFollowConfigDefinitions(t *testing.T) {
 	}
 }
 
+func TestKeyConflictWarningStatusFormatsFirstConflict(t *testing.T) {
+	cfg := config.Default()
+	cfg.Start = config.KeyBinding{Name: "F1", VK: 0x70}
+	cfg.Stop = config.KeyBinding{Name: "F1", VK: 0x70}
+	cfg.Pause = config.KeyBinding{Name: "F2", VK: 0x71}
+	cfg.Skills[0].Key = config.KeyBinding{Name: "F2", VK: 0x71}
+	cfg.Skills[0].Enabled = true
+
+	got := keyConflictWarningStatus(cfg.KeyConflicts())
+	for _, want := range []string{"키 충돌 경고", "F1", "시작 키", "종료 키", "외 1건"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("keyConflictWarningStatus() = %q, want to contain %q", got, want)
+		}
+	}
+}
+
+func TestKeyConflictWarningStatusReturnsEmptyWithoutConflict(t *testing.T) {
+	if got := keyConflictWarningStatus(config.Default().KeyConflicts()); got != "" {
+		t.Fatalf("keyConflictWarningStatus() = %q, want empty", got)
+	}
+}
+
 func TestBulkIntervalForSkillAppliesGapByRow(t *testing.T) {
 	tests := []struct {
 		name         string

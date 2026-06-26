@@ -1,6 +1,7 @@
 package config
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -213,6 +214,74 @@ func TestMenuBindingsOrderLabelsAndValues(t *testing.T) {
 			t.Fatalf("MenuBindings()[%d] = %+v, want %+v", i, got[i], want[i])
 		}
 	}
+}
+
+func TestKeyConflictsReportsControlAndOutputCollisions(t *testing.T) {
+	cfg := Default()
+	cfg.Start = KeyBinding{Name: "F1", VK: 0x70}
+	cfg.Stop = KeyBinding{Name: "F1", VK: 0x70}
+	cfg.Pause = KeyBinding{Name: "F2", VK: 0x71}
+	cfg.Skills[0].Key = KeyBinding{Name: "F2", VK: 0x71}
+	cfg.Skills[0].Enabled = true
+
+	got := cfg.KeyConflicts()
+	if len(got) != 2 {
+		t.Fatalf("KeyConflicts() length = %d, want 2: %+v", len(got), got)
+	}
+	if got[0].Key != (KeyBinding{Name: "F1", VK: 0x70}) {
+		t.Fatalf("first conflict key = %+v, want F1", got[0].Key)
+	}
+	if labels := keyUsageLabels(got[0]); !reflect.DeepEqual(labels, []string{"시작 키", "종료 키"}) {
+		t.Fatalf("first conflict labels = %v, want start/stop", labels)
+	}
+	if got[1].Key != (KeyBinding{Name: "F2", VK: 0x71}) {
+		t.Fatalf("second conflict key = %+v, want F2", got[1].Key)
+	}
+	if labels := keyUsageLabels(got[1]); !reflect.DeepEqual(labels, []string{"일시정지 키", "기술 1 출력 키"}) {
+		t.Fatalf("second conflict labels = %v, want pause/skill", labels)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v, want nil for non-fatal conflicts", err)
+	}
+}
+
+func TestKeyConflictsReportsMenuAndClickerOutputCollision(t *testing.T) {
+	cfg := Default()
+	cfg.Clicker.Key = KeyBinding{Name: "C", VK: 0x43}
+
+	got := cfg.KeyConflicts()
+	if len(got) != 1 {
+		t.Fatalf("KeyConflicts() length = %d, want 1: %+v", len(got), got)
+	}
+	if got[0].Key != (KeyBinding{Name: "C", VK: 0x43}) {
+		t.Fatalf("conflict key = %+v, want C", got[0].Key)
+	}
+	if labels := keyUsageLabels(got[0]); !reflect.DeepEqual(labels, []string{"메뉴 캐릭터 키", "클릭 반복 출력 키"}) {
+		t.Fatalf("conflict labels = %v, want menu/clicker output", labels)
+	}
+}
+
+func TestKeyConflictsIgnoresDisabledAndOutputOnlyDuplicates(t *testing.T) {
+	cfg := Default()
+	cfg.Skills[0].Key = KeyBinding{Name: "F3", VK: 0x72}
+	cfg.Skills[0].Enabled = false
+	cfg.Clicker.Key = KeyBinding{Name: "F3", VK: 0x72}
+	if got := cfg.KeyConflicts(); len(got) != 0 {
+		t.Fatalf("KeyConflicts() = %+v, want no disabled-skill conflict", got)
+	}
+
+	cfg.Skills[0].Enabled = true
+	if got := cfg.KeyConflicts(); len(got) != 0 {
+		t.Fatalf("KeyConflicts() = %+v, want no output-only conflict", got)
+	}
+}
+
+func keyUsageLabels(conflict KeyConflict) []string {
+	labels := make([]string, 0, len(conflict.Usages))
+	for _, usage := range conflict.Usages {
+		labels = append(labels, usage.Label)
+	}
+	return labels
 }
 
 func TestValidateRejectsInvalidConfig(t *testing.T) {

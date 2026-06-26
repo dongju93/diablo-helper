@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"unsafe"
 
 	"github.com/dongju93/diablo-helper/internal/config"
@@ -438,9 +439,11 @@ func (a *application) handleCommand(wParam uintptr) bool {
 	case id >= idSkillEnabledBase && id < idSkillEnabledBase+config.MaxSkills:
 		idx := id - idSkillEnabledBase
 		a.skillEnabled[idx] = !a.skillEnabled[idx]
+		a.cfg.Skills[idx].Enabled = a.skillEnabled[idx]
 		if hwnd := a.controls.skillEnabled[idx]; hwnd != 0 {
 			invalidateRect(hwnd, true)
 		}
+		a.updateRuntimeStatus()
 	case id >= idSkillKeyBase && id < idSkillKeyBase+config.MaxSkills:
 		a.startCapture(captureTarget{kind: captureSkill, index: id - idSkillKeyBase})
 	case id == idApplyBulk:
@@ -605,7 +608,7 @@ func (a *application) saveConfig() {
 	}
 	a.configPath = path
 	saveLastConfigPath(path)
-	a.setStatus("저장 완료: " + a.configPath)
+	a.setStatusWithKeyConflictWarning("저장 완료: " + a.configPath)
 }
 
 func (a *application) confirmNonTOMLSave(path string) (bool, error) {
@@ -645,7 +648,7 @@ func (a *application) loadConfig() {
 	a.capture = captureTarget{}
 	a.updateControlsFromConfig()
 	a.invalidateCaptureControls(previous)
-	a.setStatus("불러오기 완료: " + a.configPath)
+	a.setStatusWithKeyConflictWarning("불러오기 완료: " + a.configPath)
 }
 
 func (a *application) startRunnerFromHotkey() {
@@ -818,26 +821,53 @@ func (a *application) syncConfigFromControls() error {
 }
 
 func (a *application) updateRuntimeStatus() {
+	status := ""
 	switch {
 	case a.runner.Paused() && a.clicker.Paused():
-		a.setStatus("⏸ 기술 입력과 클릭 반복을 일시정지했습니다.")
+		status = "⏸ 기술 입력과 클릭 반복을 일시정지했습니다."
 	case a.runner.Paused() && a.clicker.Running():
-		a.setStatus("⏸ 기술 입력은 일시정지, 클릭 반복 실행 중.")
+		status = "⏸ 기술 입력은 일시정지, 클릭 반복 실행 중."
 	case a.clicker.Paused() && a.runner.Running():
-		a.setStatus("⏸ 클릭 반복은 일시정지, 기술 반복 실행 중.")
+		status = "⏸ 클릭 반복은 일시정지, 기술 반복 실행 중."
 	case a.runner.Paused():
-		a.setStatus("⏸ 일시정지 키를 누르고 있어 기술 입력을 중지했습니다.")
+		status = "⏸ 일시정지 키를 누르고 있어 기술 입력을 중지했습니다."
 	case a.clicker.Paused():
-		a.setStatus("⏸ 일시정지 키를 누르고 있어 클릭 반복을 중지했습니다.")
+		status = "⏸ 일시정지 키를 누르고 있어 클릭 반복을 중지했습니다."
 	case a.runner.Running() && a.clicker.Running():
-		a.setStatus("▶ 기술 반복과 클릭 반복 실행 중.")
+		status = "▶ 기술 반복과 클릭 반복 실행 중."
 	case a.runner.Running():
-		a.setStatus("▶ 기술 반복 실행 중.")
+		status = "▶ 기술 반복 실행 중."
 	case a.clicker.Running():
-		a.setStatus("▶ 클릭 반복 실행 중.")
+		status = "▶ 클릭 반복 실행 중."
 	default:
-		a.setStatus("■ 정지.")
+		status = "■ 정지."
 	}
+	a.setStatusWithKeyConflictWarning(status)
+}
+
+func (a *application) setStatusWithKeyConflictWarning(status string) {
+	warning := keyConflictWarningStatus(a.cfg.KeyConflicts())
+	if warning != "" {
+		a.setStatus(status + " " + warning)
+		return
+	}
+	a.setStatus(status)
+}
+
+func keyConflictWarningStatus(conflicts []config.KeyConflict) string {
+	if len(conflicts) == 0 {
+		return ""
+	}
+	first := conflicts[0]
+	labels := make([]string, 0, len(first.Usages))
+	for _, usage := range first.Usages {
+		labels = append(labels, usage.Label)
+	}
+	message := fmt.Sprintf("키 충돌 경고: %s 중복 지정(%s).", bindingText(first.Key), strings.Join(labels, ", "))
+	if len(conflicts) > 1 {
+		message += fmt.Sprintf(" 외 %d건.", len(conflicts)-1)
+	}
+	return message
 }
 
 func (a *application) setStatus(text string) {

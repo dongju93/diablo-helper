@@ -210,7 +210,7 @@ func (a *application) assignCapturedKey(vk uint16) {
 	a.capture = captureTarget{}
 	a.updateBindingControl(target)
 	a.invalidateCaptureControls(target)
-	a.setStatus("키 입력 완료.")
+	a.setStatusWithKeyConflictWarning("키 입력 완료.")
 }
 
 func (a *application) clearCapturedKey() {
