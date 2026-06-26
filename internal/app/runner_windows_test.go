@@ -3,12 +3,48 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
 
 	"github.com/dongju93/diablo-helper/internal/config"
 )
+
+func newSkillRunner(sendKey func(vk uint16, hold time.Duration) error) *skillRunner {
+	return newSkillRunnerWithRelease(sendKey, nil)
+}
+
+func newSkillRunnerWithRelease(sendKey func(vk uint16, hold time.Duration) error, release func(vk uint16) error) *skillRunner {
+	return newSkillRunnerWithTimedSend(wrapTestTimedKeySender(sendKey), release)
+}
+
+func newSkillRunnerWithTimedSend(sendKey func(vk uint16, hold time.Duration) (time.Time, error), release func(vk uint16) error) *skillRunner {
+	return newSkillRunnerWithContextTimedSend(func(_ context.Context, vk uint16, hold time.Duration) (time.Time, error) {
+		return sendKey(vk, hold)
+	}, release)
+}
+
+func newClickerRunner(sendKey func(vk uint16, hold time.Duration) error) *clickerRunner {
+	return newClickerRunnerWithRelease(sendKey, nil)
+}
+
+func newClickerRunnerWithRelease(sendKey func(vk uint16, hold time.Duration) error, release func(vk uint16) error) *clickerRunner {
+	return newClickerRunnerWithTimedSend(wrapTestTimedKeySender(sendKey), release)
+}
+
+func newClickerRunnerWithTimedSend(sendKey func(vk uint16, hold time.Duration) (time.Time, error), release func(vk uint16) error) *clickerRunner {
+	return newClickerRunnerWithContextTimedSend(func(_ context.Context, vk uint16, hold time.Duration) (time.Time, error) {
+		return sendKey(vk, hold)
+	}, release)
+}
+
+func wrapTestTimedKeySender(sendKey func(vk uint16, hold time.Duration) error) func(vk uint16, hold time.Duration) (time.Time, error) {
+	return func(vk uint16, hold time.Duration) (time.Time, error) {
+		startedAt := time.Now()
+		return startedAt, sendKey(vk, hold)
+	}
+}
 
 func TestSkillRunnerStartStopState(t *testing.T) {
 	runner := newSkillRunner(func(uint16, time.Duration) error { return nil })

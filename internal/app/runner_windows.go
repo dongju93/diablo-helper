@@ -172,20 +172,6 @@ type skillRunner struct {
 	sendKey contextTimedKeySender
 }
 
-func newSkillRunner(sendKey func(vk uint16, hold time.Duration) error) *skillRunner {
-	return newSkillRunnerWithRelease(sendKey, nil)
-}
-
-func newSkillRunnerWithRelease(sendKey func(vk uint16, hold time.Duration) error, release func(vk uint16) error) *skillRunner {
-	return newSkillRunnerWithTimedSend(wrapTimedKeySender(sendKey), release)
-}
-
-func newSkillRunnerWithTimedSend(sendKey timedKeySender, release func(vk uint16) error) *skillRunner {
-	return newSkillRunnerWithContextTimedSend(func(_ context.Context, vk uint16, hold time.Duration) (time.Time, error) {
-		return sendKey(vk, hold)
-	}, release)
-}
-
 func newSkillRunnerWithContextTimedSend(sendKey contextTimedKeySender, release func(vk uint16) error) *skillRunner {
 	return &skillRunner{
 		runnerCore: newRunnerCore("skill runner", release),
@@ -278,20 +264,6 @@ func skillRunnable(skill config.Skill) bool {
 type clickerRunner struct {
 	runnerCore
 	sendKey contextTimedKeySender
-}
-
-func newClickerRunner(sendKey func(vk uint16, hold time.Duration) error) *clickerRunner {
-	return newClickerRunnerWithRelease(sendKey, nil)
-}
-
-func newClickerRunnerWithRelease(sendKey func(vk uint16, hold time.Duration) error, release func(vk uint16) error) *clickerRunner {
-	return newClickerRunnerWithTimedSend(wrapTimedKeySender(sendKey), release)
-}
-
-func newClickerRunnerWithTimedSend(sendKey timedKeySender, release func(vk uint16) error) *clickerRunner {
-	return newClickerRunnerWithContextTimedSend(func(_ context.Context, vk uint16, hold time.Duration) (time.Time, error) {
-		return sendKey(vk, hold)
-	}, release)
 }
 
 func newClickerRunnerWithContextTimedSend(sendKey contextTimedKeySender, release func(vk uint16) error) *clickerRunner {
@@ -446,16 +418,7 @@ func waitRuntimeStopHandles(handles []runtimeStopHandle) bool {
 	return stoppedAny
 }
 
-type timedKeySender func(vk uint16, hold time.Duration) (time.Time, error)
-
 type contextTimedKeySender func(ctx context.Context, vk uint16, hold time.Duration) (time.Time, error)
-
-func wrapTimedKeySender(sendKey func(vk uint16, hold time.Duration) error) timedKeySender {
-	return func(vk uint16, hold time.Duration) (time.Time, error) {
-		startedAt := time.Now()
-		return startedAt, sendKey(vk, hold)
-	}
-}
 
 type scheduledSkill struct {
 	skill    config.Skill
