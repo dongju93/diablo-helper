@@ -79,13 +79,20 @@ func TestKeyConflictWarningStatusFormatsFirstConflict(t *testing.T) {
 	cfg.Start = config.KeyBinding{Name: "F1", VK: 0x70}
 	cfg.Stop = config.KeyBinding{Name: "F1", VK: 0x70}
 	cfg.Pause = config.KeyBinding{Name: "F2", VK: 0x71}
+	cfg.Clicker.Start = config.KeyBinding{Name: "F3", VK: 0x72}
+	cfg.Clicker.Stop = config.KeyBinding{Name: "F3", VK: 0x72}
 	cfg.Skills[0].Key = config.KeyBinding{Name: "F2", VK: 0x71}
 	cfg.Skills[0].Enabled = true
 
 	got := keyConflictWarningStatus(cfg.KeyConflicts())
-	for _, want := range []string{"키 충돌 경고", "F1", "시작 키", "종료 키", "외 1건"} {
+	for _, want := range []string{"키 충돌 경고", "F2", "일시정지 키", "기술 1 출력 키"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("keyConflictWarningStatus() = %q, want to contain %q", got, want)
+		}
+	}
+	for _, excluded := range []string{"F1", "F3", "시작 키", "종료 키", "클릭 시작 키", "클릭 종료 키", "외 1건"} {
+		if strings.Contains(got, excluded) {
+			t.Fatalf("keyConflictWarningStatus() = %q, want not to contain %q", got, excluded)
 		}
 	}
 }

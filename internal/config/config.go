@@ -539,8 +539,9 @@ func (c Config) Validate() error {
 
 // KeyConflicts reports non-fatal key collisions that can make runtime behavior
 // ambiguous. Control-control duplicates and control-output duplicates are
-// reported; output-output duplicates are left alone because they can be useful
-// for deliberate multi-slot timing.
+// reported, except that matching start and stop keys are treated as one control.
+// Output-output duplicates are left alone because they can be useful for
+// deliberate multi-slot timing.
 func (c Config) KeyConflicts() []KeyConflict {
 	usagesByVK := make(map[int][]KeyUsage)
 	order := make([]int, 0)
@@ -554,11 +555,19 @@ func (c Config) KeyConflicts() []KeyConflict {
 		usagesByVK[binding.VK] = append(usagesByVK[binding.VK], usage)
 	}
 
-	add(c.Start, KeyUsage{Label: "시작 키", Kind: KeyUsageControl})
-	add(c.Stop, KeyUsage{Label: "종료 키", Kind: KeyUsageControl})
+	if c.Start.Assigned() && c.Stop.Assigned() && c.Start.VK == c.Stop.VK {
+		add(c.Start, KeyUsage{Label: "시작/종료 키", Kind: KeyUsageControl})
+	} else {
+		add(c.Start, KeyUsage{Label: "시작 키", Kind: KeyUsageControl})
+		add(c.Stop, KeyUsage{Label: "종료 키", Kind: KeyUsageControl})
+	}
 	add(c.Pause, KeyUsage{Label: "일시정지 키", Kind: KeyUsageControl})
-	add(c.Clicker.Start, KeyUsage{Label: "클릭 시작 키", Kind: KeyUsageControl})
-	add(c.Clicker.Stop, KeyUsage{Label: "클릭 종료 키", Kind: KeyUsageControl})
+	if c.Clicker.Start.Assigned() && c.Clicker.Stop.Assigned() && c.Clicker.Start.VK == c.Clicker.Stop.VK {
+		add(c.Clicker.Start, KeyUsage{Label: "클릭 시작/종료 키", Kind: KeyUsageControl})
+	} else {
+		add(c.Clicker.Start, KeyUsage{Label: "클릭 시작 키", Kind: KeyUsageControl})
+		add(c.Clicker.Stop, KeyUsage{Label: "클릭 종료 키", Kind: KeyUsageControl})
+	}
 	for i := range menuBindingSpecs {
 		spec := menuBindingSpecs[i]
 		add(spec.value(c.Menu), KeyUsage{Label: "메뉴 " + spec.definition.UILabel + " 키", Kind: KeyUsageControl})

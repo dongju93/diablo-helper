@@ -221,24 +221,20 @@ func TestKeyConflictsReportsControlAndOutputCollisions(t *testing.T) {
 	cfg.Start = KeyBinding{Name: "F1", VK: 0x70}
 	cfg.Stop = KeyBinding{Name: "F1", VK: 0x70}
 	cfg.Pause = KeyBinding{Name: "F2", VK: 0x71}
+	cfg.Clicker.Start = KeyBinding{Name: "F3", VK: 0x72}
+	cfg.Clicker.Stop = KeyBinding{Name: "F3", VK: 0x72}
 	cfg.Skills[0].Key = KeyBinding{Name: "F2", VK: 0x71}
 	cfg.Skills[0].Enabled = true
 
 	got := cfg.KeyConflicts()
-	if len(got) != 2 {
-		t.Fatalf("KeyConflicts() length = %d, want 2: %+v", len(got), got)
+	if len(got) != 1 {
+		t.Fatalf("KeyConflicts() length = %d, want 1: %+v", len(got), got)
 	}
-	if got[0].Key != (KeyBinding{Name: "F1", VK: 0x70}) {
-		t.Fatalf("first conflict key = %+v, want F1", got[0].Key)
+	if got[0].Key != (KeyBinding{Name: "F2", VK: 0x71}) {
+		t.Fatalf("conflict key = %+v, want F2", got[0].Key)
 	}
-	if labels := keyUsageLabels(got[0]); !reflect.DeepEqual(labels, []string{"시작 키", "종료 키"}) {
-		t.Fatalf("first conflict labels = %v, want start/stop", labels)
-	}
-	if got[1].Key != (KeyBinding{Name: "F2", VK: 0x71}) {
-		t.Fatalf("second conflict key = %+v, want F2", got[1].Key)
-	}
-	if labels := keyUsageLabels(got[1]); !reflect.DeepEqual(labels, []string{"일시정지 키", "기술 1 출력 키"}) {
-		t.Fatalf("second conflict labels = %v, want pause/skill", labels)
+	if labels := keyUsageLabels(got[0]); !reflect.DeepEqual(labels, []string{"일시정지 키", "기술 1 출력 키"}) {
+		t.Fatalf("conflict labels = %v, want pause/skill", labels)
 	}
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("Validate() error = %v, want nil for non-fatal conflicts", err)
