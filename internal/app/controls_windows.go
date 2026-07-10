@@ -868,33 +868,26 @@ func (a *application) updateControlsFromConfig() {
 	a.updateRuntimeStatus()
 }
 
+func readParsedField(hwnd uintptr, parseFn func(string) (int, error)) (int, error) {
+	text, err := getWindowText(hwnd)
+	if err != nil {
+		return 0, err
+	}
+	return parseFn(text)
+}
+
 func (a *application) applyBulkInterval() {
-	bulkText, err := getWindowText(a.controls.bulkInterval)
+	interval, err := readParsedField(a.controls.bulkInterval, parseInterval)
 	if err != nil {
 		messageBox(a.hwnd, "잘못된 간격", err.Error(), mbOK|mbIconError)
 		return
 	}
-	interval, err := parseInterval(bulkText)
-	if err != nil {
-		messageBox(a.hwnd, "잘못된 간격", err.Error(), mbOK|mbIconError)
-		return
-	}
-	gapText, err := getWindowText(a.controls.bulkSkillGap)
+	skillGap, err := readParsedField(a.controls.bulkSkillGap, parseSkillGap)
 	if err != nil {
 		messageBox(a.hwnd, "잘못된 키별 간격", err.Error(), mbOK|mbIconError)
 		return
 	}
-	skillGap, err := parseSkillGap(gapText)
-	if err != nil {
-		messageBox(a.hwnd, "잘못된 키별 간격", err.Error(), mbOK|mbIconError)
-		return
-	}
-	holdText, err := getWindowText(a.controls.inputHold)
-	if err != nil {
-		messageBox(a.hwnd, "잘못된 눌림 시간", err.Error(), mbOK|mbIconError)
-		return
-	}
-	inputHold, err := parseInputHold(holdText)
+	inputHold, err := readParsedField(a.controls.inputHold, parseInputHold)
 	if err != nil {
 		messageBox(a.hwnd, "잘못된 눌림 시간", err.Error(), mbOK|mbIconError)
 		return
@@ -1136,57 +1129,33 @@ func (a *application) finishAsyncRuntimeStop() {
 
 func (a *application) syncConfigFromControls() error {
 	a.cfg.NormalizeForUI()
-	gapText, err := getWindowText(a.controls.bulkSkillGap)
-	if err != nil {
-		return fmt.Errorf("키별 간격: %w", err)
-	}
-	skillGap, err := parseSkillGap(gapText)
+	skillGap, err := readParsedField(a.controls.bulkSkillGap, parseSkillGap)
 	if err != nil {
 		return fmt.Errorf("키별 간격: %w", err)
 	}
 	a.cfg.SkillGapMS = skillGap
-	holdText, err := getWindowText(a.controls.inputHold)
-	if err != nil {
-		return fmt.Errorf("눌림 시간: %w", err)
-	}
-	inputHold, err := parseInputHold(holdText)
+	inputHold, err := readParsedField(a.controls.inputHold, parseInputHold)
 	if err != nil {
 		return fmt.Errorf("눌림 시간: %w", err)
 	}
 	a.cfg.InputHoldMS = inputHold
-	clickerText, err := getWindowText(a.controls.clickerInterval)
-	if err != nil {
-		return fmt.Errorf("클릭 반복: %w", err)
-	}
-	clickerInterval, err := parseInterval(clickerText)
+	clickerInterval, err := readParsedField(a.controls.clickerInterval, parseInterval)
 	if err != nil {
 		return fmt.Errorf("클릭 반복: %w", err)
 	}
 	a.cfg.Clicker.IntervalMS = clickerInterval
-	clickerHoldText, err := getWindowText(a.controls.clickerHold)
-	if err != nil {
-		return fmt.Errorf("클릭 반복 눌림 시간: %w", err)
-	}
-	clickerHold, err := parseInputHold(clickerHoldText)
+	clickerHold, err := readParsedField(a.controls.clickerHold, parseInputHold)
 	if err != nil {
 		return fmt.Errorf("클릭 반복 눌림 시간: %w", err)
 	}
 	a.cfg.Clicker.InputHoldMS = clickerHold
 	for i := range config.MaxSkills {
-		skillText, err := getWindowText(a.controls.skillInterval[i])
-		if err != nil {
-			return fmt.Errorf("기술 %d: %w", i+1, err)
-		}
-		interval, err := parseInterval(skillText)
+		interval, err := readParsedField(a.controls.skillInterval[i], parseInterval)
 		if err != nil {
 			return fmt.Errorf("기술 %d: %w", i+1, err)
 		}
 		a.cfg.Skills[i].IntervalMS = interval
-		holdText, err := getWindowText(a.controls.skillHold[i])
-		if err != nil {
-			return fmt.Errorf("기술 %d 눌림 시간: %w", i+1, err)
-		}
-		hold, err := parseInputHold(holdText)
+		hold, err := readParsedField(a.controls.skillHold[i], parseInputHold)
 		if err != nil {
 			return fmt.Errorf("기술 %d 눌림 시간: %w", i+1, err)
 		}
