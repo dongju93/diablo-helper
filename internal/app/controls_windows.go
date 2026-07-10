@@ -787,8 +787,8 @@ func (a *application) createControl(parent uintptr, class string, text string, s
 		a.instance,
 		0,
 	)
-	if hwnd != 0 && a.font != 0 {
-		sendMessage(hwnd, wmSetFont, a.font, 1)
+	if hwnd != 0 && a.gdi.font != 0 {
+		sendMessage(hwnd, wmSetFont, a.gdi.font, 1)
 		setWindowTheme(hwnd, "Explorer")
 	}
 	return hwnd

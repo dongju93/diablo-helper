@@ -36,6 +36,21 @@ var (
 	uiStatusStopped = rgb(196, 43, 28) // 빨강 – 정지
 )
 
+type gdiResources struct {
+	font            uintptr
+	titleFont       uintptr
+	sectionFont     uintptr
+	bgBrush         uintptr
+	panelBrush      uintptr
+	editBrush       uintptr
+	borderPen       uintptr
+	borderStrongPen uintptr
+	borderBrush     uintptr
+	accentBrush     uintptr
+	accentPen       uintptr
+	fontScale       float64
+}
+
 func rgb(red byte, green byte, blue byte) uintptr {
 	return uintptr(uint32(red) | uint32(green)<<8 | uint32(blue)<<16)
 }
@@ -44,64 +59,68 @@ func int32Arg(value int32) uintptr {
 	return uintptr(uint32(value))
 }
 
-func (a *application) initUIResources() {
-	scale := a.fontScale
+func (g *gdiResources) init() {
+	scale := g.fontScale
 	if scale <= 0 {
 		scale = 1
 	}
-	if a.font == 0 {
-		a.font = createUIFont("Malgun Gothic", scaledFontHeight(uiFontBaseHeight, scale), fwNormal)
+	if g.font == 0 {
+		g.font = createUIFont("Malgun Gothic", scaledFontHeight(uiFontBaseHeight, scale), fwNormal)
 	}
-	if a.titleFont == 0 {
-		a.titleFont = createUIFont("Segoe UI Variable Display", scaledFontHeight(uiTitleFontBaseHeight, scale), fwSemiBold)
+	if g.titleFont == 0 {
+		g.titleFont = createUIFont("Segoe UI Variable Display", scaledFontHeight(uiTitleFontBaseHeight, scale), fwSemiBold)
 	}
-	if a.sectionFont == 0 {
-		a.sectionFont = createUIFont("Malgun Gothic", scaledFontHeight(uiSectionFontBaseHeight, scale), fwSemiBold)
+	if g.sectionFont == 0 {
+		g.sectionFont = createUIFont("Malgun Gothic", scaledFontHeight(uiSectionFontBaseHeight, scale), fwSemiBold)
 	}
-	if a.bgBrush == 0 {
-		a.bgBrush = createBrush(uiBackground)
+	if g.bgBrush == 0 {
+		g.bgBrush = createBrush(uiBackground)
 	}
-	if a.panelBrush == 0 {
-		a.panelBrush = createBrush(uiPanel)
+	if g.panelBrush == 0 {
+		g.panelBrush = createBrush(uiPanel)
 	}
-	if a.editBrush == 0 {
-		a.editBrush = createBrush(uiPanel)
+	if g.editBrush == 0 {
+		g.editBrush = createBrush(uiPanel)
 	}
-	if a.borderPen == 0 {
-		a.borderPen = createPen(uiBorder, 1)
+	if g.borderPen == 0 {
+		g.borderPen = createPen(uiBorder, 1)
 	}
-	if a.borderStrongPen == 0 {
-		a.borderStrongPen = createPen(uiBorderStrong, 1)
+	if g.borderStrongPen == 0 {
+		g.borderStrongPen = createPen(uiBorderStrong, 1)
 	}
-	if a.borderBrush == 0 {
-		a.borderBrush = createBrush(uiBorder)
+	if g.borderBrush == 0 {
+		g.borderBrush = createBrush(uiBorder)
 	}
-	if a.accentBrush == 0 {
-		a.accentBrush = createBrush(uiAccent)
+	if g.accentBrush == 0 {
+		g.accentBrush = createBrush(uiAccent)
 	}
-	if a.accentPen == 0 {
-		a.accentPen = createPen(uiAccent, 1)
+	if g.accentPen == 0 {
+		g.accentPen = createPen(uiAccent, 1)
 	}
 }
 
-func (a *application) applyUIScale(scale float64) {
+func (g *gdiResources) applyScale(scale float64) bool {
 	if scale <= 0 {
 		scale = 1
 	}
 	scale = clampFloat(scale, uiFontMinScale, uiFontMaxScale)
-	rebuildFonts := a.font == 0 ||
-		a.titleFont == 0 ||
-		a.sectionFont == 0 ||
-		scaledFontHeight(uiFontBaseHeight, a.fontScale) != scaledFontHeight(uiFontBaseHeight, scale) ||
-		scaledFontHeight(uiTitleFontBaseHeight, a.fontScale) != scaledFontHeight(uiTitleFontBaseHeight, scale) ||
-		scaledFontHeight(uiSectionFontBaseHeight, a.fontScale) != scaledFontHeight(uiSectionFontBaseHeight, scale)
+	rebuildFonts := g.font == 0 ||
+		g.titleFont == 0 ||
+		g.sectionFont == 0 ||
+		scaledFontHeight(uiFontBaseHeight, g.fontScale) != scaledFontHeight(uiFontBaseHeight, scale) ||
+		scaledFontHeight(uiTitleFontBaseHeight, g.fontScale) != scaledFontHeight(uiTitleFontBaseHeight, scale) ||
+		scaledFontHeight(uiSectionFontBaseHeight, g.fontScale) != scaledFontHeight(uiSectionFontBaseHeight, scale)
 
-	a.fontScale = scale
+	g.fontScale = scale
 	if rebuildFonts {
-		a.disposeUIFontResources()
+		g.disposeFonts()
 	}
-	a.initUIResources()
-	if rebuildFonts {
+	g.init()
+	return rebuildFonts
+}
+
+func (a *application) applyUIScale(scale float64) {
+	if a.gdi.applyScale(scale) {
 		a.updateControlFonts()
 	}
 }
@@ -163,37 +182,37 @@ func deleteGDIObject(handle uintptr) {
 	}
 }
 
-func (a *application) disposeUIFontResources() {
-	deleteGDIObject(a.font)
-	deleteGDIObject(a.titleFont)
-	deleteGDIObject(a.sectionFont)
-	a.font = 0
-	a.titleFont = 0
-	a.sectionFont = 0
+func (g *gdiResources) disposeFonts() {
+	deleteGDIObject(g.font)
+	deleteGDIObject(g.titleFont)
+	deleteGDIObject(g.sectionFont)
+	g.font = 0
+	g.titleFont = 0
+	g.sectionFont = 0
 }
 
-func (a *application) disposeUIResources() {
-	a.disposeUIFontResources()
-	deleteGDIObject(a.bgBrush)
-	deleteGDIObject(a.panelBrush)
-	deleteGDIObject(a.editBrush)
-	deleteGDIObject(a.borderPen)
-	deleteGDIObject(a.borderStrongPen)
-	deleteGDIObject(a.borderBrush)
-	deleteGDIObject(a.accentBrush)
-	deleteGDIObject(a.accentPen)
-	a.bgBrush = 0
-	a.panelBrush = 0
-	a.editBrush = 0
-	a.borderPen = 0
-	a.borderStrongPen = 0
-	a.borderBrush = 0
-	a.accentBrush = 0
-	a.accentPen = 0
+func (g *gdiResources) dispose() {
+	g.disposeFonts()
+	deleteGDIObject(g.bgBrush)
+	deleteGDIObject(g.panelBrush)
+	deleteGDIObject(g.editBrush)
+	deleteGDIObject(g.borderPen)
+	deleteGDIObject(g.borderStrongPen)
+	deleteGDIObject(g.borderBrush)
+	deleteGDIObject(g.accentBrush)
+	deleteGDIObject(g.accentPen)
+	g.bgBrush = 0
+	g.panelBrush = 0
+	g.editBrush = 0
+	g.borderPen = 0
+	g.borderStrongPen = 0
+	g.borderBrush = 0
+	g.accentBrush = 0
+	g.accentPen = 0
 }
 
 func (a *application) updateControlFonts() {
-	if a.font == 0 {
+	if a.gdi.font == 0 {
 		return
 	}
 	for _, hwnd := range []uintptr{
@@ -235,34 +254,34 @@ func (a *application) updateControlFonts() {
 		a.controls.statusLabel,
 		a.controls.status,
 	} {
-		setControlFont(hwnd, a.font)
+		setControlFont(hwnd, a.gdi.font)
 	}
 	for _, hwnd := range a.controls.menuLabels {
-		setControlFont(hwnd, a.font)
+		setControlFont(hwnd, a.gdi.font)
 	}
 	for _, hwnd := range a.controls.menuButtons {
-		setControlFont(hwnd, a.font)
+		setControlFont(hwnd, a.gdi.font)
 	}
 	for _, hwnd := range a.controls.skillEnabled {
-		setControlFont(hwnd, a.font)
+		setControlFont(hwnd, a.gdi.font)
 	}
 	for _, hwnd := range a.controls.skillNums {
-		setControlFont(hwnd, a.font)
+		setControlFont(hwnd, a.gdi.font)
 	}
 	for _, hwnd := range a.controls.skillButtons {
-		setControlFont(hwnd, a.font)
+		setControlFont(hwnd, a.gdi.font)
 	}
 	for _, hwnd := range a.controls.skillInterval {
-		setControlFont(hwnd, a.font)
+		setControlFont(hwnd, a.gdi.font)
 	}
 	for _, hwnd := range a.controls.skillMsLbls {
-		setControlFont(hwnd, a.font)
+		setControlFont(hwnd, a.gdi.font)
 	}
 	for _, hwnd := range a.controls.skillHold {
-		setControlFont(hwnd, a.font)
+		setControlFont(hwnd, a.gdi.font)
 	}
 	for _, hwnd := range a.controls.skillHoldMsLbls {
-		setControlFont(hwnd, a.font)
+		setControlFont(hwnd, a.gdi.font)
 	}
 }
 
@@ -284,7 +303,7 @@ func (a *application) paint(hwnd uintptr) {
 	procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&client)))
 
 	lo := computeLayout(int(client.Right), int(client.Bottom), a.currentDPI(hwnd))
-	procFillRect.Call(hdc, uintptr(unsafe.Pointer(&client)), a.bgBrush)
+	procFillRect.Call(hdc, uintptr(unsafe.Pointer(&client)), a.gdi.bgBrush)
 
 	// Panels
 	a.drawPanel(hdc, lo.leftX, lo.y(92), lo.leftW, lo.h(126))
@@ -321,12 +340,12 @@ func (a *application) paint(hwnd uintptr) {
 
 	a.drawStatusDot(hdc, lo.statusDotX, lo.y(statusBarY+19), lo.s(10))
 
-	drawText(hdc, "Diablo Helper", a.titleFont, uiText, lo.x(40), lo.y(18), lo.w(300), lo.h(40), dtSingleLine|dtNoPrefix)
-	drawText(hdc, "시작/종료 키", a.sectionFont, uiText, lo.x(layoutLX+20), lo.y(108), lo.w(210), lo.h(28), dtSingleLine|dtNoPrefix)
-	drawText(hdc, "게임 메뉴 키", a.sectionFont, uiText, lo.x(layoutLX+20), lo.y(menuTitleY), lo.w(210), lo.h(28), dtSingleLine|dtNoPrefix)
-	drawText(hdc, "기술 키", a.sectionFont, uiText, lo.rx+lo.w(20), lo.y(108), lo.w(160), lo.h(28), dtSingleLine|dtNoPrefix)
-	drawText(hdc, "클릭 반복", a.sectionFont, uiText, lo.rx+lo.w(20), lo.y(clickerTitleY), lo.w(210), lo.h(28), dtSingleLine|dtNoPrefix)
-	drawText(hdc, "일시정지 키", a.sectionFont, uiText, lo.rx+lo.w(20), lo.y(pauseTitleY), lo.w(180), lo.h(28), dtSingleLine|dtNoPrefix)
+	drawText(hdc, "Diablo Helper", a.gdi.titleFont, uiText, lo.x(40), lo.y(18), lo.w(300), lo.h(40), dtSingleLine|dtNoPrefix)
+	drawText(hdc, "시작/종료 키", a.gdi.sectionFont, uiText, lo.x(layoutLX+20), lo.y(108), lo.w(210), lo.h(28), dtSingleLine|dtNoPrefix)
+	drawText(hdc, "게임 메뉴 키", a.gdi.sectionFont, uiText, lo.x(layoutLX+20), lo.y(menuTitleY), lo.w(210), lo.h(28), dtSingleLine|dtNoPrefix)
+	drawText(hdc, "기술 키", a.gdi.sectionFont, uiText, lo.rx+lo.w(20), lo.y(108), lo.w(160), lo.h(28), dtSingleLine|dtNoPrefix)
+	drawText(hdc, "클릭 반복", a.gdi.sectionFont, uiText, lo.rx+lo.w(20), lo.y(clickerTitleY), lo.w(210), lo.h(28), dtSingleLine|dtNoPrefix)
+	drawText(hdc, "일시정지 키", a.gdi.sectionFont, uiText, lo.rx+lo.w(20), lo.y(pauseTitleY), lo.w(180), lo.h(28), dtSingleLine|dtNoPrefix)
 }
 
 func (a *application) drawPanel(hdc uintptr, x int, y int, width int, height int) {
@@ -334,8 +353,8 @@ func (a *application) drawPanel(hdc uintptr, x int, y int, width int, height int
 		return
 	}
 	corner := maxInt(8, height/8)
-	oldBrush, _, _ := procSelectObject.Call(hdc, a.panelBrush)
-	oldPen, _, _ := procSelectObject.Call(hdc, a.borderPen)
+	oldBrush, _, _ := procSelectObject.Call(hdc, a.gdi.panelBrush)
+	oldPen, _, _ := procSelectObject.Call(hdc, a.gdi.borderPen)
 	procRoundRect.Call(hdc, uintptr(x), uintptr(y), uintptr(x+width), uintptr(y+height), uintptr(corner), uintptr(corner))
 	procSelectObject.Call(hdc, oldPen)
 	procSelectObject.Call(hdc, oldBrush)
@@ -346,8 +365,8 @@ func (a *application) drawInputFrame(hdc uintptr, x int, y int, width int, heigh
 		return
 	}
 	corner := maxInt(4, height/4)
-	oldBrush, _, _ := procSelectObject.Call(hdc, a.panelBrush)
-	oldPen, _, _ := procSelectObject.Call(hdc, a.borderStrongPen)
+	oldBrush, _, _ := procSelectObject.Call(hdc, a.gdi.panelBrush)
+	oldPen, _, _ := procSelectObject.Call(hdc, a.gdi.borderStrongPen)
 	procRoundRect.Call(hdc, uintptr(x), uintptr(y), uintptr(x+width), uintptr(y+height), uintptr(corner), uintptr(corner))
 	procSelectObject.Call(hdc, oldPen)
 	procSelectObject.Call(hdc, oldBrush)
@@ -362,7 +381,7 @@ func (a *application) drawDivider(hdc uintptr, x int, y int, width int) {
 		return
 	}
 	rc := rect{Left: int32(x), Top: int32(y), Right: int32(x + width), Bottom: int32(y + 1)}
-	procFillRect.Call(hdc, uintptr(unsafe.Pointer(&rc)), a.borderBrush)
+	procFillRect.Call(hdc, uintptr(unsafe.Pointer(&rc)), a.gdi.borderBrush)
 }
 
 func (a *application) drawAccentMark(hdc uintptr, x int, y int, width int, height int) {
@@ -370,8 +389,8 @@ func (a *application) drawAccentMark(hdc uintptr, x int, y int, width int, heigh
 		return
 	}
 	corner := maxInt(2, height/6)
-	oldBrush, _, _ := procSelectObject.Call(hdc, a.accentBrush)
-	oldPen, _, _ := procSelectObject.Call(hdc, a.accentPen)
+	oldBrush, _, _ := procSelectObject.Call(hdc, a.gdi.accentBrush)
+	oldPen, _, _ := procSelectObject.Call(hdc, a.gdi.accentPen)
 	procRoundRect.Call(hdc, uintptr(x), uintptr(y), uintptr(x+width), uintptr(y+height), uintptr(corner), uintptr(corner))
 	procSelectObject.Call(hdc, oldPen)
 	procSelectObject.Call(hdc, oldBrush)
@@ -426,7 +445,7 @@ func drawText(hdc uintptr, text string, font uintptr, color uintptr, x int, y in
 }
 
 func (a *application) colorStatic(hdc uintptr, hwndCtl uintptr) uintptr {
-	a.initUIResources()
+	a.gdi.init()
 	procSetBkMode.Call(hdc, transparent)
 	if hwndCtl != 0 && hwndCtl == a.controls.status {
 		color := a.statusTextColor()
@@ -434,7 +453,7 @@ func (a *application) colorStatic(hdc uintptr, hwndCtl uintptr) uintptr {
 	} else {
 		procSetTextColor.Call(hdc, uiText)
 	}
-	return a.panelBrush
+	return a.gdi.panelBrush
 }
 
 // statusTextColor returns the colour that should be used for the status text
@@ -455,17 +474,17 @@ func (a *application) anyPaused() bool {
 }
 
 func (a *application) colorEdit(hdc uintptr) uintptr {
-	a.initUIResources()
+	a.gdi.init()
 	procSetBkColor.Call(hdc, uiPanel)
 	procSetTextColor.Call(hdc, uiText)
-	return a.editBrush
+	return a.gdi.editBrush
 }
 
 func (a *application) drawButton(item *drawItemStruct) {
 	if item == nil || item.HDC == 0 {
 		return
 	}
-	a.initUIResources()
+	a.gdi.init()
 
 	text, _ := getWindowText(item.HwndItem)
 	id := int(item.CtlID)
@@ -526,13 +545,13 @@ func (a *application) drawButton(item *drawItemStruct) {
 		text = "미지정"
 	}
 
-	baseBrush := a.panelBrush
+	baseBrush := a.gdi.panelBrush
 	if id == idLoad || id == idSave {
-		baseBrush = a.bgBrush
+		baseBrush = a.gdi.bgBrush
 	}
 	procFillRect.Call(item.HDC, uintptr(unsafe.Pointer(&item.RcItem)), baseBrush)
 	a.fillRoundedButton(item.HDC, item.RcItem, fill, border, focused || capturing)
-	drawTextInRect(item.HDC, text, a.font, textColor, item.RcItem, dtCenter|dtVCenter|dtSingleLine|dtEndEllipsis|dtNoPrefix)
+	drawTextInRect(item.HDC, text, a.gdi.font, textColor, item.RcItem, dtCenter|dtVCenter|dtSingleLine|dtEndEllipsis|dtNoPrefix)
 }
 
 func (a *application) fillRoundedButton(hdc uintptr, rc rect, fill uintptr, border uintptr, strongBorder bool) {
@@ -566,7 +585,7 @@ func (a *application) fillRoundedButton(hdc uintptr, rc rect, fill uintptr, bord
 // right (ON) side of the track with a small margin.
 func (a *application) drawToggleSwitch(hdc uintptr, rc rect, on bool, hovered bool, pressed bool) {
 	// Clear background with panel colour so the control blends in.
-	procFillRect.Call(hdc, uintptr(unsafe.Pointer(&rc)), a.panelBrush)
+	procFillRect.Call(hdc, uintptr(unsafe.Pointer(&rc)), a.gdi.panelBrush)
 
 	// Track colours
 	var trackColor uintptr

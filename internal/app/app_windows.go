@@ -25,18 +25,7 @@ type application struct {
 	instance           uintptr
 	hook               uintptr
 	mouseHook          uintptr
-	font               uintptr
-	titleFont          uintptr
-	sectionFont        uintptr
-	bgBrush            uintptr
-	panelBrush         uintptr
-	editBrush          uintptr
-	borderPen          uintptr
-	borderStrongPen    uintptr
-	borderBrush        uintptr
-	accentBrush        uintptr
-	accentPen          uintptr
-	fontScale          float64
+	gdi                gdiResources
 	dpi                int
 	configPath         string
 	cfg                config.Config
@@ -298,7 +287,7 @@ func (a *application) cleanup() {
 		appInstance = nil
 	}
 	a.runtimeInputTarget.Store(0)
-	a.disposeUIResources()
+	a.gdi.dispose()
 }
 
 func (a *application) startSignalHandler() {
