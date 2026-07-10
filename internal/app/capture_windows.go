@@ -31,24 +31,24 @@ type captureTarget struct {
 }
 
 // pressedKeys keeps repeat-suppression state as bits instead of heap map keys.
-type pressedKeys [4]uint64
+type pressedKeys [(maxVK + 1) / 64]uint64
 
 func (p *pressedKeys) set(vk uint16) {
-	if vk > 255 {
+	if vk > maxVK {
 		return
 	}
 	p[vk/64] |= uint64(1) << (vk % 64)
 }
 
 func (p *pressedKeys) clear(vk uint16) {
-	if vk > 255 {
+	if vk > maxVK {
 		return
 	}
 	p[vk/64] &^= uint64(1) << (vk % 64)
 }
 
 func (p *pressedKeys) has(vk uint16) bool {
-	if vk > 255 {
+	if vk > maxVK {
 		return false
 	}
 	return p[vk/64]&(uint64(1)<<(vk%64)) != 0

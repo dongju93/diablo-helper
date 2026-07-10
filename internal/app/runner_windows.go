@@ -337,10 +337,10 @@ func clickerRunnable(clicker config.Clicker) bool {
 
 func skillOutputKeys(skills []config.Skill) []uint16 {
 	keys := make([]uint16, 0, len(skills))
-	var seen [256]bool
+	var seen [maxVK + 1]bool
 	for _, skill := range skills {
 		vk := skill.Key.VK
-		if vk <= 0 || vk > 255 || seen[vk] {
+		if vk <= 0 || vk > maxVK || seen[vk] {
 			continue
 		}
 		seen[vk] = true

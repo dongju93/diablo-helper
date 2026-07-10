@@ -3,6 +3,7 @@
 package app
 
 const (
+	maxVK      = 0xFF
 	vkLButton  = 0x01
 	vkRButton  = 0x02
 	vkMButton  = 0x04

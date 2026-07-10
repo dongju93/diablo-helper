@@ -18,6 +18,8 @@ import (
 // negative values are rejected by Validate instead of being silently replaced.
 const missingInputHoldMS = -1
 
+const fileAttributeReparsePoint = 0x400
+
 // SaveOptions controls validation rules used when writing config files.
 type SaveOptions struct {
 	// AllowNonTOMLExtension allows SaveFileWithOptions to write paths without
@@ -190,7 +192,7 @@ func fileInfoIsReparsePoint(info os.FileInfo) bool {
 	if !attributes.IsValid() || !attributes.CanUint() {
 		return false
 	}
-	return attributes.Uint()&0x400 != 0
+	return attributes.Uint()&fileAttributeReparsePoint != 0
 }
 
 // MarshalTOML normalizes cfg for UI/save shape, validates it, and writes

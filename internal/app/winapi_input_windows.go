@@ -35,7 +35,7 @@ func (t *injectedInputTracker) keys() []uint16 {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	keys := make([]uint16, 0, 4)
-	for vk := uint16(0); vk < 256; vk++ {
+	for vk := uint16(0); vk <= maxVK; vk++ {
 		if t.down.has(vk) {
 			keys = append(keys, vk)
 		}
