@@ -184,6 +184,7 @@ func (r *skillRunner) Start(cfg config.Config) bool {
 }
 
 func (r *skillRunner) StartContext(parent context.Context, cfg config.Config) bool {
+	cfg.Skills = append([]config.Skill(nil), cfg.Skills...)
 	cfg.NormalizeForUI()
 	skills := runnableSkills(cfg)
 	if len(skills) == 0 {
