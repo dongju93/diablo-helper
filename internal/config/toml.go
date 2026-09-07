@@ -12,12 +12,6 @@ import (
 	"strings"
 )
 
-// missingInputHoldMS is the sentinel value used during TOML parsing to mean
-// "the key was not present in the file". It is distinct from any explicit
-// user-supplied value, including 0 or other negatives, so that malformed
-// negative values are rejected by Validate instead of being silently replaced.
-const missingInputHoldMS = -1
-
 const fileAttributeReparsePoint = 0x400
 
 // SaveOptions controls validation rules used when writing config files.
@@ -238,7 +232,10 @@ func MarshalTOML(cfg Config) ([]byte, error) {
 func ParseTOML(data []byte) (Config, error) {
 	cfg := Default()
 	cfg.Skills = nil
-	cfg.Clicker.InputHoldMS = missingInputHoldMS
+	// Track presence separately so explicit values, including negatives, reach
+	// Validate unchanged. Presence is only needed at the parsing boundary.
+	var clickerHoldPresent bool
+	var skillHoldPresent [MaxSkills]bool
 
 	var currentSkill *Skill
 	scanner := bufio.NewScanner(bytes.NewReader(data))
@@ -252,10 +249,9 @@ func ParseTOML(data []byte) (Config, error) {
 				return Config{}, fmt.Errorf("line %d: too many [[skills]] sections (max %d)", lineNumber, MaxSkills)
 			}
 			cfg.Skills = append(cfg.Skills, Skill{
-				Name:        fmt.Sprintf("Skill %d", len(cfg.Skills)+1),
-				IntervalMS:  DefaultIntervalMS,
-				InputHoldMS: missingInputHoldMS,
-				Enabled:     DefaultSkillEnabled,
+				Name:       fmt.Sprintf("Skill %d", len(cfg.Skills)+1),
+				IntervalMS: DefaultIntervalMS,
+				Enabled:    DefaultSkillEnabled,
 			})
 			currentSkill = &cfg.Skills[len(cfg.Skills)-1]
 			continue
@@ -278,17 +274,31 @@ func ParseTOML(data []byte) (Config, error) {
 			if err := setSkillValue(currentSkill, key, value); err != nil {
 				return Config{}, fmt.Errorf("line %d: %w", lineNumber, err)
 			}
+			if key == "hold_ms" {
+				skillHoldPresent[len(cfg.Skills)-1] = true
+			}
 			continue
 		}
 		if err := setTopLevelValue(&cfg, key, value); err != nil {
 			return Config{}, fmt.Errorf("line %d: %w", lineNumber, err)
+		}
+		if key == "clicker_hold_ms" {
+			clickerHoldPresent = true
 		}
 	}
 	if err := scanner.Err(); err != nil {
 		return Config{}, err
 	}
 
-	fillMissingInputHolds(&cfg)
+	// Legacy files inherit the final global hold only for omitted fields.
+	if !clickerHoldPresent {
+		cfg.Clicker.InputHoldMS = cfg.InputHoldMS
+	}
+	for i := range cfg.Skills {
+		if !skillHoldPresent[i] {
+			cfg.Skills[i].InputHoldMS = cfg.InputHoldMS
+		}
+	}
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err
 	}
@@ -372,17 +382,6 @@ func setSkillValue(skill *Skill, key string, value string) error {
 		return setBool(&skill.Enabled, value)
 	default:
 		return fmt.Errorf("unknown skill key %q", key)
-	}
-}
-
-func fillMissingInputHolds(cfg *Config) {
-	if cfg.Clicker.InputHoldMS == missingInputHoldMS {
-		cfg.Clicker.InputHoldMS = cfg.InputHoldMS
-	}
-	for i := range cfg.Skills {
-		if cfg.Skills[i].InputHoldMS == missingInputHoldMS {
-			cfg.Skills[i].InputHoldMS = cfg.InputHoldMS
-		}
 	}
 }
 

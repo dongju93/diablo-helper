@@ -409,6 +409,126 @@ enabled = true
 	}
 }
 
+func TestParseTOMLInputHoldPresence(t *testing.T) {
+	for _, global := range []struct {
+		name  string
+		input string
+		want  int
+	}{
+		{name: "default", want: DefaultInputHoldMS},
+		{name: "explicit global", input: "input_hold_ms = 35\n", want: 35},
+	} {
+		for target := -1; target < MaxSkills; target++ {
+			field, errorPrefix := "clicker_hold_ms", "clicker input hold"
+			if target >= 0 {
+				field, errorPrefix = "hold_ms", fmt.Sprintf("skill %d input hold", target+1)
+			}
+			for _, tt := range []struct {
+				name      string
+				value     string
+				want      int
+				wantError string
+			}{
+				{name: "omitted", want: global.want},
+				{name: "negative one", value: "-1", wantError: "must be at least"},
+				{name: "zero", value: "0", wantError: "must be at least"},
+				{name: "minimum", value: "1", want: 1},
+				{name: "maximum", value: "1000", want: 1000},
+				{name: "above maximum", value: "1001", wantError: "must be at most"},
+			} {
+				t.Run(global.name+"/"+errorPrefix+"/"+tt.name, func(t *testing.T) {
+					var input strings.Builder
+					if target == -1 && tt.value != "" {
+						fmt.Fprintf(&input, "%s = %s\n", field, tt.value)
+					}
+					// The global value may follow the explicit clicker value.
+					input.WriteString(global.input)
+					for i := 0; i <= min(max(target+1, 0), MaxSkills-1); i++ {
+						input.WriteString("[[skills]]\n")
+						if i == target && tt.value != "" {
+							fmt.Fprintf(&input, "%s = %s\n", field, tt.value)
+						}
+					}
+					cfg, err := ParseTOML([]byte(input.String()))
+					if tt.wantError != "" {
+						wantError := errorPrefix + " " + tt.wantError
+						if err == nil || !strings.Contains(err.Error(), wantError) {
+							t.Fatalf("ParseTOML() error = %v, want %q", err, wantError)
+						}
+						return
+					}
+					if err != nil {
+						t.Fatalf("ParseTOML() error = %v", err)
+					}
+					if cfg.InputHoldMS != global.want {
+						t.Fatalf("input hold = %d, want %d", cfg.InputHoldMS, global.want)
+					}
+					wantClicker := global.want
+					if target == -1 {
+						wantClicker = tt.want
+					}
+					if cfg.Clicker.InputHoldMS != wantClicker {
+						t.Fatalf("clicker hold = %d, want %d", cfg.Clicker.InputHoldMS, wantClicker)
+					}
+					if len(cfg.Skills) != MaxSkills {
+						t.Fatalf("skills length = %d, want %d", len(cfg.Skills), MaxSkills)
+					}
+					for i, skill := range cfg.Skills {
+						want := global.want
+						if i == target {
+							want = tt.want
+						}
+						if skill.InputHoldMS != want {
+							t.Fatalf("skill %d hold = %d, want %d", i+1, skill.InputHoldMS, want)
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestParseTOMLInputHoldDuplicateLastValueWins(t *testing.T) {
+	for _, field := range []struct {
+		name   string
+		prefix string
+	}{
+		{name: "clicker_hold_ms"},
+		{name: "hold_ms", prefix: "[[skills]]\n"},
+	} {
+		for _, tt := range []struct {
+			first string
+			last  string
+			valid bool
+		}{
+			{first: "-1", last: "1", valid: true},
+			{first: "1000", last: "1", valid: true},
+			{first: "1", last: "-1"},
+		} {
+			t.Run(field.name+"/"+tt.first+" to "+tt.last, func(t *testing.T) {
+				input := fmt.Sprintf("%s%s = %s\n%s = %s\n", field.prefix, field.name, tt.first, field.name, tt.last)
+				cfg, err := ParseTOML([]byte(input))
+				if !tt.valid {
+					if err == nil || !strings.Contains(err.Error(), "input hold must be at least") {
+						t.Fatalf("ParseTOML() error = %v, want input hold minimum error", err)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatalf("ParseTOML() error = %v", err)
+				}
+				hold := cfg.Clicker.InputHoldMS
+				if field.name == "hold_ms" {
+					hold = cfg.Skills[0].InputHoldMS
+				}
+				if hold != 1 {
+					t.Fatalf("hold = %d, want last value 1", hold)
+				}
+			})
+		}
+	}
+}
+
 func TestSaveFileAndLoadFileRoundTrip(t *testing.T) {
 	cfg := Default()
 	cfg.Start = KeyBinding{Name: "F5", VK: 0x74}
